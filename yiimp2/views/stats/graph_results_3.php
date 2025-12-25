@@ -1,22 +1,17 @@
 <?php
 
-$algo = user()->getState('yaamp-algo');
+use app\models\Hashstats;
+use Yii;
 
+// Set JSON response header
+Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+$algo = Yii::$app->YiimpUtils->getCurrentAlgo();
 $t = time() - 48*60*60;
-$stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
 
-$algo_unit_factor = yaamp_algo_mBTC_factor($algo);
+$algo_unit_factor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
 
-echo '[';
+$data = Hashstats::getBtcPerUnitChartData($algo, $t, $algo_unit_factor);
 
-foreach($stats as $i=>$n)
-{
-	$m = $n->hashrate ? bitcoinvaluetoa($n->earnings * 24 * $algo_unit_factor * 1000000/$n->hashrate): 0;
-
-	if($i) echo ',';
-	$d = date('Y-m-d H:i:s', $n->time);
-	echo "[\"$d\",$m]";
-}
-
-echo ']';
+return $data;
 

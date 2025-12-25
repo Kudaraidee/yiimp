@@ -1,0 +1,2 @@
+# This file ensures the chartjs-adapter-date-fns vendor directory is tracked by git
+# Chart.js adapter files will be installed here during Docker build process

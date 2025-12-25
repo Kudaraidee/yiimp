@@ -1,0 +1,82 @@
+# Test environment Dockerfile
+FROM ubuntu:24.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    php8.3 \
+    php8.3-cli \
+    php8.3-curl \
+    php8.3-gd \
+    php8.3-intl \
+    php8.3-mbstring \
+    php8.3-mysql \
+    php8.3-xml \
+    php8.3-zip \
+    php8.3-bcmath \
+    php8.3-memcache \
+    mysql-client \
+    git \
+    unzip \
+    curl \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI for container inspection tests
+RUN install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+    && chmod a+r /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update \
+    && apt-get install -y docker-ce-cli \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Set working directory
+WORKDIR /app
+
+# Copy application files
+COPY yiimp2 /app/yiimp2
+COPY sql /app/sql
+COPY bin /app/bin
+COPY config /app/config
+COPY web /app/web
+COPY stratum /app/stratum
+COPY docker-compose.yml /app/docker-compose.yml
+COPY docker-compose.test.yml /app/docker-compose.test.yml
+COPY run-tests.sh /app/run-tests.sh
+RUN chmod +x /app/run-tests.sh
+
+# Install PHP dependencies
+WORKDIR /app/yiimp2
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+
+# Create necessary directories
+RUN mkdir -p /app/test-results \
+    && mkdir -p /app/yiimp2/runtime \
+    && mkdir -p /app/yiimp2/web/assets \
+    && mkdir -p /app/yiimp2/tests/_output \
+    && chmod -R 777 /app/yiimp2/runtime \
+    && chmod -R 777 /app/yiimp2/web/assets \
+    && chmod -R 777 /app/yiimp2/tests/_output \
+    && chmod -R 777 /app/test-results
+
+# Create test configuration
+RUN echo '<?php\n\
+return [\n\
+    "class" => "yii\\db\\Connection",\n\
+    "dsn" => "mysql:host=" . getenv("DB_HOST") . ";dbname=" . getenv("DB_NAME"),\n\
+    "username" => getenv("DB_USER"),\n\
+    "password" => getenv("DB_PASSWORD"),\n\
+    "charset" => "utf8",\n\
+];' > /app/yiimp2/config/db-test.php
+
+# Set entrypoint
+ENTRYPOINT ["/app/run-tests.sh"]
+CMD ["all"]

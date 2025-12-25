@@ -1,121 +1,77 @@
 <?php
 
 use yii\helpers\Html;
-use app\components\rpc\WalletRPC;
-use app\models\Coins;
+use yii\helpers\Url;
 
-echo <<<end
-<script type="text/javascript">
-function wallet_peers(id)
-{
-	var w = window.open("/explorer/peers?id=" + id, "peers",
-		"width=400,height=600,location=no,menubar=no,resizable=yes,status=no,toolbar=no");
-}
-</script>
+/* @var $this yii\web\View */
+/* @var $coins app\models\Coins[] */
 
-<style type="text/css">
-a.low { color: red; font-weight: bold; }
-</style>
+$this->title = 'Block Explorer';
+$this->params['breadcrumbs'][] = $this->title;
+?>
 
-<br/>
-<div class="main-left-box">
-<div class="main-left-title">Block Explorer</div>
-<div class="main-left-inner">
-end;
+<div class="explorer-index">
+    <h1><?= Html::encode($this->title) ?></h1>
 
-Yii::$app->ViewUtils->showTableSorter('maintable', "{
-	tableClass: 'dataGrid2',
-	textExtraction: {
-		6: function(node, table, n) { return $(node).attr('data'); },
-		8: function(node, table, n) { return $(node).attr('data'); }
-	}
-}");
-
-echo <<<end
-<thead>
-<tr>
-<th width="30" data-sorter=""></th>
-<th>Name</th>
-<th>Symbol</th>
-<th>Algo</th>
-<th>Version</th>
-<th>Height</th>
-<th>Difficulty</th>
-<th>Connections</th>
-<th>Network Hash</th>
-<th data-sorter=""></th>
-</tr>
-</thead><tbody>
-end;
-
-$list = Coins::find()->where(['enable' => 1, 'visible' => 1])->orderBy('name')->all();
-
-foreach($list as $coin)
-{
-	if($coin->symbol == 'BTC') continue;
-	if(!empty($coin->symbol2)) continue;
-
-	$coin->version = Yii::$app->ConversionUtils->formatWalletVersion($coin);
-
-	$coin->network_hash = Yii::$app->cache->get("yiimp-nethashrate-{$coin->symbol}");
-	if (!$coin->network_hash) {
-		$remote = new WalletRPC($coin);
-		if ($remote)
-			$info = $remote->getmininginfo();
-		if (isset($info['networkhashps'])) {
-			if (is_array($info['networkhashps'])) {
-				if (isset($info['networkhashps'][$coin->algo])) {
-					$coin->network_hash = $info['networkhashps'][$coin->algo];
-				}
-			}
-			else $coin->network_hash = $info['networkhashps'];
-			Yii::$app->cache->set("yiimp-nethashrate-{$coin->symbol}", $coin->network_hash, 60);
-		}
-		else if (isset($info['netmhashps'])) {
-			$coin->network_hash = floatval($info['netmhashps']) * 1e6;
-			Yii::$app->cache->set("yiimp-nethashrate-{$coin->symbol}", $coin->network_hash, 60);
-		}
-	}
-
-	$difficulty = Yii::$app->ConversionUtils->Itoa2($coin->difficulty, 3);
-	$nethash_sfx = $coin->network_hash? strtoupper(Yii::$app->ConversionUtils->Itoa2($coin->network_hash)).'H/s': '';
-
-	echo '<tr class="ssrow">';
-	echo '<td><img src="'.$coin->image.'" width="18"></td>';
-
-	echo '<td><b>'.$coin->createExplorerLink($coin->name).'</a></b></td>';
-	echo '<td><b>'.$coin->symbol.'</b></td>';
-
-	echo '<td>'.$coin->algo.'</td>';
-	echo '<td>'.$coin->version.'</td>';
-
-	echo '<td>'.$coin->block_height.'</td>';
-	$diffnote = '';
-	if ($coin->algo == 'equihash' || $coin->algo == 'quark') $diffnote = '*';
-	echo '<td data="'.$coin->difficulty.'">'.$difficulty.$diffnote.'</td>';
-	$cnx_class = (intval($coin->connections) > 3) ? '' : 'low';
-	$peers_link = Html::a($coin->connections, "javascript:wallet_peers({$coin->id});", array('class'=>$cnx_class));
-	echo '<td>'.$peers_link.'</td>';
-	echo '<td data="'.$coin->network_hash.'">'.$nethash_sfx.'</td>';
-
-	echo "<td>";
-
-	if(!empty($coin->link_bitcointalk))
-		echo Html::a('forum', $coin->link_bitcointalk, array('target'=>'_blank'));
-
-	elseif(!empty($coin->link_site))
-		echo Html::a('site', $coin->link_site, array('target'=>'_blank'));
-
-	echo "</td>";
-	echo "</tr>";
-}
-
-echo <<<end
-</tbody>
-</table>
-<p style="font-size: .8em;">
-	&nbsp;* Unified difficulty based on the hash target (might be different than wallet one)<br/>
-</p>
-</div></div>
-
-end;
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Available Coins</h3>
+                </div>
+                <div class="card-body">
+                    <p>Select a coin to explore its blockchain:</p>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Coin</th>
+                                    <th>Symbol</th>
+                                    <th>Algorithm</th>
+                                    <th>Current Height</th>
+                                    <th>Difficulty</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($coins as $coin): ?>
+                                <tr>
+                                    <td>
+                                        <?php if (!empty($coin->image)): ?>
+                                            <img src="<?= Html::encode($coin->image) ?>" alt="<?= Html::encode($coin->name) ?>" class="img-24 mr-8">
+                                        <?php endif; ?>
+                                        <?= Html::encode($coin->name) ?>
+                                    </td>
+                                    <td><strong><?= Html::encode($coin->getOfficialSymbol()) ?></strong></td>
+                                    <td><?= Html::encode($coin->algo) ?></td>
+                                    <td>
+                                        <?php
+                                        // Get latest block height from blocks table
+                                        $latestBlock = \app\models\Blocks::find()
+                                            ->where(['coinid' => $coin->id])
+                                            ->orderBy(['height' => SORT_DESC])
+                                            ->one();
+                                        echo $latestBlock ? number_format($latestBlock->height) : 'N/A';
+                                        ?>
+                                    </td>
+                                    <td><?= $coin->difficulty ? number_format($coin->difficulty, 8) : 'N/A' ?></td>
+                                    <td>
+                                        <?= Html::a('Explore', ['coin', 'symbol' => $coin->getOfficialSymbol()], ['class' => 'btn btn-sm btn-primary']) ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                                
+                                <?php if (empty($coins)): ?>
+                                <tr>
+                                    <td colspan="6" class="text-center">No coins available for exploration.</td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

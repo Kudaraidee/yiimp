@@ -2,14 +2,16 @@
 
 use app\models\Coins;
 use app\models\Mining;
+use app\components\DynamicStyleManager;
 
-function valuetocell($amount) {
+// Helper function as closure to avoid redeclaration
+$valuetocell = function($amount) {
 	$html = $amount ? Yii::$app->ConversionUtils->bitcoinvaluetoa($amount) : '-';
 	//$html = rtrim($html,'0');
 	//$html = rtrim($html,'.');
 	$html = preg_replace('/([0]+)$/', '<span class="eov">${1}</span>', $html);
 	return $html;
-}
+};
 
 /////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,8 +81,8 @@ foreach($coins as $coin)
 	$lowsymbol = strtolower($coin->symbol);
 	echo '<td><img src="'.$coin->image.'" width="24"></td>';
 
-	$algo_color = Yii::$app->YiimpUtils->getAlgoColors($coin->algo);
-	echo '<td class="status" style="background-color: '.$algo_color.';">';
+	$algoColorClass = DynamicStyleManager::getAlgoColorClass($coin->algo);
+	echo '<td class="status ' . $algoColorClass . '">';
 
 	if(!$coin->enable) echo '<span class="hidden" title="Coin disabled">X</span>';
 	else if($coin->auto_ready) echo '<span class="green" title="Auto enable">A</span>';
@@ -112,20 +114,20 @@ foreach($coins as $coin)
 	$version = Yii::$app->ConversionUtils->formatWalletVersion($coin);
 	if (!empty($coin->symbol2)) $version .= " ({$coin->symbol2})";
 
-	echo "<td><b><a href='/admin/coinwallet?id=$coin->id'>$coin->name ($coin->symbol)</a></b>
-		<br><span style='font-size: .8em'>$version</span></td>";
+	echo '<td><b>' . \yii\helpers\Html::a($coin->name . ' (' . $coin->symbol . ')', ['coinwallet', 'id' => $coin->id]) . '</b>
+		<br><span class="text-small">' . $version . '</span></td>';
 
 	echo "<td>$coin->rpchost:$coin->rpcport";
 	if($coin->connections) echo " ($coin->connections)";
-	echo "<br><span style='font-size: .8em'>$coin->rpcencoding <span style='background-color:$algo_color;'>&nbsp; ($coin->algo) &nbsp;</span></span></td>";
+	echo "<br><span class='text-small'>$coin->rpcencoding <span class='{$algoColorClass}'>&nbsp; ($coin->algo) &nbsp;</span></span></td>";
 
 	$difficulty = Yii::$app->ConversionUtils->Itoa2($coin->difficulty, 3);
 	if ($coin->difficulty > 1e20) $difficulty = '&nbsp;';
 
 	if(!empty($coin->errors))
-		echo '<td align="right" style="font-size: .9em;" class="red" title="'.$coin->errors.'"><b>'.$difficulty.'</b><br/>'.$coin->block_height.'</td>';
+		echo '<td align="right" class="text-smaller red" title="'.$coin->errors.'"><b>'.$difficulty.'</b><br/>'.$coin->block_height.'</td>';
 	else
-		echo '<td align="right" style="font-size: .9em;"><b>'.$difficulty.'</b><br>'.$coin->block_height.'</td>';
+		echo '<td align="right" class="text-smaller"><b>'.$difficulty.'</b><br>'.$coin->block_height.'</td>';
 
 	$btcmhd = Yii::$app->YiimpUtils->yiimp_profitability($coin);
 	$btcmhd = Yii::$app->ConversionUtils->mbitcoinvaluetoa($btcmhd);
@@ -149,7 +151,7 @@ foreach($coins as $coin)
 	$percent_pool1 = $ss1? $ss1.'%': '';
 	$percent_pool2 = $ss2? $ss2.'%': '';
 
-	echo '<td align="right" style="font-size: .9em;" title="Pool % of last 100 net blocks">';
+	echo '<td align="right" class="text-smaller" title="Pool % of last 100 net blocks">';
 	if($ss1 > 50)
 		echo '<b>'.$btcmhd.'</b><br/><span class="blue">'.$percent_pool1.'</span>';
 	else
@@ -160,33 +162,33 @@ foreach($coins as $coin)
 	$price2 = Yii::$app->ConversionUtils->bitcoinvaluetoa($coin->price2);
 
 	if($coin->dontsell && YAAMP_ALLOW_EXCHANGE)
-		echo "<td align=right style='font-size: .9em; background-color: #ffaaaa'>$price<br>$price2</td>";
+		echo "<td align=right class='text-smaller price-warning'>$price<br>$price2</td>";
 	else
-		echo "<td align=right style='font-size: .9em'>$price<br>$price2</td>";
+		echo "<td align=right class='text-smaller'>$price<br>$price2</td>";
 
-	$cell = valuetocell($coin->mint).'<br/>'.valuetocell($coin->cleared);
+	$cell = $valuetocell($coin->mint).'<br/>'.$valuetocell($coin->cleared);
 
 	if($coin->balance+$coin->mint < $coin->cleared)
-		echo '<td align="right" style="font-size: .9em;"><span class="red">'.$cell.'</span></td>';
+		echo '<td align="right" class="text-smaller"><span class="red">'.$cell.'</span></td>';
 	else
-		echo '<td align="right" style="font-size: .9em;">'.$cell.'</td>';
+		echo '<td align="right" class="text-smaller">'.$cell.'</td>';
 
-	$cell = valuetocell($coin->balance).'<br/>'.valuetocell($coin->available);
-	echo '<td align="right" style="font-size: .9em;">'.$cell.'</td>';
+	$cell = $valuetocell($coin->balance).'<br/>'.$valuetocell($coin->available);
+	echo '<td align="right" class="text-smaller">'.$cell.'</td>';
 
 	$btc = Yii::$app->ConversionUtils->bitcoinvaluetoa($coin->balance * $coin->price);
 	$available = Yii::$app->ConversionUtils->bitcoinvaluetoa($coin->available * $coin->price);
-	echo '<td align="right" style="font-size: .9em;">'.$btc.'<br/>'.$available.'</td>';
+	echo '<td align="right" class="text-smaller">'.$btc.'<br/>'.$available.'</td>';
 
 	$fiat = round($coin->balance * $coin->price * $mining->usdbtc, 2). ' $';
 	$available = round($coin->available * $coin->price * $mining->usdbtc, 2). ' $';
-	echo '<td align="right" style="font-size: .9em;">'.$fiat.'<br/>'.$available.'</td>';
+	echo '<td align="right" class="text-smaller">'.$fiat.'<br/>'.$available.'</td>';
 
 	$marketname = '';
 //	$bestmarket = Yii::$app->YiimpUtils->getBestMarket($coin);
 //	if($bestmarket)	$marketname = $bestmarket->name;
 
-	echo "<td align=right style='font-size: .9em'>$coin->reward<br>$marketname</td>";
+	echo "<td align=right class='text-smaller'>$coin->reward<br>$marketname</td>";
 
 	echo "</tr>";
 }

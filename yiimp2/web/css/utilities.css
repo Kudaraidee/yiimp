@@ -1,0 +1,491 @@
+/**
+ * Utility Classes
+ * 
+ * This file contains common utility classes that replace inline styles
+ * throughout the application for CSP compliance.
+ * 
+ * These classes follow a single-purpose utility pattern.
+ */
+
+/* Resume Update Button
+ * Used for auto-refresh pause buttons on various pages
+ */
+.resume-update-button {
+    color: #444;
+    background-color: #ffd;
+    border: 1px solid #ccc;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+
+.resume-update-button:hover {
+    background-color: #ffe;
+    border-color: #bbb;
+}
+
+.resume-update-button:active {
+    background-color: #eec;
+}
+
+/* API Code Block
+ * Used for API documentation code examples
+ */
+.api-code-block {
+    padding: 3px;
+    font-size: 0.8em;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-family: 'Courier New', Courier, monospace;
+    overflow-x: auto;
+}
+
+.api-code-block pre {
+    margin: 0;
+    padding: 0.5rem;
+}
+
+/* Row Highlighting Classes
+ * Used for table row states
+ */
+.row-immature {
+    background-color: #e0d3e8;
+}
+
+.row-selected {
+    background-color: #e8f4f8;
+}
+
+.row-not-ready {
+    opacity: 0.4;
+}
+
+.row-merge-mined {
+    opacity: 0.6;
+}
+
+/* Warning State
+ * Used for cells that need attention
+ */
+.price-warning {
+    background-color: #ffaaaa;
+}
+
+/* Performance Indicator States
+ * Used for 24-hour actual performance comparison cells
+ */
+.perf-excellent {
+    color: white;
+    background-color: #5cb85c;
+}
+
+.perf-poor {
+    color: white;
+    background-color: #d9534f;
+}
+
+.perf-bad {
+    color: white;
+    background-color: #e4804e;
+}
+
+.perf-warning {
+    color: white;
+    background-color: #f0ad4e;
+}
+
+/* Border Utilities */
+.border-top-thick {
+    border-top: 3px solid #eee;
+}
+
+.border-bottom-thick {
+    border-bottom: 2px solid #eee;
+}
+
+.border-top-3 {
+    border-top: 3px solid #eee;
+}
+
+/* Cursor Utilities */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.cursor-default {
+    cursor: default;
+}
+
+.cursor-not-allowed {
+    cursor: not-allowed;
+}
+
+/* Text Size Utilities */
+.text-small {
+    font-size: 0.8em;
+}
+
+.text-smaller {
+    font-size: 0.75em;
+}
+
+.text-tiny {
+    font-size: 0.7em;
+}
+
+.text-large {
+    font-size: 1.2em;
+}
+
+.text-larger {
+    font-size: 1.1em;
+}
+
+/* Float Utilities (for legacy support) */
+.float-end {
+    float: right;
+}
+
+.float-start {
+    float: left;
+}
+
+.float-none {
+    float: none;
+}
+
+/* Clear float */
+.clearfix::after {
+    content: "";
+    display: table;
+    clear: both;
+}
+
+/* Display Utilities */
+.d-inline {
+    display: inline;
+}
+
+.d-inline-block {
+    display: inline-block;
+}
+
+.d-block {
+    display: block;
+}
+
+.d-none {
+    display: none;
+}
+
+/* Spacing Utilities */
+.m-0 {
+    margin: 0;
+}
+
+.p-0 {
+    padding: 0;
+}
+
+.p-2 {
+    padding: 0.5rem;
+}
+
+.mt-0-pl-4 {
+    margin-top: 0;
+    padding-left: 1rem;
+}
+
+.mt-1 {
+    margin-top: 0.25rem;
+}
+
+.mt-2 {
+    margin-top: 0.5rem;
+}
+
+.mt-3 {
+    margin-top: 1rem;
+}
+
+.mb-1 {
+    margin-bottom: 0.25rem;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+.pt-1 {
+    padding-top: 0.25rem;
+}
+
+.pt-2 {
+    padding-top: 0.5rem;
+}
+
+.pt-3 {
+    padding-top: 1rem;
+}
+
+.pb-1 {
+    padding-bottom: 0.25rem;
+}
+
+.pb-2 {
+    padding-bottom: 0.5rem;
+}
+
+.pb-3 {
+    padding-bottom: 1rem;
+}
+
+.pb-8 {
+    padding-bottom: 2rem;
+}
+
+.pl-4 {
+    padding-left: 1rem;
+}
+
+.p-10 {
+    padding: 10px;
+}
+
+/* Text Alignment */
+.text-left {
+    text-align: left;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-right-small {
+    text-align: right;
+    font-size: 0.8em;
+}
+
+/* Text Transform */
+.text-uppercase {
+    text-transform: uppercase;
+}
+
+.text-lowercase {
+    text-transform: lowercase;
+}
+
+.text-capitalize {
+    text-transform: capitalize;
+}
+
+/* Font Weight */
+.font-weight-normal {
+    font-weight: normal;
+}
+
+.font-weight-bold {
+    font-weight: bold;
+}
+
+.fw-bold {
+    font-weight: bold;
+}
+
+.font-weight-light {
+    font-weight: 300;
+}
+
+/* Font Family */
+.font-mono {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.font-mono-large {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.1em;
+}
+
+/* Color Utilities */
+.text-muted {
+    color: #6c757d;
+}
+
+.text-primary {
+    color: #0d6efd;
+}
+
+.text-success {
+    color: #198754;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+
+.text-warning {
+    color: #ffc107;
+}
+
+.text-info {
+    color: #0dcaf0;
+}
+
+.text-darkred {
+    color: #8b0000;
+}
+
+/* Coin-specific colors */
+.coin-short {
+    color: #c55;
+}
+
+.coin-chart-1 {
+    color: #4bb2c5;
+}
+
+.coin-chart-2 {
+    color: #eaa228;
+}
+
+/* Background Color Utilities */
+.bg-light {
+    background-color: #f8f9fa;
+}
+
+.bg-light-gray {
+    background-color: #f2f2f2;
+}
+
+.bg-gray {
+    background-color: #d9d9d9;
+}
+
+.bg-white {
+    background-color: #ffffff;
+}
+
+.bg-transparent {
+    background-color: transparent;
+}
+
+/* Width Utilities */
+.w-100 {
+    width: 100%;
+}
+
+.w-75 {
+    width: 75%;
+}
+
+.w-50 {
+    width: 50%;
+}
+
+.w-25 {
+    width: 25%;
+}
+
+.w-16 {
+    width: 16px;
+}
+
+.w-auto {
+    width: auto;
+}
+
+/* Column Width Utilities */
+.coin-icon-column {
+    max-width: 18px;
+}
+
+/* Height Utilities */
+.h-100 {
+    height: 100%;
+}
+
+.h-auto {
+    height: auto;
+}
+
+/* Overflow Utilities */
+.overflow-auto {
+    overflow: auto;
+}
+
+.overflow-hidden {
+    overflow: hidden;
+}
+
+.overflow-visible {
+    overflow: visible;
+}
+
+/* Position Utilities */
+.position-relative {
+    position: relative;
+}
+
+.position-absolute {
+    position: absolute;
+}
+
+.position-fixed {
+    position: fixed;
+}
+
+.position-static {
+    position: static;
+}
+
+/* Visibility Utilities */
+.visible {
+    visibility: visible;
+}
+
+.invisible {
+    visibility: hidden;
+}
+
+/* Responsive Utilities */
+@media (max-width: 767.98px) {
+    .d-md-none {
+        display: none;
+    }
+    
+    .d-md-block {
+        display: block;
+    }
+}
+
+@media (min-width: 768px) {
+    .d-md-inline {
+        display: inline;
+    }
+    
+    .d-md-inline-block {
+        display: inline-block;
+    }
+}
+
+/* Print Utilities */
+@media print {
+    .d-print-none {
+        display: none !important;
+    }
+    
+    .d-print-block {
+        display: block !important;
+    }
+}

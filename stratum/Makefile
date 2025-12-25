@@ -17,8 +17,7 @@ SOURCES=stratum.cpp db.cpp coind.cpp coind_aux.cpp coind_template.cpp coind_subm
 SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/lib/keccak/keccakf1600.c kawpow/lib/ethash/primes.c \
 	kawpow/lib/ethash/ethash.cpp kawpow/lib/ethash/progpow.cpp kawpow/hash.cpp kawpow/kawpow.cpp \
 	firopow/lib/progpow.cpp firopow/overrides.cpp firopow/hash.cpp \
-	phihash/lib/progpow.cpp phihash/hash.cpp \
-	meowpow/lib/progpow.cpp meowpow/hash.cpp
+	phihash/lib/progpow.cpp phihash/hash.cpp
 
 CFLAGS += -DHAVE_CURL
 SOURCES += rpc_curl.cpp

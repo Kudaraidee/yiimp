@@ -189,7 +189,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	char script1[4*1024];
 	char script2[32];
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 	{
 		// coinbase v_in only current height
 		sprintf(script1, "%s", eheight);
@@ -687,38 +687,6 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         strcat(templ->coinb2, devscript2);
         if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
         strcat(templ->coinb2, "00000000");
-        return;
-    }
-
-    else if(!strcmp(coind->symbol, "CLORE")||!strcmp(coind->symbol, "CMS")||!strcmp(coind->symbol, "MEWC")||!strcmp(coind->symbol, "PHI"))
-    {
-        // Community address required in coinbase to avoid "bad-cb-amount" rejection
-
-        char script_payee[1024];
-        json_int_t coinbase_value = json_get_int(json_result, "coinbasevalue");
-        const char *community_address = json_get_string(json_result, "CommunityAutonomousAddress");
-        json_int_t community_amount = json_get_int(json_result, "CommunityAutonomousValue");
-
-        json_int_t miner_amount = coinbase_value;
-
-        base58_decode(community_address, script_payee);
-
-        // two outputs: miner + community
-        strcat(templ->coinb2, "02");
-
-        // miner output (pool)
-        job_pack_tx(coind, templ->coinb2, miner_amount, NULL);
-
-        // community output (autonomous address)
-        job_pack_tx(coind, templ->coinb2, community_amount, script_payee);
-
-		if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
-
-        strcat(templ->coinb2, "00000000"); // locktime
-        coind->reward = (double)miner_amount / 100000000 * coind->reward_mul;
-
-        debuglog("[%s] community fund added %s (%f)\n", coind->symbol, community_address, (double)community_amount/100000000);
-		debuglog("[%s] coinbase: %f\n", coind->symbol, coind->reward);
         return;
     }
 

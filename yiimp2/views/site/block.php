@@ -1,5 +1,7 @@
 <?php
 
+use app\components\CspHelper;
+
 $homeUrl = Yii::$app->homeUrl;
 
 $id = (int) Yii::$app->getRequest()->getQueryParam('id');
@@ -12,7 +14,7 @@ echo <<<end
 <br><br><br><br><br><br><br><br><br><br>
 <br><br><br><br><br><br><br><br><br><br>
 
-<script>
+<?= CspHelper::beginScript() ?>
 
 $(function()
 {
@@ -41,7 +43,7 @@ function main_refresh()
 	$.get(url, '', main_ready).error(main_error);
 }
 
-</script>
+<?= CspHelper::endScript() ?>
 
 end;
 

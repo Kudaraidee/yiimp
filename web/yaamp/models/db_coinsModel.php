@@ -41,6 +41,7 @@ class db_coins extends CActiveRecord
 			'powend_height' => 'End of PoW',
 			'rpchost'	=> 'RPC Host',
 			'rpcport'	=> 'RPC Port',
+			'rpcwallet'	=> 'RPC Wallet',
 			'rpcuser'	=> 'RPC User',
 			'rpcpasswd'	=> 'RPC Password',
 			'rpccurl'	=> 'RPC via curl',

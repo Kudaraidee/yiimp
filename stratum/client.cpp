@@ -25,7 +25,7 @@ bool client_suggest_target(YAAMP_CLIENT *client, json_value *json_params)
 bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 {
 	//if(client_find_my_ip(client->sock->ip)) return false;
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 		get_nonce_prefix(client->extranonce1_default);
 	else
 		get_next_extraonce1(client->extranonce1_default);
@@ -55,6 +55,22 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		if (strstr(client->version, "NiceHash")) {
 			client->is_nicehash = true;
 			client->difficulty_actual = g_stratum_nicehash_difficulty;
+		}
+
+		// Avalon, Whatsminer and some other ASICs need larger extranonce2 space
+		// This prevents duplicate shares and improves hashrate
+		if(strstr(client->version, "avalon") || strstr(client->version, "Avalon") || 
+		   strstr(client->version, "AvalonMiner") || strstr(client->version, "cgminer") ||
+		   strstr(client->version, "whatsminer") || strstr(client->version, "WhatsMiner") ||
+		   strstr(client->version, "btctools") || strstr(client->version, "M20") ||
+		   strstr(client->version, "M21") || strstr(client->version, "M30") ||
+		   strstr(client->version, "M31") || strstr(client->version, "M32") ||
+		   strstr(client->version, "M50") || strstr(client->version, "M53")) {
+			client->extranonce2size = client->extranonce2size_default = 8;
+			if (g_debuglog_client) {
+				debuglog("ASIC with extended nonce space detected (%s), extranonce2size set to 8 for %s\n", 
+					client->version, client->sock->ip);
+			}
 		}
 
 		if(strstr(client->version, "proxy") || strstr(client->version, "/3."))
@@ -127,7 +143,7 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		debuglog("new client with nonce %s\n", client->extranonce1);
 	}
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 	{
 		kawpow_send_nonceprefix(client);
 	}
@@ -238,7 +254,62 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 		if (!len)
 			return false;
 
-		char *sep = strpbrk(client->username, ".,;:");
+		// Check for CashAddr format (bitcoincash:, ecash:, bchtest:, nexa:, etc.)
+		// These should NOT be split at the colon
+		bool is_cashaddr = false;
+		char *colon = strchr(client->username, ':');
+		if (colon) {
+			int prefix_len = colon - client->username;
+			// Known CashAddr prefixes (Bitcoin Cash, eCash, Nexa, and their testnets)
+			const char* cashaddr_prefixes[] = {
+				"bitcoincash", "bchtest", "bchreg",     // Bitcoin Cash
+				"ecash", "ectest", "ecreg",             // eCash
+				"nexa", "nexatest", "nexareg",          // Nexa
+				NULL
+			};
+			
+			for (int i = 0; cashaddr_prefixes[i] != NULL; i++) {
+				int known_len = strlen(cashaddr_prefixes[i]);
+				if (prefix_len == known_len && strncmp(client->username, cashaddr_prefixes[i], known_len) == 0) {
+					is_cashaddr = true;
+					break;
+				}
+			}
+			
+			// If not a known prefix, check if it looks like a CashAddr format:
+			// - Prefix is lowercase letters only
+			// - Followed by colon and then base32-like characters (qpzry9x8gf2tvdw0s3jn54khce6mua7l)
+			if (!is_cashaddr && prefix_len > 2 && prefix_len < 20) {
+				bool valid_prefix = true;
+				for (int i = 0; i < prefix_len; i++) {
+					if (!islower(client->username[i])) {
+						valid_prefix = false;
+						break;
+					}
+				}
+				// Check if characters after colon look like base32 (CashAddr uses specific charset)
+				if (valid_prefix && strlen(colon + 1) > 10) {
+					char first_char = tolower(*(colon + 1));
+					// CashAddr addresses typically start with 'q' or 'p' after the colon
+					if (first_char == 'q' || first_char == 'p' || first_char == 'r' || first_char == 'z') {
+						is_cashaddr = true;
+					}
+				}
+			}
+		}
+
+		// Find separator, but skip colon if it's part of CashAddr format
+		char *sep = NULL;
+		if (is_cashaddr) {
+			// For CashAddr, only look for other separators after the colon
+			if (colon) {
+				sep = strpbrk(colon + 1, ".,;:");
+			}
+		} else {
+			// Normal case: any of these can be separators
+			sep = strpbrk(client->username, ".,;:");
+		}
+
 		if (sep) {
 			*sep = '\0';
 			strncpy(client->worker, sep+1, 1023-len);
@@ -711,32 +782,88 @@ void *client_thread(void *p)
 */
 bool client_configure(YAAMP_CLIENT *client, json_value *json_params)
 {
+	// Default version mask for ASIC Boost
+	// 0x1fffe000 = bits 13-28 can be modified (standard ASIC Boost)
+	// This allows ASICs to use version rolling for optimization
 	uint32_t version_mask = 0x1fffe000;
 	bool version_rolling_enabled = false;
+	bool minimum_difficulty_requested = false;
+	double minimum_difficulty = 0;
 
     if(json_params->u.array.length>1 && json_is_array(json_params->u.array.values[0]) && json_is_object(json_params->u.array.values[1]))
 	{
 		for (int index_array=0; index_array < json_params->u.array.values[0]->u.array.length; ++index_array) {
-			if (json_is_string(json_params->u.array.values[0]->u.array.values[index_array]) && 
-				!strcmp(json_params->u.array.values[0]->u.array.values[index_array]->u.string.ptr, "version-rolling"))
+			if (json_is_string(json_params->u.array.values[0]->u.array.values[index_array]))
 			{
-				for (int index_object=0; index_object < json_params->u.array.values[1]->u.object.length; ++index_object) {
-					if(!strcmp(json_params->u.array.values[1]->u.object.values[index_object].name, "version-rolling.mask") &&
-						json_is_string(json_params->u.array.values[1]->u.object.values[index_object].value))
-					{
-						version_mask = strtoul(json_params->u.array.values[1]->u.object.values[index_object].value->u.string.ptr, NULL, 16);
-						version_rolling_enabled = true;
+				const char* extension = json_params->u.array.values[0]->u.array.values[index_array]->u.string.ptr;
+				
+				// Version rolling support (ASIC Boost)
+				if (!strcmp(extension, "version-rolling"))
+				{
+					for (int index_object=0; index_object < json_params->u.array.values[1]->u.object.length; ++index_object) {
+						if(!strcmp(json_params->u.array.values[1]->u.object.values[index_object].name, "version-rolling.mask") &&
+							json_is_string(json_params->u.array.values[1]->u.object.values[index_object].value))
+						{
+							version_mask = strtoul(json_params->u.array.values[1]->u.object.values[index_object].value->u.string.ptr, NULL, 16);
+							version_rolling_enabled = true;
+						}
+						// Support for minimum difficulty request
+						else if(!strcmp(json_params->u.array.values[1]->u.object.values[index_object].name, "version-rolling.min-bit-count") &&
+							json_is_integer(json_params->u.array.values[1]->u.object.values[index_object].value))
+						{
+							// min-bit-count is informational, we already support the full mask
+						}
+					}
+				}
+				// Minimum difficulty extension (for ASICs)
+				else if (!strcmp(extension, "minimum-difficulty"))
+				{
+					for (int index_object=0; index_object < json_params->u.array.values[1]->u.object.length; ++index_object) {
+						if(!strcmp(json_params->u.array.values[1]->u.object.values[index_object].name, "minimum-difficulty.value") &&
+							json_is_integer(json_params->u.array.values[1]->u.object.values[index_object].value))
+						{
+							minimum_difficulty = json_params->u.array.values[1]->u.object.values[index_object].value->u.integer;
+							minimum_difficulty_requested = true;
+						}
 					}
 				}
 			}
 		}
 	}
 
-	if (version_rolling_enabled)
+	// Build response
+	char response[256];
+	if (version_rolling_enabled && minimum_difficulty_requested)
 	{
-		return client_send_result(client, "{\"version-rolling\":true,\"version-rolling.mask\":\"%08x\"}", version_mask);
+		// Apply minimum difficulty if requested
+		if (minimum_difficulty > client->difficulty_actual) {
+			client->difficulty_actual = client_normalize_difficulty(minimum_difficulty, client);
+		}
+		snprintf(response, sizeof(response), 
+			"{\"version-rolling\":true,\"version-rolling.mask\":\"%08x\",\"minimum-difficulty\":true}", 
+			version_mask);
+	}
+	else if (version_rolling_enabled)
+	{
+		snprintf(response, sizeof(response), 
+			"{\"version-rolling\":true,\"version-rolling.mask\":\"%08x\"}", 
+			version_mask);
+	}
+	else if (minimum_difficulty_requested)
+	{
+		if (minimum_difficulty > client->difficulty_actual) {
+			client->difficulty_actual = client_normalize_difficulty(minimum_difficulty, client);
+		}
+		snprintf(response, sizeof(response), "{\"minimum-difficulty\":true}");
 	}
 	else {
-		return client_send_result(client, "{\"version-rolling\": false}");
+		snprintf(response, sizeof(response), "{\"version-rolling\":false}");
 	}
+	
+	if (g_debuglog_client && (version_rolling_enabled || minimum_difficulty_requested)) {
+		debuglog("ASIC configure: version_mask=%08x, min_diff=%.0f for %s\n", 
+			version_mask, minimum_difficulty, client->sock->ip);
+	}
+
+	return client_send_result(client, response);
 }

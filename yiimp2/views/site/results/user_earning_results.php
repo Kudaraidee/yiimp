@@ -8,13 +8,7 @@
 use app\models\Earnings;
 use app\models\Coins;
 use app\models\Blocks;
-
-function WriteBoxHeader($title)
-{
-	echo "<div class='main-left-box'>";
-	echo "<div class='main-left-title'>$title</div>";
-	echo "<div class='main-left-inner'>";
-}
+use app\components\ViewHelper;
 
 $algo = Yii::$app->session->get('yaamp-algo');
 
@@ -24,7 +18,7 @@ if(!$user || $user->is_locked) return;
 $count = (int) Yii::$app->getRequest()->getQueryParam('count');
 $count = $count? $count: 50;
 
-WriteBoxHeader("Last $count Earnings: $user->username");
+ViewHelper::renderBoxHeader("Last $count Earnings: $user->username");
 $earnings = Earnings::find()
 				->where(['userid' => $user->id])
 				->orderBy('create_time desc')
@@ -78,12 +72,12 @@ foreach($earnings as $earning)
 
 		echo '<tr class="ssrow">';
 		echo '<td width="18"><img width="16" src="/images/btc.png"></td>';
-		echo '<td><b>Rental</b><span style="font-size: .8em;"> ('.$block->algo.')</span></td>';
-		echo '<td align="right" style="font-size: .8em;"><b>'.$reward.' BTC</b></td>';
-		echo '<td align="right" style="font-size: .8em;">'.$percent.'%</td>';
-		echo '<td align="right" style="font-size: .8em;">'.$value.'</td>';
-		echo '<td align="right" style="font-size: .8em;">'.$d.'&nbsp;ago</td>';
-		echo '<td align="right" style="font-size: .8em;"><span class="block cleared">Cleared</span></td>';
+		echo '<td><b>Rental</b><span class="text-small"> ('.$block->algo.')</span></td>';
+		echo '<td align="right" class="text-small"><b>'.$reward.' BTC</b></td>';
+		echo '<td align="right" class="text-small">'.$percent.'%</td>';
+		echo '<td align="right" class="text-small">'.$value.'</td>';
+		echo '<td align="right" class="text-small">'.$d.'&nbsp;ago</td>';
+		echo '<td align="right" class="text-small"><span class="block cleared">Cleared</span></td>';
 		echo '</tr>';
 
 		continue;
@@ -97,13 +91,13 @@ foreach($earnings as $earning)
 	$blockUrl = $coin->createExplorerLink($coin->name, array('height'=>$block->height));
 	echo '<tr class="ssrow">';
 	echo '<td width="18"><img width="16" src="'.$coin->image.'"></td>';
-	echo '<td><b>'.$blockUrl.'</b><span style="font-size: .8em;"> ('.$coin->algo.')</span></td>';
-	echo '<td align="right" style="font-size: .8em;">'.$height.'</td>';
-	echo '<td align="right" style="font-size: .8em;"><b>'.$reward.' '.$coin->symbol_show.'</b></td>';
-	echo '<td align="right" style="font-size: .8em;">'.$percent.'%</td>';
-	echo '<td align="right" style="font-size: .8em;">'.$value.'</td>';
-	echo '<td align="right" style="font-size: .8em;">'.$d.'&nbsp;ago</td>';
-	echo '<td align="right" style="font-size: .8em;">';
+	echo '<td><b>'.$blockUrl.'</b><span class="text-small"> ('.$coin->algo.')</span></td>';
+	echo '<td align="right" class="text-small">'.$height.'</td>';
+	echo '<td align="right" class="text-small"><b>'.$reward.' '.$coin->symbol_show.'</b></td>';
+	echo '<td align="right" class="text-small">'.$percent.'%</td>';
+	echo '<td align="right" class="text-small">'.$value.'</td>';
+	echo '<td align="right" class="text-small">'.$d.'&nbsp;ago</td>';
+	echo '<td align="right" class="text-small">';
 
 	if($earning->status == 0) {
 		$eta = '';

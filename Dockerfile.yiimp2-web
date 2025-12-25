@@ -1,0 +1,160 @@
+# Multi-stage Dockerfile for Yiimp2 Web Frontend
+# Requirements: 20.1, 20.4, 20.7, 20.8
+
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG INSTALL_DEV_DEPS=false
+
+# Install PHP, Composer, Node.js and NPM for dependency installation
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:ondrej/php \
+    && apt-get update \
+    && apt-get install -y \
+    php8.4-cli \
+    php8.4-bcmath \
+    php8.4-curl \
+    php8.4-gd \
+    php8.4-intl \
+    php8.4-mbstring \
+    php8.4-mysql \
+    php8.4-xml \
+    php8.4-zip \
+    unzip \
+    git \
+    nodejs \
+    npm \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Composer from official image
+COPY --from=docker.io/library/composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy yiimp2 application
+COPY yiimp2 /tmp/yiimp2
+
+# Install Composer dependencies (with or without dev dependencies)
+WORKDIR /tmp/yiimp2
+RUN if [ "$INSTALL_DEV_DEPS" = "true" ]; then \
+        composer install --optimize-autoloader --no-interaction; \
+    else \
+        composer install --no-dev --optimize-autoloader --no-interaction; \
+    fi
+
+# Install Chart.js and adapter via NPM
+RUN npm install chart.js@4.5.1 chartjs-adapter-date-fns@3.0.0
+
+# Copy Chart.js files to vendor directory
+RUN mkdir -p web/js/vendor/chart.js \
+    && mkdir -p web/js/vendor/chartjs-adapter-date-fns \
+    && cp node_modules/chart.js/dist/chart.umd.min.js web/js/vendor/chart.js/ \
+    && cp node_modules/chart.js/dist/chart.umd.js web/js/vendor/chart.js/ \
+    && cp node_modules/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js web/js/vendor/chartjs-adapter-date-fns/ \
+    && cp node_modules/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.js web/js/vendor/chartjs-adapter-date-fns/
+
+# Remove node_modules to minimize image size
+RUN rm -rf node_modules
+
+# Production stage - minimal runtime image
+FROM ubuntu:24.04 AS production
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Nginx, PHP-FPM, and runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    && add-apt-repository ppa:ondrej/php \
+    && apt-get update \
+    && apt-get install -y \
+    nginx \
+    php8.4-fpm \
+    php8.4-bcmath \
+    php8.4-curl \
+    php8.4-gd \
+    php8.4-intl \
+    php8.4-mbstring \
+    php8.4-mysql \
+    php8.4-opcache \
+    php8.4-xml \
+    php8.4-zip \
+    php8.4-memcache \
+    php8.4-memcached \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Nginx configuration files
+COPY config/nginx/yiimp2.conf /etc/nginx/sites-available/yiimp2.conf
+RUN ln -sf /etc/nginx/sites-available/yiimp2.conf /etc/nginx/sites-enabled/default
+
+# Copy PHP-FPM configuration
+COPY config/php-fpm/www.conf /etc/php/8.4/fpm/pool.d/www.conf
+
+# Remove default Nginx site
+RUN rm -f /etc/nginx/sites-enabled/default.dpkg-dist
+
+# Copy application from builder stage
+COPY --from=builder --chown=www-data:www-data /tmp/yiimp2 /var/yiimp2
+
+# Copy startup script
+COPY docker/start-web.sh /start-web.sh
+RUN chmod +x /start-web.sh
+
+# Create runtime directories
+RUN mkdir -p /var/yiimp2/runtime \
+    && mkdir -p /var/yiimp2/web/assets \
+    && mkdir -p /var/log/yiimp2 \
+    && mkdir -p /run/php \
+    && chown -R www-data:www-data /var/yiimp2/runtime \
+    && chown -R www-data:www-data /var/yiimp2/web/assets \
+    && chown -R www-data:www-data /var/yiimp2/web/js/vendor \
+    && chown -R www-data:www-data /var/log/yiimp2 \
+    && chown -R www-data:www-data /run/php \
+    && chmod -R 775 /var/yiimp2/runtime \
+    && chmod -R 775 /var/yiimp2/web/assets \
+    && chmod -R 644 /var/yiimp2/web/js/vendor \
+    && chmod -R 775 /var/log/yiimp2
+
+WORKDIR /var/yiimp2
+
+# Expose port 80
+EXPOSE 80
+
+# Start Nginx and PHP-FPM using startup script
+CMD ["/start-web.sh"]
+
+# Development stage - includes dev dependencies and debugging tools
+FROM production AS dev
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install development tools
+RUN apt-get update && apt-get install -y \
+    php8.4-xdebug \
+    vim \
+    nano \
+    curl \
+    wget \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Nginx development configuration (overwrite production config)
+COPY config/nginx/yiimp2-dev.conf /etc/nginx/sites-available/yiimp2.conf
+
+# Copy application with dev dependencies from builder
+COPY --from=builder --chown=www-data:www-data /tmp/yiimp2 /var/yiimp2
+
+# Ensure runtime directories exist with proper permissions
+RUN mkdir -p /var/yiimp2/runtime \
+    && mkdir -p /var/yiimp2/web/assets \
+    && mkdir -p /var/log/yiimp2 \
+    && mkdir -p /run/php \
+    && chown -R www-data:www-data /var/yiimp2/runtime \
+    && chown -R www-data:www-data /var/yiimp2/web/assets \
+    && chown -R www-data:www-data /var/yiimp2/web/js/vendor \
+    && chown -R www-data:www-data /var/log/yiimp2 \
+    && chown -R www-data:www-data /run/php \
+    && chmod -R 775 /var/yiimp2/runtime \
+    && chmod -R 775 /var/yiimp2/web/assets \
+    && chmod -R 644 /var/yiimp2/web/js/vendor \
+    && chmod -R 775 /var/log/yiimp2

@@ -13,28 +13,38 @@ int job_get_jobid()
 	return jobid;
 }
 
+// Track last prevhash to detect new blocks
+static char g_last_prevhash[512] = "";
+
 static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 {
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
+	
+	// Check if this is a new block (prevhash changed)
+	bool clean_jobs = (strcmp(g_last_prevhash, templ->prevhash_be) != 0);
+	if (clean_jobs) {
+		strncpy(g_last_prevhash, templ->prevhash_be, sizeof(g_last_prevhash) - 1);
+		g_last_prevhash[sizeof(g_last_prevhash) - 1] = '\0';
+	}
 
 	if (!strcmp(g_stratum_algo, "lbry")) {
 		sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",%s]}\n",
 			job->id, templ->prevhash_be, templ->claim_be, templ->coinb1, templ->coinb2,
-			templ->txmerkles, templ->version, templ->nbits, templ->ntime);
+			templ->txmerkles, templ->version, templ->nbits, templ->ntime, clean_jobs ? "true" : "false");
 		return;
 	} else if (strlen(templ->extradata_hex) == 128) {
 		// LUX smart contract state hashes (like lbry extra field, here the 2 root hashes in one)
 		sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",%s]}\n",
 			job->id, templ->prevhash_be, templ->extradata_be, templ->coinb1, templ->coinb2,
-			templ->txmerkles, templ->version, templ->nbits, templ->ntime);
+			templ->txmerkles, templ->version, templ->nbits, templ->ntime, clean_jobs ? "true" : "false");
 		return;
 	} else if (!strcmp(g_stratum_algo,"neoscrypt-xaya")) {
 		sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-				"\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+				"\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",%s]}\n",
 			job->id, "0000000000000000000000000000000000000000000000000000000000000000", templ->xaya_header,
-			"", "", "20000000", templ->nbits, templ->ntime);
+			"", "", "20000000", templ->nbits, templ->ntime, clean_jobs ? "true" : "false");
 		return;
 	}
 
@@ -72,16 +82,17 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 		//[2017-12-07 13:53:12] < {"id":null,"method":"client.show_message","params":["equihash KMD block 611840"]}
 
 		sprintf(buffer, "%s{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-				"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",true,\"%s\",\"%s\"]}\n", job_message,
+				"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%s,\"%s\",\"%s\"]}\n", job_message,
 				job->id, version_reversed, prev_hash_reversed, merkleroot_reversed,
 				finalsaplingroot_reversed, time_reversed, bits_reversed,
-				equihash_params, equihash_personalization);
+				clean_jobs ? "true" : "false", equihash_params, equihash_personalization);
 		return;
 	}
 
 	// standard stratum
-	sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
-		job->id, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime);
+	sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",%s]}\n",
+		job->id, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime,
+		clean_jobs ? "true" : "false");
 }
 
 static YAAMP_JOB *job_get_last(int coinid)
@@ -122,7 +133,7 @@ void job_send_last(YAAMP_CLIENT *client)
 	client->jobid_sent = job->id;
 
 	char buffer[YAAMP_SMALLBUFSIZE];
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -143,7 +154,7 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 	}
 
 	char buffer[YAAMP_SMALLBUFSIZE];
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -185,7 +196,7 @@ void job_broadcast(YAAMP_JOB *job)
 
 		char buffer[YAAMP_SMALLBUFSIZE];
 		memset(buffer, 0, sizeof(buffer));
-		if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+		if (is_kawpow || is_firopow || is_phihash)
 		{
 			kawpow_job_mining_notify_buffer(job, client, buffer);
 		}

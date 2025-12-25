@@ -1,0 +1,192 @@
+services:
+  # Test database service for yiimp2
+  yiimp2-test-db:
+    image: mariadb:10.11
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root_password
+      MYSQL_DATABASE: yiimp2_test
+      MYSQL_USER: yiimp2_test
+      MYSQL_PASSWORD: test_password
+    volumes:
+      - ./sql/yiimp2-init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - yiimp2-test-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest_root_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Legacy test database for independence tests
+  yiimp-test-db:
+    image: mariadb:10.11
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root_password
+      MYSQL_DATABASE: yiimp_test
+      MYSQL_USER: yiimp_test
+      MYSQL_PASSWORD: test_password
+    volumes:
+      - ./sql/yiimp2-init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - yiimp2-test-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ptest_root_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Memcached service
+  yiimp2-test-memcached:
+    image: memcached:alpine
+    networks:
+      - yiimp2-test-network
+
+  # Web frontend service (test port: 9090)
+  yiimp2-test-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-web
+    depends_on:
+      yiimp2-test-db:
+        condition: service_healthy
+      yiimp2-test-memcached:
+        condition: service_started
+    environment:
+      DB_HOST: yiimp2-test-db
+      DB_NAME: yiimp2_test
+      DB_USER: yiimp2_test
+      DB_PASSWORD: test_password
+      MEMCACHED_HOST: yiimp2-test-memcached
+    volumes:
+      - ./config/yiimp2/serverconfig.php:/etc/yiimp2/serverconfig.php:ro
+      - ./log/yiimp2:/var/log/yiimp2
+    ports:
+      - "9090:80"
+    networks:
+      - yiimp2-test-network
+
+  # Stratum server - SHA256 (test ports: 5333+)
+  yiimp2-test-stratum-sha256:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-stratum
+    depends_on:
+      yiimp2-test-db:
+        condition: service_healthy
+    volumes:
+      - ./config/yiimp2/stratum/test-sha256.conf:/etc/stratum.conf:ro
+    ports:
+      - "5333:3333"
+    networks:
+      - yiimp2-test-network
+    command: ["/etc/stratum.conf"]
+
+  # Stratum server - Scrypt (test ports: 5333+)
+  yiimp2-test-stratum-scrypt:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-stratum
+    depends_on:
+      yiimp2-test-db:
+        condition: service_healthy
+    volumes:
+      - ./config/yiimp2/stratum/test-scrypt.conf:/etc/stratum.conf:ro
+    ports:
+      - "5433:3333"
+    networks:
+      - yiimp2-test-network
+    command: ["/etc/stratum.conf"]
+
+  # Backend service - main
+  yiimp2-test-backend-main:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    depends_on:
+      yiimp2-test-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: yiimp2-test-db
+      DB_NAME: yiimp2_test
+      DB_USER: yiimp2_test
+      DB_PASSWORD: test_password
+    volumes:
+      - ./config/yiimp2/serverconfig.php:/etc/yiimp2/serverconfig.php:ro
+      - ./log/yiimp2:/var/log/yiimp2
+    networks:
+      - yiimp2-test-network
+    command: ["sleep", "infinity"]  # Keep running for tests
+
+  # Backend service - loop2
+  yiimp2-test-backend-loop2:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    depends_on:
+      yiimp2-test-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: yiimp2-test-db
+      DB_NAME: yiimp2_test
+      DB_USER: yiimp2_test
+      DB_PASSWORD: test_password
+    volumes:
+      - ./config/yiimp2/serverconfig.php:/etc/yiimp2/serverconfig.php:ro
+      - ./log/yiimp2:/var/log/yiimp2
+    networks:
+      - yiimp2-test-network
+    command: ["sleep", "infinity"]  # Keep running for tests
+
+  # Test runner service - runs after all services are up
+  yiimp2-test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      yiimp2-test-db:
+        condition: service_healthy
+      yiimp-test-db:
+        condition: service_healthy
+      yiimp2-test-web:
+        condition: service_started
+      yiimp2-test-stratum-sha256:
+        condition: service_started
+      yiimp2-test-stratum-scrypt:
+        condition: service_started
+      yiimp2-test-backend-main:
+        condition: service_started
+      yiimp2-test-backend-loop2:
+        condition: service_started
+    environment:
+      DB_HOST: yiimp2-test-db
+      DB_NAME: yiimp2_test
+      DB_USER: yiimp2_test
+      DB_PASSWORD: test_password
+      LEGACY_DB_HOST: yiimp-test-db
+      LEGACY_DB_NAME: yiimp_test
+      LEGACY_DB_USER: yiimp_test
+      LEGACY_DB_PASSWORD: test_password
+      # Docker socket for container inspection tests
+      DOCKER_HOST: unix:///var/run/docker.sock
+      # Compose project name for container identification
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-yiimp}
+    volumes:
+      - ./yiimp2:/app/yiimp2
+      - ./sql:/app/sql:ro
+      - ./bin:/app/bin:ro
+      - ./config:/app/config:ro
+      - ./web:/app/web:ro
+      - ./stratum:/app/stratum:ro
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
+      - ./docker-compose.test.yml:/app/docker-compose.test.yml:ro
+      - ./test-results:/app/test-results
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - yiimp2-test-network
+    working_dir: /app/yiimp2
+    # Keep container running for interactive testing
+    command: ["tail", "-f", "/dev/null"]
+
+networks:
+  yiimp2-test-network:
+    driver: bridge

@@ -4,6 +4,7 @@
 
 use app\components\rpc\WalletRPC;
 use app\models\Coins;
+use app\components\CspHelper;
 
 $id = (int) Yii::$app->getRequest()->getQueryParam('id');
 $coin = Coins::findOne($id);
@@ -36,14 +37,12 @@ echo '<div id="main_actions">';
 
 //app()->clientScript->registerCoreScript('jquery.ui'); // dialog
 
-echo <<<END
-
-<br/><a class="red" href="/admin/deleteearnings?id={$coin->id}"><b>DELETE EARNINGS</b></a>
-<br/><a href="/admin/clearearnings?id={$coin->id}"><b>CLEAR EARNINGS</b></a>
-<br/><a href="/admin/checkblocks?id={$coin->id}"><b>UPDATE BLOCKS</b></a>
-<br/><a href="/admin/payuserscoin?id={$coin->id}"><b>DO PAYMENTS</b></a>
-<br/>
-</div>
+echo '<br/>' . Html::a('<b>DELETE EARNINGS</b>', ['delete-earnings', 'id' => $coin->id], ['class' => 'red']);
+echo '<br/>' . Html::a('<b>CLEAR EARNINGS</b>', ['clear-earnings', 'id' => $coin->id]);
+echo '<br/>' . Html::a('<b>UPDATE BLOCKS</b>', ['check-blocks', 'id' => $coin->id]);
+echo '<br/>' . Html::a('<b>DO PAYMENTS</b>', ['pay-users-coin', 'id' => $coin->id]);
+echo '<br/>';
+echo '</div>';
 
 <style type="text/css">
 table.dataGrid a.red, table.dataGrid a.red:visited, a.red { color: darkred; }
@@ -69,14 +68,14 @@ tr.ssrow.orphan { color: darkred; }
 
 <div id="main_results"></div>
 
-<script type="text/javascript">
+<?= CspHelper::beginScript() ?>
 
 function uninstall_coin()
 {
 	if(!confirm("Uninstall this coin?"))
 		return;
 
-	window.location.href = '/admin/uninstallcoin?id=$coin->id';
+	window.location.href = '<?= \yii\helpers\Url::to(['uninstall-coin', 'id' => $coin->id]) ?>';
 }
 
 var main_delay=30000;
@@ -84,7 +83,7 @@ var main_timeout;
 
 function main_refresh()
 {
-	var url = "/admin/coinwallet_details?id={$id}&rows={$maxrows}&since={$since}";
+	var url = "<?= \yii\helpers\Url::to(['coinwallet-details', 'id' => $id, 'rows' => $maxrows, 'since' => $since]) ?>";
 
 	clearTimeout(main_timeout);
 	$.get(url, '', main_ready);
@@ -121,16 +120,16 @@ function showSellAmountDialog(marketname, address, marketid, bookmarkid)
 				if (marketid > 0)
 					window.location.href = '/market/sellto?id='+marketid+'&amount='+amount;
 				else
-					window.location.href = '/admin/bookmarkSend?id='+bookmarkid+'&amount='+amount;
+					window.location.href = '<?= \yii\helpers\Url::to(['bookmark-send']) ?>?id='+bookmarkid+'&amount='+amount;
 			},
 		}
 	});
 	return false;
 }
 
-</script>
+<?= CspHelper::endScript() ?>
 
-<div id="sell-amount-dialog" style="display: none;">
+<div id="sell-amount-dialog" class="d-none">
 <br>
 Address: <span id="dlgaddr">xxxxxxxxxxxx</span><br><br>
 Amount: <input type=text id="input_sell_amount" value="$sellamount">

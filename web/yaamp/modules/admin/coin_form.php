@@ -426,6 +426,12 @@ echo CUFHtml::activeTextField($coin, 'rpcport', array('maxlength'=>5,'style'=>'w
 echo '<p class="formHint2"></p>';
 echo CUFHtml::closeCtrlHolder();
 
+echo CUFHtml::openActiveCtrlHolder($coin, 'rpcwallet');
+echo CUFHtml::activeLabelEx($coin, 'rpcwallet');
+echo CUFHtml::activeTextField($coin, 'rpcwallet', array('maxlength'=>64,'style'=>'width: 180px;'));
+echo '<p class="formHint2">Wallet name for Bitcoin Core 0.17+ (e.g., "pool" for Briskcoin 3.0)</p>';
+echo CUFHtml::closeCtrlHolder();
+
 if(empty($coin->rpcuser))
 	$coin->rpcuser = 'yiimprpc';
 

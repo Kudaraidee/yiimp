@@ -1,0 +1,26 @@
+{
+  "name": "yiimp2-csp-compliance",
+  "version": "1.0.0",
+  "description": "Linting configuration for CSP-compliant styling",
+  "private": true,
+  "scripts": {
+    "lint:css": "stylelint \"yiimp2/web/css/**/*.css\"",
+    "lint:php-styles": "node scripts/check-php-inline-styles.js",
+    "lint": "npm run lint:css && npm run lint:php-styles",
+    "lint:fix": "stylelint \"yiimp2/web/css/**/*.css\" --fix",
+    "test:visual": "playwright test --config=tests/visual/playwright.config.js",
+    "test:visual:update": "playwright test --config=tests/visual/playwright.config.js --update-snapshots",
+    "test:visual:report": "playwright show-report tests/visual/playwright-report"
+  },
+  "devDependencies": {
+    "stylelint": "^16.26.1",
+    "stylelint-config-standard": "^39.0.1",
+    "glob": "^10.3.0",
+    "@playwright/test": "^1.40.0",
+    "pixelmatch": "^5.3.0",
+    "pngjs": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

@@ -184,12 +184,17 @@ class SiteController extends CommonController
 		$this->render('terms');
 	}
 
+        public function actionPrivacypolicy()
+        {
+                $this->render('privacypolicy');
+        }
+
 	/////////////////////////////////////////////////
 
 	public function actionBlock()
 	{
 		$this->render('block');
-		
+
 	}
 
 	public function actionBlock_results()

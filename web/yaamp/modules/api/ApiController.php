@@ -36,34 +36,34 @@ class ApiController extends CommonController
 
             $workers = (int) controller()->memcache->get_database_scalar("api_status_workers-$algo", "select COUNT(id) FROM workers WHERE algo=:algo", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
             $workers_shared = (int) controller()->memcache->get_database_scalar("api_status_workers_shared-$algo", "select COUNT(id) FROM workers WHERE algo=:algo and not password like '%m=solo%'", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
             $workers_solo = (int) controller()->memcache->get_database_scalar("api_status_workers_solo-$algo", "select COUNT(id) FROM workers WHERE algo=:algo and password like '%m=solo%'", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
-			if (yaamp_pool_rate($algo)) $pool_hash = yaamp_pool_rate($algo);
-			else $pool_hash = '0';
+		if (yaamp_pool_rate($algo)) $pool_hash = yaamp_pool_rate($algo);
+		else $pool_hash = '0';
 
-			if (yaamp_pool_shared_rate($algo)) $pool_shared_hash = yaamp_pool_shared_rate($algo);
-			else $pool_shared_hash = '0';
+		if (yaamp_pool_shared_rate($algo)) $pool_shared_hash = yaamp_pool_shared_rate($algo);
+		else $pool_shared_hash = '0';
 
-			if (yaamp_pool_solo_rate($algo)) $pool_shared_hash = yaamp_pool_solo_rate($algo);
-			else $pool_solo_hash = '0';
+		if (yaamp_pool_solo_rate($algo)) $pool_solo_hash = yaamp_pool_solo_rate($algo);
+		else $pool_solo_hash = '0';
 
             $price = controller()->memcache->get_database_scalar("api_status_price-$algo", "select price from hashrate where algo=:algo order by time desc limit 1", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
             $price = bitcoinvaluetoa(take_yaamp_fee($price / 1000, $algo));
 
             $rental = controller()->memcache->get_database_scalar("api_status_rental-$algo", "select rent from hashrate where algo=:algo order by time desc limit 1", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
             $rental = bitcoinvaluetoa($rental);
 
@@ -71,17 +71,17 @@ class ApiController extends CommonController
 
             $avgprice = controller()->memcache->get_database_scalar("api_status_avgprice-$algo", "select avg(price) from hashrate where algo=:algo and time>$t", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
             $avgprice = bitcoinvaluetoa(take_yaamp_fee($avgprice / 1000, $algo));
 
             $total1 = controller()->memcache->get_database_scalar("api_status_total-$algo", "select sum(amount*price) from blocks where category!='orphan' and time>$t and algo=:algo", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
             $hashrate1 = (double) controller()->memcache->get_database_scalar("api_status_avghashrate-$algo", "select avg(hashrate) from hashrate where time>$t and algo=:algo", array(
                 ':algo' => $algo
-            ));
+            ), 5);
 
             $algo_unit_factor = yaamp_algo_mBTC_factor($algo);
             $btcmhday1        = $hashrate1 > 0 ? mbitcoinvaluetoa($total1 / $hashrate1 * 1000000 * 1000 * $algo_unit_factor) : 0;
@@ -98,7 +98,7 @@ class ApiController extends CommonController
                 "fees_solo" => (double) $fees_solo,
                 "hashrate" => (int) $pool_hash,
                 "hashrate_shared" => (int) $pool_shared_hash,
-                "hashrate_solo" => (int) $pool_solo_hash,
+//                "hashrate_solo" => (int) $pool_solo_hash,
                 "workers" => (int) $workers,
                 "workers_shared" => (int) $workers_shared,
                 "workers_solo" => (int) $workers_solo,
@@ -185,10 +185,12 @@ class ApiController extends CommonController
 		
 				if (yaamp_coin_shared_rate($coin->id)) $pool_shared_hash = yaamp_coin_shared_rate($coin->id);
 				else $pool_shared_hash = '0';
+
 		
 
 				if (yaamp_coin_solo_rate($coin->id)) $pool_solo_hash = yaamp_coin_solo_rate($coin->id);
 				else $pool_solo_hash = '0';
+				$pool_solo_hash = yaamp_coin_solo_rate($coin->id) ?: 0;
 	
 				$btcmhd = yaamp_profitability($coin);
 				$btcmhd = mbitcoinvaluetoa($btcmhd);

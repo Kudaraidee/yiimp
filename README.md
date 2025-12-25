@@ -63,6 +63,30 @@ additional SSL-support added by using HAProxy and Letsencrypt certificates - for
     - You can also use lighttpd or apache
 
 <h2 align="left"> Configuration</h2>
+
+## Security Configuration
+
+**Important:** Before deploying, configure security settings properly.
+
+See [SECURITY_CONFIGURATION.md](SECURITY_CONFIGURATION.md) for comprehensive security setup guide including:
+- Cookie validation key generation
+- HTTPS configuration
+- Session management
+- Debug mode settings
+- Security best practices
+
+**Quick Start:**
+```bash
+# Generate secure keys
+./generate-secure-keys.sh
+
+# Edit .env with your settings
+nano .env
+
+# Deploy
+docker-compose up -d
+```
+
 <h3 align="center">Nginx </h3>
 
 Use this Config on nginx:

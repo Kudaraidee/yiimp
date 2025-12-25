@@ -5,6 +5,7 @@
 use app\models\Coins;
 use app\models\Workers;
 use app\models\Stratums;
+use app\components\CspHelper;
 
 $defaultalgo = Yii::$app->session->get('yaamp-algo');
 
@@ -69,12 +70,10 @@ foreach (Yii::$app->YiimpUtils->get_algos() as $algo)
     }
 }
 
-function cmp($a, $b)
-{
+// Use anonymous function to avoid redeclaration
+usort($algos, function($a, $b) {
     return $a[0] < $b[0];
-}
-
-usort($algos, 'cmp');
+});
 $total_coins = 0;
 $total_workers = 0;
 $total_solo_workers = 0;
@@ -174,23 +173,23 @@ foreach ($algos as $item)
     $fees_solo = Yii::$app->YiimpUtils->yiimp_fee_solo($algo);
     $port = 1;//getAlgoPort($algo);
 
-    if ($defaultalgo == $algo) echo "<tr style='cursor: pointer; background-color: #d9d9d9;' onclick='javascript:select_algo(\"$algo\")'>";
-    else echo "<tr style='cursor: pointer' class='ssrow' onclick='javascript:select_algo(\"$algo\")'>";
-    echo "<td style='font-size: 110%; background-color: #f2f2f2;'><b>$algo</b></td>";
-    echo "<td align=center style='font-size: .8em; background-color: #f2f2f2;'></td>";
-    echo "<td align=center style='font-size: .8em; background-color: #f2f2f2;'></td>";
-    echo "<td align=center style='font-size: .8em; background-color: #f2f2f2;'></td>";
-    echo "<td align=center style='font-size: .8em; background-color: #f2f2f2;'></td>";
-    echo '<td align="center" style="font-size: .8em; background-color: #f2f2f2;"></td>';
-    echo '<td align="center" style="font-size: .8em; background-color: #f2f2f2;"></td>';
-    echo "<td align=center style='font-size: .8em; background-color: #f2f2f2;'></td>";
-    echo "<td align=center style='font-size: .8em; background-color: #f2f2f2;'></td>";
-    if ($algo == $best_algo) echo '<td class="estimate" align="center" style="font-size: .8em; background-color: #f2f2f2;" title="normalized ' . $norm . '"><b>' . $price . '</b></td>';
-    else if ($norm > 0) echo '<td class="estimate" align="center" style="font-size: .8em; background-color: #f2f2f2;" title="normalized ' . $norm . '">' . $price . '</td>';
-    else echo '<td class="estimate" align="center" style="font-size: .8em; background-color: #f2f2f2;"></td>';
-    echo '<td class="estimate" align="center" style="font-size: .8em; background-color: #f2f2f2;"></td>';
-    if ($algo == $best_algo) echo '<td align="center" style="font-size: .8em; background-color: #f2f2f2;" data="' . $btcmhday1 . '"><b>' . $btcmhday1 . '*</b></td>';
-    else echo '<td align="center" style="font-size: .8em; background-color: #f2f2f2;" data="' . $btcmhday1 . '">' . $btcmhday1 . '</td>';
+    if ($defaultalgo == $algo) echo "<tr class='cursor-pointer algo-row bg-gray' data-algo='$algo'>";
+    else echo "<tr class='cursor-pointer ssrow algo-row' data-algo='$algo'>";
+    echo "<td class='bg-light-gray text-larger'><b>$algo</b></td>";
+    echo "<td align=center class='text-small bg-light-gray'></td>";
+    echo "<td align=center class='text-small bg-light-gray'></td>";
+    echo "<td align=center class='text-small bg-light-gray'></td>";
+    echo "<td align=center class='text-small bg-light-gray'></td>";
+    echo '<td align="center" class="text-small bg-light-gray"></td>';
+    echo '<td align="center" class="text-small bg-light-gray"></td>';
+    echo "<td align=center class='text-small bg-light-gray'></td>";
+    echo "<td align=center class='text-small bg-light-gray'></td>";
+    if ($algo == $best_algo) echo '<td class="estimate text-small bg-light-gray" align="center" title="normalized ' . $norm . '"><b>' . $price . '</b></td>';
+    else if ($norm > 0) echo '<td class="estimate text-small bg-light-gray" align="center" title="normalized ' . $norm . '">' . $price . '</td>';
+    else echo '<td class="estimate text-small bg-light-gray" align="center"></td>';
+    echo '<td class="estimate text-small bg-light-gray" align="center"></td>';
+    if ($algo == $best_algo) echo '<td align="center" class="text-small bg-light-gray" data="' . $btcmhday1 . '"><b>' . $btcmhday1 . '*</b></td>';
+    else echo '<td align="center" class="text-small bg-light-gray" data="' . $btcmhday1 . '">' . $btcmhday1 . '</td>';
     echo "</tr>";
     if ($coins->count() > 0)
     {
@@ -200,7 +199,7 @@ foreach ($algos as $item)
         {
             $name = substr($coin->name, 0, 20);
             $symbol = $coin->getOfficialSymbol();
-            echo "<td align='left' valign='top' style='font-size: .8em;'><img width='10' src='" . $coin->image . "'>  <b>$name ($coin->symbol)</b> </td>";
+            echo "<td align='left' valign='top' class='text-small'><img width='10' src='" . $coin->image . "'>  <b>$name ($coin->symbol)</b> </td>";
 
             $coin_stratum = Stratums::find()
                                 ->where(['algo' => $algo, 'symbol' => $symbol]);
@@ -208,16 +207,16 @@ foreach ($algos as $item)
             $port_db = ($port_count > 1) ? $coin_stratum->one():null;
 
             $auto_exchange = $coin->auto_exchange;
-            if ($auto_exchange != 1) echo "<td align='center' valign='top' style='font-size: .8em;'><img width=13 src='/images/cancel.png'></td>";
-            else echo "<td align='center' valign='top' style='font-size: .8em;'><img width=13 src='/images/ok.png'></td>";
+            if ($auto_exchange != 1) echo "<td align='center' valign='top' class='text-small'><img width=13 src='/images/cancel.png'></td>";
+            else echo "<td align='center' valign='top' class='text-small'><img width=13 src='/images/ok.png'></td>";
 			
 			$min_payout = max(floatval(YAAMP_PAYMENTS_MINI), floatval($coin->payout_min));
-			echo "<td align='center' style='font-size: .8em;'><b>".$min_payout." $symbol</b></td>";
+			echo "<td align='center' class='text-small'><b>".$min_payout." $symbol</b></td>";
 
 			if ($port_count >= 1) 
-				echo "<td align='center' style='font-size: .8em;'><b>".$port_db->port."</b></td>";
+				echo "<td align='center' class='text-small'><b>".$port_db->port."</b></td>";
 			else 
-				echo "<td align='center' style='font-size: .8em;'><b>$port</b></td>";
+				echo "<td align='center' class='text-small'><b>$port</b></td>";
             
             $subquery = (new \yii\db\Query())->select(['userid'])->from('workers')->distinct();
             $users_total = (new \yii\db\Query())
@@ -233,9 +232,9 @@ foreach ($algos as $item)
                 ->scalar();
 
             if ($port_count >= 1) 
-				echo "<td align='center' style='font-size: .8em;'>$users_coins</td>";
+				echo "<td align='center' class='text-small'>$users_coins</td>";
 			else	
-				echo "<td align='center' style='font-size: .8em;'>$users_total</td>";
+				echo "<td align='center' class='text-small'>$users_total</td>";
             
             $workers_coin_query = (new \yii\db\Query())
                 ->select(['count(id)'])
@@ -245,9 +244,9 @@ foreach ($algos as $item)
             $workers_coins= $workers_coin_query->andWhere(['not like', 'password', 'm=solo'])->scalar();
             $solo_workers_coins = $workers_coin_query->andWhere(['like', 'password', 'm=solo'])->scalar();
             if ($port_count == 1) 
-	    		echo "<td align='center' style='font-size: .8em;'>$workers_coins / $solo_workers_coins </td>";
+	    		echo "<td align='center' class='text-small'>$workers_coins / $solo_workers_coins </td>";
 			else
-				echo "<td align='center' style='font-size: .8em;'>$workers / $solo_workers </td>";
+				echo "<td align='center' class='text-small'>$workers / $solo_workers </td>";
 			
             $pool_hash = Yii::$app->YiimpUtils->coin_rate($coin->id);
             $pool_hash_sfx = $pool_hash ? Yii::$app->ConversionUtils->Itoa2($pool_hash) . 'h/s' : '0 h/s';
@@ -255,17 +254,17 @@ foreach ($algos as $item)
 			$pool_shared_hash_sfx = $pool_shared_hash ? Yii::$app->ConversionUtils->Itoa2($pool_shared_hash) . 'h/s' : '0 h/s';
 			$pool_solo_hash = Yii::$app->YiimpUtils->coin_solo_rate($coin->id);
 			$pool_solo_hash_sfx = $pool_solo_hash ? Yii::$app->ConversionUtils->Itoa2($pool_solo_hash) . 'h/s' : '0 h/s';
-			echo "<td align='center' style='font-size: .8em;'>$pool_shared_hash_sfx / $pool_solo_hash_sfx / $pool_hash_sfx</td>";
+			echo "<td align='center' class='text-small'>$pool_shared_hash_sfx / $pool_solo_hash_sfx / $pool_hash_sfx</td>";
             
             $min_ttf = $coin->network_ttf > 0 ? min($coin->actual_ttf, $coin->network_ttf) : $coin->actual_ttf;
 
             $network_hash = Yii::$app->YiimpUtils->coin_nethash($coin);
             $network_hash = $network_hash ? Yii::$app->ConversionUtils->Itoa2($network_hash) . 'h/s' : '';
-            echo "<td align='center' style='font-size: .8em;' data='$pool_hash'>$network_hash</td>";
-            echo "<td align='center' style='font-size: .8em;'>{$fees}% / {$fees_solo}% </td>";
+            echo "<td align='center' class='text-small' data='$pool_hash'>$network_hash</td>";
+            echo "<td align='center' class='text-small'>{$fees}% / {$fees_solo}% </td>";
             $btcmhd = Yii::$app->YiimpUtils->yiimp_profitability($coin);
             $btcmhd = Yii::$app->ConversionUtils->mbitcoinvaluetoa($btcmhd);
-            echo "<td align='center' style='font-size: .8em;'>$btcmhd</td>";
+            echo "<td align='center' class='text-small'>$btcmhd</td>";
             echo "</tr>";
         }
     }
@@ -279,14 +278,14 @@ foreach ($algos as $item)
 echo "</tbody>";
 
 
-if ($defaultalgo == 'all') echo "<tr style='cursor: pointer; background-color: #d9d9d9;' onclick='javascript:select_algo(\"all\")'>";
-else echo "<tr style='cursor: pointer' class='ssrow' onclick='javascript:select_algo(\"all\")'>";
+if ($defaultalgo == 'all') echo "<tr class='cursor-pointer algo-row bg-gray' data-algo='all'>";
+else echo "<tr class='cursor-pointer ssrow algo-row' data-algo='all'>";
 echo "<td><b>all</b></td>";
 echo "<td></td>";
-echo "<td align=center style='font-size: .8em;'>$total_coins Coins</td>";
+echo "<td align=center class='text-small'>$total_coins Coins</td>";
 echo "<td></td>";
-echo "<td align=center style='font-size: .8em;'>$total_users Users</td>";
-echo "<td align=center style='font-size: .8em;'>Shared: $total_workers workers<br>Solo: $total_solo_workers workers</td>";
+echo "<td align=center class='text-small'>$total_users Users</td>";
+echo "<td align=center class='text-small'>Shared: $total_workers workers<br>Solo: $total_solo_workers workers</td>";
 echo "<td></td>";
 echo '<td class="estimate"></td>';
 echo '<td class="estimate"></td>';
@@ -295,18 +294,27 @@ echo "<td></td>";
 echo "<td></td>";
 echo "</tr>";
 echo "</table>";
-echo '<p style="font-size: .8em;">&nbsp;* values in mBTC/MH/day, per GH for sha & blake algos</p>';
+echo '<p class="text-small">&nbsp;* values in mBTC/MH/day, per GH for sha & blake algos</p>';
 echo "</div></div><br />";
 ?>
+
+<?= CspHelper::beginScript() ?>
+// Event listeners for algo selection rows
+document.addEventListener('DOMContentLoaded', function() {
+	var algoRows = document.querySelectorAll('.algo-row');
+	algoRows.forEach(function(row) {
+		row.addEventListener('click', function() {
+			var algo = this.getAttribute('data-algo');
+			select_algo(algo);
+		});
+	});
+});
+<?= CspHelper::endScript() ?>
 
 <?php
 if (!$showestimates):
 ?>
-
-<style type="text/css">
-#maintable1 .estimate { display: none; }
-</style>
-
+<?= CspHelper::style('#maintable1 .estimate { display: none; }') ?>
 <?php
 endif;
 ?>

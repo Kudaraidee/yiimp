@@ -7,13 +7,7 @@
 
 use app\models\Coins;
 use app\models\Workers;
-
-function WriteBoxHeader($title)
-{
-    echo "<div class='main-left-box'>";
-    echo "<div class='main-left-title'>$title</div>";
-    echo "<div class='main-left-inner'>";
-}
+use app\components\ViewHelper;
 
 $algo = Yii::$app->session->get('yaamp-algo');
 
@@ -37,7 +31,7 @@ else
 
 $coin_count  = $count > 1 ? "on $count wallets" : 'on a single wallet';
 $miner_count = $worker > 1 ? "$worker miners" : "$worker miner";
-WriteBoxHeader("Mining $coin_count $total_rate_d, $miner_count");
+ViewHelper::renderBoxHeader("Mining $coin_count $total_rate_d, $miner_count");
 
 Yii::$app->ViewUtils->showTableSorter('maintable3', "{
     tableClass: 'dataGrid2',
@@ -110,7 +104,7 @@ foreach ($list as $coin) {
     $min_ttf      = $coin->network_ttf > 0 ? min($coin->actual_ttf, $coin->network_ttf) : $coin->actual_ttf;
 
     if (!$coin->auto_ready)
-        echo "<tr style='opacity: 0.4;'>";
+        echo "<tr class='ssrow row-not-ready'>";
     else
         echo "<tr class='ssrow'>";
 
@@ -128,61 +122,61 @@ foreach ($list as $coin) {
         $owed2  = Yii::$app->ConversionUtils->bitcoinvaluetoa($owed - $coin->balance);
         $symbol = $coin->getOfficialSymbol();
         $title  = "We are short of this currency ($owed2 $symbol). Please switch to another currency until we find more $symbol blocks.";
-        echo "<td><b><a href=\"/site/block?id={$coin->id}\" title=\"$title\" style=\"color: #c55;\">$name</a></b><span style=\"font-size: .8em;\"> ({$coin->algo})</span></td>";
+        echo "<td><b><a href=\"/site/block?id={$coin->id}\" title=\"$title\" class=\"coin-short\">$name</a></b><span class=\"text-small\"> ({$coin->algo})</span></td>";
     } else {
-		echo "<td><b><a href='/site/block?id=$coin->id'>$name</a></b><span style='font-size: .8em'> ($coin->algo)</span>".
-			(($coin->auto_exchange)?"":"<span style='font-size: .8em; color: red; font-weight: bold;'>(no autotrade)</span>").
+		echo "<td><b><a href='/site/block?id=$coin->id'>$name</a></b><span class='text-small'> ($coin->algo)</span>".
+			(($coin->auto_exchange)?"":"<span class='text-small text-danger fw-bold'>(no autotrade)</span>").
 			"</td>";
     }
-    echo "<td align=right style='font-size: .8em;'><b>$reward $coin->symbol_show</b></td>";
+    echo "<td align=right class='text-small'><b>$reward $coin->symbol_show</b></td>";
 
     $title = "POW $coin->difficulty";
     if ($coin->rpcencoding == 'POS')
         $title .= "\nPOS $coin->difficulty_pos";
 
-    echo '<td align="right" style="font-size: .8em;" data="' . $coin->difficulty . '" title="' . $title . '">' . $difficulty . '</td>';
+    echo '<td align="right" class="text-small" data="' . $coin->difficulty . '" title="' . $title . '">' . $difficulty . '</td>';
 
     if (!empty($coin->errors))
-        echo "<td align=right style='font-size: .8em; color: red;' title='$coin->errors'>$height</td>";
+        echo "<td align=right class='text-small text-danger' title='$coin->errors'>$height</td>";
     else
-        echo "<td align=right style='font-size: .8em;'>$height</td>";
+        echo "<td align=right class='text-small'>$height</td>";
 
     if (!YAAMP_ALLOW_EXCHANGE && !empty($real_ttf) && !empty($shared_real_ttf) && !empty($solo_real_ttf))
-        echo '<td align="right" style="font-size: .8em ;" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
+        echo '<td align="right" class="text-small" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
 Solo: '.$solo_real_ttf.' at '.$pool_solo_hash_sfx.'
 Full pool speed: '.$pool_ttf.' at '.$pool_total_rate.'">'.$real_ttf.'</td>';
     elseif (!empty($real_ttf) && !empty($shared_real_ttf) && !empty($solo_real_ttf))
-        echo '<td align="right" style="font-size: .8em ;" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
+        echo '<td align="right" class="text-small" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
 Solo: '.$solo_real_ttf.' at '.$pool_solo_hash_sfx.'
 Full pool speed: '.$pool_ttf.' at '.$pool_total_rate.'">'.$real_ttf.'</td>';
     elseif (!empty($real_ttf) && !empty($shared_real_ttf) && !empty($solo_real_ttf))
-        echo '<td align="right" style="font-size: .8em ;" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
+        echo '<td align="right" class="text-small" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
 Solo: '.$solo_real_ttf.' at '.$pool_solo_hash_sfx.'
 Full pool speed: '.$pool_ttf.' at '.$pool_total_rate.'">'.$real_ttf.'</td>';
     elseif (!empty($real_ttf) && !empty($shared_real_ttf))
-        echo '<td align="right" style="font-size: .8em ;" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
+        echo '<td align="right" class="text-small" title="Shared: '.$shared_real_ttf.' at '.$pool_shared_hash_sfx.'
 Full pool speed: '.$pool_ttf.' at '.$pool_total_rate.'">'.$real_ttf.'</td>';
     elseif (!empty($real_ttf) && !empty($solo_real_ttf))
-        echo '<td align="right" style="font-size: .8em ;" title="Solo: '.$solo_real_ttf.' at '.$pool_solo_hash_sfx.'
+        echo '<td align="right" class="text-small" title="Solo: '.$solo_real_ttf.' at '.$pool_solo_hash_sfx.'
 Full pool speed: '.$pool_ttf.' at '.$pool_total_rate.'">'.$real_ttf.'</td>';
     elseif (!empty($real_ttf))
-        echo '<td align="right" style="font-size: .8em ;" title="Full pool speed: '.$pool_ttf.' at '.$pool_total_rate.'">'.$real_ttf.'</td>';
+        echo '<td align="right" class="text-small" title="Full pool speed: '.$pool_ttf.' at '.$pool_total_rate.'">'.$real_ttf.'</td>';
     else
-        echo '<td align="right" style="font-size: .8em;" title="At current pool speed">' . $pool_ttf . '</td>';
+        echo '<td align="right" class="text-small" title="At current pool speed">' . $pool_ttf . '</td>';
 
     if ($coin->auxpow && $coin->auto_ready)
-        echo "<td align=right style='font-size: .8em; opacity: 0.6;' title='merge mined\n$network_hash_string' data='$pool_hash'>$pool_hash_sfx</td>";
+        echo "<td align=right class='text-small row-merge-mined' title='merge mined\n$network_hash_string' data='$pool_hash'>$pool_hash_sfx</td>";
     else
-        echo "<td align=right style='font-size: .8em;' title='Network: $network_hash_string' data='$pool_hash'>$pool_hash_sfx</td>";
+        echo "<td align=right class='text-small' title='Network: $network_hash_string' data='$pool_hash'>$pool_hash_sfx</td>";
 
     $btcmhd = Yii::$app->ConversionUtils->mbitcoinvaluetoa($btcmhd);
-    echo "<td align=right style='font-size: .8em;' data='$btcmhd'><b>$btcmhd</b></td>";
+    echo "<td align=right class='text-small' data='$btcmhd'><b>$btcmhd</b></td>";
     echo "</tr>";
 }
 
 echo "</table>";
 
-echo '<p style="font-size: .8em;">
+echo '<p class="text-small">
     &nbsp;*** estimated average time to find a block at full pool speed<br/>
     &nbsp;** approximate from the last 5 minutes submitted shares<br/>
     &nbsp;* 24h estimation from net difficulty in mBTC/MH/day (GH/day for sha & blake algos)<br>

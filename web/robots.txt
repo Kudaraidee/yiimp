@@ -1,2 +1,25 @@
 User-agent: *
-Disallow: /
+# Erlaube Indexierung der öffentlichen Seiten
+Allow: /
+
+# Blockiere administrative Bereiche
+Disallow: /yaamp/modules/admin/
+Disallow: /yaamp/runtime/
+Disallow: /yaamp/commands/
+
+# Blockiere technische Verzeichnisse
+Disallow: /framework/
+Disallow: /extensions/
+Disallow: /assets/
+
+# Blockiere Skripte und Konfigurationsdateien
+Disallow: /*.sh$
+Disallow: /*.php$
+Disallow: /serverconfig
+
+# Erlaube wichtige öffentliche Seiten explizit
+Allow: /index.php
+Allow: /yaamp/modules/site/
+
+# Sitemap
+Sitemap: https://your-pool.example.com/sitemap.xml

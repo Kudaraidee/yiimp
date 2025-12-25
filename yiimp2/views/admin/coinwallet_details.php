@@ -62,12 +62,12 @@ if (YAAMP_ALLOW_EXCHANGE) {
 }
 echo "Balance (db) $balance $symbol";
 echo ", Owned " . Yii::$app->ConversionUtils->bitcoinvaluetoa($coin->available) . " $symbol";
-echo ", Owed " . Html::a($owed, "/admin/earning?id=" . $coin->id) . " $symbol ($owed_btc BTC)";
-echo ", " . Html::a($reserved1, "/admin/payments?id=" . $coin->id) . " $symbol cleared<br/><br/>";
+echo ", Owed " . Html::a($owed, ['earning', 'coinid' => $coin->id]) . " $symbol ($owed_btc BTC)";
+echo ", " . Html::a($reserved1, ['payments', 'coinid' => $coin->id]) . " $symbol cleared<br/><br/>";
 
 //////////////////////////////////////////////////////////////////////////////////////
 
-$bookmarkAdd = Html::a('+', "/admin/bookmarkAdd?id=" . $coin->id, array(
+$bookmarkAdd = Html::a('+', ['bookmark-add', 'id' => $coin->id], array(
     'title' => 'Add a bookmark'
 ));
 
@@ -117,11 +117,11 @@ foreach ($list as $market) {
     echo '<td title="' . $updated . '">' . $price . '</td>';
     echo '<td title="' . $updated . '">' . $price2 . '</td>';
 
-    echo '<td style="max-width: 800px; text-overflow: ellipsis; overflow: hidden;">';
+    echo '<td class="text-ellipsis">';
     if (!empty($market->deposit_address)) {
-        $name = CJavaScript::encode($market->name);
-        $addr = CJavaScript::encode($market->deposit_address);
-        echo CHtml::link(YAAMP_ALLOW_EXCHANGE ? "sell" : "send", "javascript:;", array(
+        $name = \yii\helpers\Json::encode($market->name);
+        $addr = \yii\helpers\Json::encode($market->deposit_address);
+        echo Html::a(YAAMP_ALLOW_EXCHANGE ? "sell" : "send", "javascript:;", array(
             'onclick' => "return showSellAmountDialog($name, $addr, {$market->id});"
         ));
         echo ' ' . $market->deposit_address;
@@ -176,7 +176,7 @@ foreach ($list as $bookmark) {
         ));
         echo ' ' . $bookmark->address;
     }
-    echo ' <a href="/admin/bookmarkEdit?id=' . $bookmark->id . '">edit</a>';
+    echo ' ' . Html::a('edit', ['bookmark-edit', 'id' => $bookmark->id]);
     echo '</td>';
 
     echo '<td></td>';
@@ -190,7 +190,7 @@ foreach ($list as $bookmark) {
     echo '<td align="center"></td>';
 
     echo '<td align="right">';
-    echo '<a class="red" href="/admin/bookmarkDel?id=' . $bookmark->id . '">delete</a>';
+    echo Html::a('delete', ['bookmark-delete', 'id' => $bookmark->id], ['class' => 'red']);
     echo '</td>';
 
     echo "</tr>";
@@ -254,9 +254,9 @@ if ($coin->enable)
 else
     echo "<td>[&nbsp;&nbsp;&nbsp;&nbsp;]</td>";
 
-echo '<td><b><a href="/site/block?id=' . $coin->id . '">' . $coin->name . '</a></b></td>';
+echo '<td><b>' . Html::a($coin->name, ['/site/block', 'id' => $coin->id]) . '</b></td>';
 echo '<td width="60"><b>' . $coin->symbol . '</b></td>';
-echo '<td><a href="/site/gomining?algo=' . $coin->algo . '">' . $coin->algo . '</a></td>';
+echo '<td>' . Html::a($coin->algo, ['/site/gomining', 'algo' => $coin->algo]) . '</td>';
 
 if (!$info || !isset($info['balance']) ) {
     // echo '<td colspan="5">ERROR ' . $remote->error . '</td>';
@@ -269,7 +269,7 @@ if (!$info || !isset($info['balance']) ) {
 $errors      = isset($info['errors']) ? $info['errors'] : '';
 $balance     = isset($info['balance']) ? $info['balance'] : '';
 $txfee       = isset($info['paytxfee']) ? $info['paytxfee'] : '';
-$connections = isset($info['connections']) ? Html::a($info['connections'], '/admin/coinpeers?id=' . $coin->id) : '';
+$connections = isset($info['connections']) ? Html::a($info['connections'], ['coin-peers', 'id' => $coin->id]) : '';
 $blocks      = isset($info['blocks']) ? $info['blocks'] : '';
 $zbalance    = null;
 
@@ -295,7 +295,7 @@ echo "<td>$btc</td>";
 if ($PoS)
     echo '<td>' . $stake . '</td>';
 else if ($DCR) {
-    echo '<td>' . Html::a("$stake ($tickets)", '/admin/cointickets?id=' . $coin->id) . '</td>';
+    echo '<td>' . Html::a("$stake ($tickets)", ['coin-tickets', 'id' => $coin->id]) . '</td>';
     echo '<td>' . Html::a($ticketprice, "https://dcrstats.com/", array(
         'target' => '_blank'
     )) . '</td>';
@@ -508,7 +508,7 @@ foreach ($txs_array as $tx) {
             ':address' => $address
         ));
         if ($exists)
-            echo CHtml::link($address, '/?address=' . $address);
+            echo Html::a($address, ['/site/index', 'address' => $address]);
         else
             echo $address . '<br>';
     }
@@ -535,10 +535,10 @@ foreach ($txs_array as $tx) {
 
 echo '</tbody></table>';
 
-$url     = '/admin/coinwallet?id=' . $coin->id . '&since=' . (time() - 31 * 24 * 3600) . '&rows=' . ($maxrows * 2);
+$url     = \yii\helpers\Url::to(['coinwallet', 'id' => $coin->id, 'since' => (time() - 31 * 24 * 3600), 'rows' => ($maxrows * 2)]);
 $moreurl = Html::a('Click here to show more transactions...', $url);
 
-echo '<div class="loadfooter" style="margin-top: 4px;">' . $moreurl . '</div>';
+echo '<div class="loadfooter" class="mt-4px">' . $moreurl . '</div>';
 echo '</div>';
 
 //////////////////////////////////////////////////////////////////////////////////////

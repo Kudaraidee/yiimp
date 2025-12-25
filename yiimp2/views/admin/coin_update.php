@@ -7,10 +7,25 @@ use yii\widgets\ActiveForm;
 use yii\helpers\ArrayHelper;
 
 use app\models\Algos;
+use app\assets\CspCompliantAsset;
 
-echo Html::a('Back to coin list', ['/admin/coinlist']);
+CspCompliantAsset::register($this);
 
-$form = ActiveForm::begin();
+echo Html::a('Back to coin list', ['coinwallets']);
+
+$form = ActiveForm::begin([
+	'options' => [
+		'class' => 'yiimp-form',
+	],
+	'fieldConfig' => [
+		'options' => ['class' => 'form-group'],
+		'errorOptions' => ['class' => 'invalid-feedback'],
+		'inputOptions' => ['class' => 'form-control'],
+		'labelOptions' => ['class' => 'form-label'],
+	],
+	'enableClientValidation' => true,
+	'validateOnSubmit' => true,
+]);
 
 echo $form->errorSummary($coin);
 echo Html::beginTag('fieldset', array('class'=>'inlineLabels'));

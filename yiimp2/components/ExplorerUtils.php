@@ -4,241 +4,329 @@ namespace app\components;
 
 use Yii;
 use yii\base\Component;
-use yii\helpers\Html;
+use app\models\Coins;
 
+/**
+ * ExplorerUtils component for blockchain exploration utilities
+ */
 class ExplorerUtils extends Component
 {
-	public const ADDRESSVERSION = "00"; //this is a hex byte
-
-	function decodeHex($hex)
-	{
-		$hex=strtoupper($hex);
-		$chars="0123456789ABCDEF";
-		$return="0";
-		for($i=0;$i<strlen($hex);$i++)
-		{
-			$current=(string)strpos($chars,$hex[$i]);
-			$return=(string)bcmul($return,"16",0);
-			$return=(string)bcadd($return,$current,0);
-		}
-		return $return;
-	}
-
-	function encodeHex($dec)
-	{
-		$chars="0123456789ABCDEF";
-		$return="";
-		while (bccomp($dec,0)==1)
-		{
-			$dv=(string)bcdiv($dec,"16",0);
-			$rem=(integer)bcmod($dec,"16");
-			$dec=$dv;
-			$return=$return.$chars[$rem];
-		}
-		return strrev($return);
-	}
-
-	function decodeBase58($base58)
-	{
-		$origbase58=$base58;
-
-		$chars="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-		$return="0";
-		for($i=0;$i<strlen($base58);$i++)
-		{
-			$current=(string)strpos($chars,$base58[$i]);
-			$return=(string)bcmul($return,"58",0);
-			$return=(string)bcadd($return,$current,0);
-		}
-
-		$return=encodeHex($return);
-
-		//leading zeros
-		for($i=0;$i<strlen($origbase58)&&$origbase58[$i]=="1";$i++)
-		{
-			$return="00".$return;
-		}
-
-		if(strlen($return)%2!=0)
-		{
-			$return="0".$return;
-		}
-
-		return $return;
-	}
-
-	function encodeBase58($hex)
-	{
-		if(strlen($hex)%2!=0)
-		{
-			die("encodeBase58: uneven number of hex characters");
-		}
-		$orighex=$hex;
-
-		$chars="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-		$hex=decodeHex($hex);
-		$return="";
-		while (bccomp($hex,0)==1)
-		{
-			$dv=(string)bcdiv($hex,"58",0);
-			$rem=(integer)bcmod($hex,"58");
-			$hex=$dv;
-			$return=$return.$chars[$rem];
-		}
-		$return=strrev($return);
-
-		//leading zeros
-		for($i=0;$i<strlen($orighex)&&substr($orighex,$i,2)=="00";$i+=2)
-		{
-			$return="1".$return;
-		}
-
-		return $return;
-	}
-
-	function hash160ToAddress($hash160,$addressversion = ADDRESSVERSION)
-	{
-		$hash160=$addressversion.$hash160;
-		$check=pack("H*" , $hash160);
-		$check=hash("sha256",hash("sha256",$check,true));
-		$check=substr($check,0,8);
-		$hash160=strtoupper($hash160.$check);
-		return encodeBase58($hash160);
-	}
-
-	function addressToHash160($addr)
-	{
-		$addr=decodeBase58($addr);
-		$addr=substr($addr,2,strlen($addr)-10);
-		return $addr;
-	}
-
-	function checkAddress($addr,$addressversion = ADDRESSVERSION)
-	{
-		$addr=decodeBase58($addr);
-		if(strlen($addr)!=50)
-		{
-			return false;
-		}
-		$version=substr($addr,0,2);
-		if(hexdec($version)>hexdec($addressversion))
-		{
-			return false;
-		}
-		$check=substr($addr,0,strlen($addr)-8);
-		$check=pack("H*" , $check);
-		$check=strtoupper(hash("sha256",hash("sha256",$check,true)));
-		$check=substr($check,0,8);
-		return $check==substr($addr,strlen($addr)-8);
-	}
-
-	function hash160($data)
-	{
-		$data=pack("H*" , $data);
-		return strtoupper(hash("ripemd160",hash("sha256",$data,true)));
-	}
-
-	function pubKeyToAddress($pubkey)
-	{
-		return hash160ToAddress(hash160($pubkey));
-	}
-
-	function remove0x($string)
-	{
-		if(substr($string,0,2)=="0x"||substr($string,0,2)=="0X")
-		{
-			$string=substr($string,2);
-		}
-		return $string;
-	}
-
-	// version is used for multi algo coins
-	function versionToAlgo($coin, $version)
-	{
-		// could be filled by block json (chain analysis)
-		$algos['MYR'] = array(
-			0=>'sha256', 1=>'scrypt', 2=>'myr-gr', 3=>'skein', 4=>'qubit', 5=>'yescrypt'
-		);
-		
-		$algos['DGB'] = array(
-			0=>'scrypt', 1=>'sha256', 2=>'myr-gr', 3=>'skein', 4=>'qubit'
-		);
-		
-		$algos['AUR'] = array(
-			0=>'sha256', 1=>'scrypt', 2=>'myr-gr', 3=>'skein', 4=>'qubit'
-		);
-		
-		$algos['DGC'] = array(
-			0=>'scrypt', 1=>'sha256', 2=>'x11'
-		);
-		
-		$algos['DUO'] = array(
-			0=>'sha256', 1=>'scrypt'
-		);
-		
-		$algos['J'] = array(
-			2 =>'sha256', 3=>'x11', 4=>'x13', 5=>'x15', 6=>'scrypt',
-			7 =>'nist5',  8 =>'myr-gr', 9=>'penta', 10=>'whirlpool',
-			11=>'luffa',  12=>'keccak', 13=>'quark', 15=>'bastion'
-		);
-		$algos['GCH'] = array(
-			0=>'x12', 1=>'x11', 2=>'x13', 3=>'sha256', 4=>'blake2s'
-		);
-		
-		$algos['GLT'] = array(
-			0=>'sha256', 1=>'scrypt', 2=>'x11', 3=>'neoscrypt', 4=>'equihash', 5=>'yescrypt', 6=>'hmq1725', 
-			7=>'xevan', 8=>'nist5', 9=>'bitcore', 10=>'pawelhash', 11=>'x13', 12=>'x14', 13=>'x15', 14=>'x17', 
-			15=>'lyra2v2', 16=>'blake2s', 17=>'blake2b', 18=>'astralhash', 19=>'padihash', 20=>'jeonghash', 
-			21=>'keccak', 22=>'zhash', 23=>'globalhash', 24=>'skein', 25=>'myr-gr', 26=>'qubit', 27=>'skunk', 
-			28=>'quark', 29=>'x16r'
-		);
-		
-		$algos['RICHX'] = array(
-			0=>'sha256', 1=>'scrypt', 2=>'myr-gr', 3=>'skein', 4=>'qubit'
-		);
-		
-		$algos['SFR'] = array(
-			0=>'sha256', 1=>'scrypt', 2=>'myr-gr', 3=>'x11', 4=>'blake'
-		);
-		
-		$algos['UIS'] = array(
-			0=>'lyra2v2', 1=>'skein', 2=>'qubit', 3=>'yescrypt', 4=>'x11'
-		);
-		
-		$algos['XVG'] = array(
-			0=>'scrypt', 1=>'scrypt', 2=>'myr-gr', 3=>'x17', 4=>'blake2s', 10=>'lyra2v2',
-		);
-		
-		$algos['XSH'] = array(
-			0=>'scrypt', 1=>'scrypt', 2=>'myr-gr', 3=>'x17', 4=>'blake2s', 10=>'lyra2v2', 11=>'x16s',
-		);
-		
-		$algos['ARG'] = array(
-			0=>'sha256', 1=>'scrypt', 2=>'lyra2v2', 3=>'myr-gr', 4=>'argon2d', 5=>'yescrypt',
-		);
-		$algos['BTA'] = array(
-			0=>'sha256', 1=>'scrypt', 2=>'x16r', 3=>'lyra2z', 4=>'x11', 5=>'nist5', 6=>'x16s',
-		);
-		$algos['PLSR'] = array(
-			0=>'curvehash', 1=>'minotaurx',
-		);
-		
-		
-		$symbol = $coin->symbol;
-		if (!empty($coin->symbol2)) $symbol = $coin->symbol2;
-
-		if ($symbol == 'J')
-			return Yii::$app->ConversionUtils->arraySafeVal($algos[$symbol], $version, '');
-		else if($symbol == 'GCH')
-			return Yii::$app->ConversionUtils->arraySafeVal($algos[$symbol], ($version - 9), '');
-		else if($symbol == 'XVG')
-			return Yii::$app->ConversionUtils->arraySafeVal($algos[$symbol], ($version >> 11), 'scrypt');
-		else if($symbol == 'PLSR')
-			return Yii::$app->ConversionUtils->arraySafeVal($algos[$symbol], ($version >> 16) & 255, '');
-		else if($symbol == 'XSH')
-			return Yii::$app->ConversionUtils->arraySafeVal($algos[$symbol], (($version-536870000) >> 11), 'scrypt');
-		else if (isset($algos[$symbol]))
-			return Yii::$app->ConversionUtils->arraySafeVal($algos[$symbol], ($version >> 9) & 7, '');
-		return false;
-	}
+    /**
+     * Get block details from RPC
+     * 
+     * @param Coins $coin Coin model
+     * @param string|null $hash Block hash
+     * @param int|null $height Block height
+     * @return array|null Block details or null on error
+     */
+    public function getBlockDetails($coin, $hash = null, $height = null)
+    {
+        $rpc = Yii::$app->RpcClient->getConnection($coin);
+        
+        if (!$rpc) {
+            Yii::error("ExplorerUtils: Failed to connect to {$coin->symbol} RPC", __METHOD__);
+            return null;
+        }
+        
+        try {
+            // If height is provided, get hash first
+            if ($height !== null && $hash === null) {
+                $hash = $rpc->getblockhash($height);
+                if (!$hash) {
+                    Yii::warning("ExplorerUtils: Block not found at height {$height} for {$coin->symbol}", __METHOD__);
+                    return null;
+                }
+            }
+            
+            if (empty($hash)) {
+                Yii::warning("ExplorerUtils: No hash or height provided for {$coin->symbol}", __METHOD__);
+                return null;
+            }
+            
+            // Get block details
+            $block = $rpc->getblock($hash);
+            
+            if (!$block) {
+                Yii::warning("ExplorerUtils: Block {$hash} not found for {$coin->symbol}", __METHOD__);
+                return null;
+            }
+            
+            // Ensure we have the hash in the result
+            if (!isset($block['hash'])) {
+                $block['hash'] = $hash;
+            }
+            
+            return $block;
+            
+        } catch (\Exception $e) {
+            Yii::error("ExplorerUtils: Error getting block details for {$coin->symbol}: {$e->getMessage()}", __METHOD__);
+            return null;
+        }
+    }
+    
+    /**
+     * Get transaction details from RPC
+     * 
+     * @param Coins $coin Coin model
+     * @param string $txid Transaction ID
+     * @return array|null Transaction details or null on error
+     */
+    public function getTransactionDetails($coin, $txid)
+    {
+        $rpc = Yii::$app->RpcClient->getConnection($coin);
+        
+        if (!$rpc) {
+            Yii::error("ExplorerUtils: Failed to connect to {$coin->symbol} RPC", __METHOD__);
+            return null;
+        }
+        
+        try {
+            // Try getrawtransaction first (with verbose=1)
+            $tx = $rpc->getrawtransaction($txid, 1);
+            
+            if (!$tx) {
+                // Fallback to gettransaction for wallet transactions
+                $tx = $rpc->gettransaction($txid);
+            }
+            
+            if (!$tx) {
+                Yii::warning("ExplorerUtils: Transaction {$txid} not found for {$coin->symbol}", __METHOD__);
+                return null;
+            }
+            
+            return $tx;
+            
+        } catch (\Exception $e) {
+            Yii::error("ExplorerUtils: Error getting transaction details for {$coin->symbol}: {$e->getMessage()}", __METHOD__);
+            return null;
+        }
+    }
+    
+    /**
+     * Search for a hash and determine if it's a block or transaction
+     * 
+     * @param Coins $coin Coin model
+     * @param string $query Hash to search for
+     * @return string|null 'block', 'transaction', or null if not found
+     */
+    public function searchHash($coin, $query)
+    {
+        $rpc = Yii::$app->RpcClient->getConnection($coin);
+        
+        if (!$rpc) {
+            Yii::error("ExplorerUtils: Failed to connect to {$coin->symbol} RPC", __METHOD__);
+            return null;
+        }
+        
+        try {
+            // First, try as a block hash
+            $block = $rpc->getblock($query);
+            if ($block) {
+                return 'block';
+            }
+        } catch (\Exception $e) {
+            // Not a block, continue
+        }
+        
+        try {
+            // Try as a transaction
+            $tx = $rpc->getrawtransaction($query, 1);
+            if (!$tx) {
+                $tx = $rpc->gettransaction($query);
+            }
+            if ($tx) {
+                return 'transaction';
+            }
+        } catch (\Exception $e) {
+            // Not a transaction either
+        }
+        
+        Yii::warning("ExplorerUtils: Hash {$query} not found for {$coin->symbol}", __METHOD__);
+        return null;
+    }
+    
+    /**
+     * Get peer connection information
+     * 
+     * @param Coins $coin Coin model
+     * @return array|null Array of peer information or null on error
+     */
+    public function getPeerInfo($coin)
+    {
+        $rpc = Yii::$app->RpcClient->getConnection($coin);
+        
+        if (!$rpc) {
+            Yii::error("ExplorerUtils: Failed to connect to {$coin->symbol} RPC", __METHOD__);
+            return null;
+        }
+        
+        try {
+            $peers = $rpc->getpeerinfo();
+            
+            if (!$peers) {
+                Yii::warning("ExplorerUtils: No peer info available for {$coin->symbol}", __METHOD__);
+                return [];
+            }
+            
+            return $peers;
+            
+        } catch (\Exception $e) {
+            Yii::error("ExplorerUtils: Error getting peer info for {$coin->symbol}: {$e->getMessage()}", __METHOD__);
+            return null;
+        }
+    }
+    
+    /**
+     * Get blockchain statistics for graphing
+     * 
+     * @param Coins $coin Coin model
+     * @param int $days Number of days to retrieve (default 30)
+     * @return array|null Array of statistics or null on error
+     */
+    public function getBlockchainStats($coin, $days = 30)
+    {
+        try {
+            // Get blockchain info from RPC
+            $rpc = Yii::$app->RpcClient->getConnection($coin);
+            
+            if (!$rpc) {
+                Yii::error("ExplorerUtils: Failed to connect to {$coin->symbol} RPC", __METHOD__);
+                return null;
+            }
+            
+            $info = $rpc->getblockchaininfo();
+            if (!$info) {
+                $info = $rpc->getinfo();
+            }
+            if (!$info) {
+                $info = $rpc->getmininginfo();
+            }
+            
+            if (!$info) {
+                Yii::warning("ExplorerUtils: No blockchain info available for {$coin->symbol}", __METHOD__);
+                return null;
+            }
+            
+            // Get historical data from blocks table
+            $startTime = time() - ($days * 24 * 60 * 60);
+            
+            $blocks = \app\models\Blocks::find()
+                ->where(['coinid' => $coin->id])
+                ->andWhere(['>=', 'time', $startTime])
+                ->orderBy(['time' => SORT_ASC])
+                ->all();
+            
+            $stats = [
+                'current' => $info,
+                'history' => [],
+            ];
+            
+            // Group blocks by day for graphing
+            foreach ($blocks as $block) {
+                $day = date('Y-m-d', $block->time);
+                
+                if (!isset($stats['history'][$day])) {
+                    $stats['history'][$day] = [
+                        'date' => $day,
+                        'blocks' => 0,
+                        'difficulty' => [],
+                        'hashrate' => [],
+                    ];
+                }
+                
+                $stats['history'][$day]['blocks']++;
+                $stats['history'][$day]['difficulty'][] = $block->difficulty;
+            }
+            
+            // Calculate averages
+            foreach ($stats['history'] as $day => &$data) {
+                if (!empty($data['difficulty'])) {
+                    $data['avg_difficulty'] = array_sum($data['difficulty']) / count($data['difficulty']);
+                }
+                unset($data['difficulty']);
+            }
+            
+            return $stats;
+            
+        } catch (\Exception $e) {
+            Yii::error("ExplorerUtils: Error getting blockchain stats for {$coin->symbol}: {$e->getMessage()}", __METHOD__);
+            return null;
+        }
+    }
+    
+    /**
+     * Get recent blocks for a coin
+     * 
+     * @param Coins $coin Coin model
+     * @param int $limit Number of blocks to retrieve (default 20)
+     * @return array Array of block information
+     */
+    public function getRecentBlocks($coin, $limit = 20)
+    {
+        try {
+            $blocks = \app\models\Blocks::find()
+                ->where(['coinid' => $coin->id])
+                ->orderBy(['height' => SORT_DESC])
+                ->limit($limit)
+                ->all();
+            
+            return $blocks;
+            
+        } catch (\Exception $e) {
+            Yii::error("ExplorerUtils: Error getting recent blocks for {$coin->symbol}: {$e->getMessage()}", __METHOD__);
+            return [];
+        }
+    }
+    
+    /**
+     * Get recent transactions for a coin from recent blocks
+     * 
+     * @param Coins $coin Coin model
+     * @param int $limit Number of transactions to retrieve (default 20)
+     * @return array Array of transaction information
+     */
+    public function getRecentTransactions($coin, $limit = 20)
+    {
+        try {
+            $rpc = Yii::$app->RpcClient->getConnection($coin);
+            
+            if (!$rpc) {
+                return [];
+            }
+            
+            // Get recent blocks
+            $blocks = $this->getRecentBlocks($coin, 10);
+            
+            $transactions = [];
+            
+            foreach ($blocks as $block) {
+                if (count($transactions) >= $limit) {
+                    break;
+                }
+                
+                // Get block details from RPC to get transaction list
+                $blockDetails = $this->getBlockDetails($coin, $block->hash);
+                
+                if ($blockDetails && isset($blockDetails['tx'])) {
+                    foreach ($blockDetails['tx'] as $txid) {
+                        if (count($transactions) >= $limit) {
+                            break;
+                        }
+                        
+                        $transactions[] = [
+                            'txid' => $txid,
+                            'height' => $block->height,
+                            'time' => $block->time,
+                        ];
+                    }
+                }
+            }
+            
+            return $transactions;
+            
+        } catch (\Exception $e) {
+            Yii::error("ExplorerUtils: Error getting recent transactions for {$coin->symbol}: {$e->getMessage()}", __METHOD__);
+            return [];
+        }
+    }
 }

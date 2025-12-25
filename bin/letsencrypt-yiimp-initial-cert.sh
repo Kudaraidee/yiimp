@@ -15,7 +15,6 @@ $LETSENCRYPT_BIN certonly \
     --text \
     --expand \
     --agree-tos \
-    --email $MAILADDRESS \
     -d $DOMAINNAME
 
 # Cat the certificate chain and the private key together for haproxy

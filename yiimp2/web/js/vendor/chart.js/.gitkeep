@@ -1,0 +1,2 @@
+# This file ensures the chart.js vendor directory is tracked by git
+# Chart.js files will be installed here during Docker build process

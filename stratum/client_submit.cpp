@@ -502,7 +502,7 @@ void client_submit_error(YAAMP_CLIENT *client, YAAMP_JOB *job, int id, const cha
 bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 {
 	// simple backport, will need some rework
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow) {
+	if (is_kawpow || is_firopow || is_phihash) {
 		return kawpow_submit(client, json_params);
 	}
 	// submit(worker_name, jobid, extranonce2, ntime, nonce):
@@ -630,6 +630,18 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		client_submit_error(client, job, 22, "Duplicate share", extranonce2, ntime, nonce);
 		return true;
 	}
+	
+	// Add share to list immediately with minimal data to prevent duplicate submissions
+	// This is especially important for ASICs that may retry quickly
+	// The share will be properly recorded later with correct difficulty
+	YAAMP_SHARE *pending_share = new YAAMP_SHARE;
+	memset(pending_share, 0, sizeof(YAAMP_SHARE));
+	pending_share->jobid = job->id;
+	strcpy(pending_share->extranonce2, extranonce2);
+	strcpy(pending_share->ntime, ntime);
+	strcpy(pending_share->nonce, nonce);
+	strcpy(pending_share->nonce1, client->extranonce1);
+	g_list_share.AddHead(pending_share);
 
 	if ((!is_equihash) && (strlen(extranonce2) != client->extranonce2size*2))
 	{
@@ -748,6 +760,8 @@ if (g_debuglog_hash) {
 				jobid, extranonce2, ntime, nonce, share_diff, client->difficulty_actual, share_diff_coin);
 	}
 
+	// Share was already added to g_list_share earlier to prevent duplicates
+	// Now add it to worker list for database recording
 	share_add(client, job, true, extranonce2, ntime, nonce, share_diff, 0, job->templ->height);
 
 	object_unlock(job);

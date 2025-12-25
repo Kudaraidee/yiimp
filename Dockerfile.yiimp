@@ -22,16 +22,13 @@ COPY --from=docker.io/library/composer:latest /usr/bin/composer /usr/bin/compose
 RUN set -xe \
     && : "---------- Modify apache config ----------" \
     && a2enmod remoteip \
-    && a2enmod rewrite
+    && a2enmod rewrite \
+    && a2enmod ssl
 
 COPY config/000-default.conf /etc/apache2/sites-available/
 COPY config/ports.conf /etc/apache2/
 RUN echo "RemoteIPHeader x-forwarded-for" >> /etc/apache2/apache2.conf \
     && echo "RemoteIPInternalProxy 127.0.0.1" >> /etc/apache2/apache2.conf
-
-# enable yii2-port on alternate vhost
-COPY config/001-yiimp2.conf /etc/apache2/sites-available/
-RUN a2ensite 001-yiimp2
 
 # add php-mcrypt from pecl
 RUN pecl install mcrypt
@@ -51,18 +48,19 @@ RUN python3 -m venv /opt/certbot/ && \
     /opt/certbot/bin/pip install certbot && \
     ln -s /opt/certbot/bin/certbot /usr/bin/certbot
 
-COPY --chmod=755 /bin/letsencrypt-* /usr/local/bin/
+COPY --chmod=755 bin/letsencrypt-* /usr/local/bin/
 
 # build stratum binary
-COPY /stratum /tmp/stratum
+COPY stratum /tmp/stratum
 WORKDIR /tmp/stratum
-RUN make buildonly && cp stratum /usr/bin/
+RUN cp algos/blake3/blake3.h algos/xelisv2-pepew/blake3.h && \
+    make buildonly && cp stratum /usr/bin/
 
 # create default log directory
 RUN mkdir /var/log/yiimp
 
 # Build devel image
-FROM baseimage as image-devel
+FROM baseimage AS image-devel
 
 RUN set -xe \
     && : "---------- changes only on devel env e.g. enable xdebug ----------"
@@ -74,7 +72,7 @@ RUN set -xe \
     && : "---------- Install Xdebug from apt repo ----------" \
     && apt-get install -y php-xdebug
 
-COPY /config/xdebug.ini /usr/local/etc/php/conf.d/
+COPY config/xdebug.ini /usr/local/etc/php/conf.d/
 
 # change apache run-group to match with virtualbox-env
 RUN sed -i 's/APACHE_RUN_GROUP:=www-data/APACHE_RUN_GROUP:=vboxsf/g' /etc/apache2/envvars
@@ -84,15 +82,20 @@ WORKDIR /var/www/
 CMD ["apache2-foreground"]
 
 # Build production image
-FROM baseimage as image-prod
+FROM baseimage AS image-prod
 
-COPY --chown=www-data:www-data /web/ /var/www/
-COPY --chown=www-data:www-data /yiimp2/ /var/yiimp2/
+COPY --chown=www-data:www-data web/ /var/www/
 
-WORKDIR /var/yiimp2/
-RUN sudo -u www-data composer install
+# Create runtime and log directories for Yii1 application
+RUN mkdir -p /var/www/yaamp/runtime && \
+    mkdir -p /var/log/apache2 && \
+    mkdir -p /var/log/yiimp && \
+    chown -R www-data:www-data /var/www/yaamp/runtime && \
+    chown -R www-data:www-data /var/log/yiimp && \
+    chmod -R 775 /var/www/yaamp/runtime && \
+    chmod -R 775 /var/log/yiimp
 
 WORKDIR /var/www/
 
-COPY /config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 CMD ["/usr/bin/supervisord"]

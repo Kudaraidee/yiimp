@@ -6,13 +6,15 @@ use app\models\Coins;
 use app\models\Markets;
 
 echo <<<end
-<div align="right" style="margin-bottom: 6px;">
-<input class="search" type="search" data-column="all" style="width: 140px;" placeholder="Search..." />
-</div>
 <style type="text/css">
 tr.ssrow.filtered { display: none; }
 .page .footer { clear: both; width: auto; margin-top: 16px; }
+.coin-search-wrapper { text-align: right; margin-bottom: 6px; }
+.coin-search-input { width: 140px; }
 </style>
+<div class="coin-search-wrapper">
+<input class="search coin-search-input" type="search" data-column="all" placeholder="Search..." />
+</div>
 end;
 
 Yii::$app->ViewUtils->showTableSorter('maintable', "{
@@ -57,14 +59,15 @@ foreach($coins as $coin)
 
 	$coin->version = substr($coin->version, 0, 20);
 	$difficulty = Yii::$app->ConversionUtils->Itoa2($coin->difficulty, 3);
-	$created = Yii::$app->ConversionUtils->datetoa2($coin->created);
+	// Note: 'created' field doesn't exist in coins table, using ID as fallback
+	$created = $coin->id ? 'ID: ' . $coin->id : '-';
 
 	echo '<tr class="ssrow">';
 	echo '<td><img src="'.$coin->image.'" width="18"></td>';
 
-	echo '<td><b><a href="/admin/coin_update?id='.$coin->id.'">'.$coin->name.'</a></b></td>';
+	echo '<td><b>' . \yii\helpers\Html::a($coin->name, ['coin-update', 'id' => $coin->id]) . '</b></td>';
 
-	echo "<td><b><a href='/admin/coinwallet_update?id=$coin->id'>$coin->symbol</a></b></td>";
+	echo '<td><b>' . \yii\helpers\Html::a($coin->symbol, ['coinwallet-update', 'id' => $coin->id]) . '</b></td>';
 
 	echo "<td>$coin->algo</td>";
 
@@ -121,7 +124,7 @@ echo '<tr class="ssrow sfooter">';
 echo '<th></th>';
 echo '<th colspan="9">';
 echo "<b>$total coins, $total_installed installed, $total_active running</b>";
-echo '<br/><br/><a href="/admin/coin_create">Add a new coin</a>';
+echo '<br/><br/>' . \yii\helpers\Html::a('Add a new coin', ['coin-create']);
 echo '</th>';
 echo "</tr>";
 

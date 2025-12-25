@@ -1,0 +1,68 @@
+# Multi-stage Dockerfile for Yiimp2 Stratum Server
+# Requirements: 20.2, 20.5, 20.7, 20.8
+
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install build tools and dependencies (GCC 9 required for correct stratum compilation)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    automake \
+    autotools-dev \
+    libtool \
+    gcc-9 \
+    g++-9 \
+    git \
+    libssl-dev \
+    libcurl4-openssl-dev \
+    libmariadb-dev-compat \
+    libmariadb-dev \
+    libgmp-dev \
+    libsodium-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set GCC 9 as default (newer versions produce invalid stratum code)
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 100 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 100
+
+# Copy stratum source code
+COPY stratum /tmp/stratum
+
+# Build stratum binary
+WORKDIR /tmp/stratum
+RUN cp algos/blake3/blake3.h algos/xelisv2-pepew/blake3.h && \
+    make buildonly
+
+# Final stage - minimal runtime image
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    libcurl4 \
+    libmariadb3 \
+    libgmp10 \
+    libsodium23 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy stratum binary from builder
+COPY --from=builder /tmp/stratum/stratum /usr/local/bin/stratum
+
+# Make stratum executable
+RUN chmod +x /usr/local/bin/stratum
+
+# Create directory for stratum config
+RUN mkdir -p /etc/stratum
+
+WORKDIR /
+
+# Set ENTRYPOINT to stratum binary
+ENTRYPOINT ["/usr/local/bin/stratum"]
+
+# Default command (config file path, can be overridden)
+CMD ["/etc/stratum.conf"]

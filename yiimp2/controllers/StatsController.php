@@ -56,7 +56,7 @@ class StatsController extends Controller
 
 	public function actionGraph_results_8()
 	{
-		$this->renderPartial('graph_results_8');
+		return $this->renderPartial('graph_results_8');
 	}
 
 	public function actionGraph_results_9()

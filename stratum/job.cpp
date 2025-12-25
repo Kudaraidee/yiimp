@@ -1,7 +1,9 @@
 
 #include "stratum.h"
 
-#define MAX_JOBAGE 120;
+// Increased from 120 to 300 seconds (5 minutes) to support ASICs better
+// ASICs can work on the same job longer without getting stale shares
+#define MAX_JOBAGE 300;
 
 #define RETURN_ON_CONDITION(condition, ret) \
 	if(condition) \

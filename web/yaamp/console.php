@@ -63,8 +63,8 @@ return array(
 			'keyPrefix'=>'',
 			'servers'=>array(
 				array(
-					'host'=>'127.0.0.1',
-					'port'=> 11211,
+					'host'=> defined('YAAMP_MEMCACHE_HOST') ? YAAMP_MEMCACHE_HOST : '127.0.0.1',
+					'port'=> defined('YAAMP_MEMCACHE_PORT') ? YAAMP_MEMCACHE_PORT : 11211,
 					'weight'=> 60,
 				),
 			),

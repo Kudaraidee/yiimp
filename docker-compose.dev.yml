@@ -1,0 +1,190 @@
+services:
+  yiimp2-db-dev:
+    image: mariadb:10.11
+    container_name: yiimp2-db-dev
+    environment:
+      MYSQL_ROOT_PASSWORD: yiimp2_dev
+      MYSQL_DATABASE: yiimp2_dev
+      MYSQL_USER: yiimp2_dev
+      MYSQL_PASSWORD: yiimp2_dev
+    volumes:
+      - yiimp2-db-data-dev:/var/lib/mysql
+      - ./sql/yiimp2-init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "3307:3306"
+    networks:
+      - yiimp2-network-dev
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  yiimp2-memcached-dev:
+    image: memcached:1.6-alpine
+    container_name: yiimp2-memcached-dev
+    command: memcached -m 64
+    networks:
+      - yiimp2-network-dev
+
+  yiimp2-web-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-web
+      target: dev
+      args:
+        - INSTALL_DEV_DEPS=true
+    container_name: yiimp2-web-dev
+    environment:
+      # Application Configuration
+      - YIIMP_DEBUG=true
+      - YIIMP_COOKIE_VALIDATION_KEY=dev1234567890abcdef1234567890abcdef1234567890abcdef1234567890abc
+      - YIIMP_SESSION_TIMEOUT=3600
+      - YIIMP_SESSION_NAME=YIIMP2SESSID_DEV
+      - YIIMP_FORCE_HTTPS=false
+      # Database Configuration (override serverconfig.php for dev)
+      - DB_HOST=yiimp2-db-dev
+      - DB_NAME=yiimp2_dev
+      - DB_USER=yiimp2_dev
+      - DB_PASSWORD=yiimp2_dev
+      # Memcached Configuration
+      - MEMCACHED_HOST=yiimp2-memcached-dev
+      - MEMCACHED_PORT=11211
+    volumes:
+      # Application code (mounted for live development)
+      - ./yiimp2:/var/yiimp2
+      # Application configuration (use dev-specific config)
+      - ./config/yiimp2/serverconfig-dev.php:/etc/yiimp2/serverconfig.php:ro
+      # Nginx development configuration
+      - ./config/nginx/yiimp2-dev.conf:/etc/nginx/sites-available/yiimp2.conf:ro
+      # PHP-FPM configuration
+      - ./config/php-fpm/www.conf:/etc/php/8.3/fpm/pool.d/www.conf:ro
+      # Logs
+      - ./log/yiimp2:/var/log/yiimp2
+    ports:
+      - "8090:80"
+    depends_on:
+      yiimp2-db-dev:
+        condition: service_healthy
+      yiimp2-memcached-dev:
+        condition: service_started
+    networks:
+      - yiimp2-network-dev
+
+  yiimp2-backend-main-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    container_name: yiimp2-backend-main-dev
+    command: ["/var/www/yaamp/main-yiimp2.sh"]
+    environment:
+      - YIIMP_DEBUG=true
+      # Database Configuration (override serverconfig.php for dev)
+      - DB_HOST=yiimp2-db-dev
+      - DB_NAME=yiimp2_dev
+      - DB_USER=yiimp2_dev
+      - DB_PASSWORD=yiimp2_dev
+      # Memcached Configuration
+      - MEMCACHED_HOST=yiimp2-memcached-dev
+    volumes:
+      - ./config/yiimp2/serverconfig-dev.php:/etc/yiimp2/serverconfig.php:ro
+    depends_on:
+      yiimp2-db-dev:
+        condition: service_healthy
+      yiimp2-memcached-dev:
+        condition: service_started
+    networks:
+      - yiimp2-network-dev
+
+  yiimp2-backend-loop2-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    container_name: yiimp2-backend-loop2-dev
+    command: ["/var/www/yaamp/loop2-yiimp2.sh"]
+    environment:
+      - YIIMP_DEBUG=true
+      # Database Configuration (override serverconfig.php for dev)
+      - DB_HOST=yiimp2-db-dev
+      - DB_NAME=yiimp2_dev
+      - DB_USER=yiimp2_dev
+      - DB_PASSWORD=yiimp2_dev
+      # Memcached Configuration
+      - MEMCACHED_HOST=yiimp2-memcached-dev
+    volumes:
+      - ./config/yiimp2/serverconfig-dev.php:/etc/yiimp2/serverconfig.php:ro
+    depends_on:
+      yiimp2-db-dev:
+        condition: service_healthy
+      yiimp2-memcached-dev:
+        condition: service_started
+    networks:
+      - yiimp2-network-dev
+
+  yiimp2-backend-blocks-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    container_name: yiimp2-backend-blocks-dev
+    command: ["/var/www/yaamp/blocks-yiimp2.sh"]
+    environment:
+      - YIIMP_DEBUG=true
+      # Database Configuration (override serverconfig.php for dev)
+      - DB_HOST=yiimp2-db-dev
+      - DB_NAME=yiimp2_dev
+      - DB_USER=yiimp2_dev
+      - DB_PASSWORD=yiimp2_dev
+      # Memcached Configuration
+      - MEMCACHED_HOST=yiimp2-memcached-dev
+    volumes:
+      - ./config/yiimp2/serverconfig-dev.php:/etc/yiimp2/serverconfig.php:ro
+    depends_on:
+      yiimp2-db-dev:
+        condition: service_healthy
+      yiimp2-memcached-dev:
+        condition: service_started
+    networks:
+      - yiimp2-network-dev
+
+  yiimp2-stratum-sha256-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-stratum
+      args:
+        - ALGO=sha256
+    container_name: yiimp2-stratum-sha256-dev
+    command: ["/etc/stratum/config.conf"]
+    volumes:
+      - ./config/yiimp2/stratum/sha256.dev.conf:/etc/stratum/config.conf:ro
+    ports:
+      - "3333:3333"
+    depends_on:
+      yiimp2-db-dev:
+        condition: service_healthy
+    networks:
+      - yiimp2-network-dev
+
+  yiimp2-stratum-sha256-high-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-stratum
+      args:
+        - ALGO=sha256
+    container_name: yiimp2-stratum-sha256-high-dev
+    command: ["/etc/stratum/config.conf"]
+    volumes:
+      - ./config/yiimp2/stratum/sha256-high.dev.conf:/etc/stratum/config.conf:ro
+    ports:
+      - "3334:3333"
+    depends_on:
+      yiimp2-db-dev:
+        condition: service_healthy
+    networks:
+      - yiimp2-network-dev
+
+networks:
+  yiimp2-network-dev:
+    driver: bridge
+
+volumes:
+  yiimp2-db-data-dev:

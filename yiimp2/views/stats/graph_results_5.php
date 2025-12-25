@@ -1,33 +1,17 @@
 <?php
 
-$algo = user()->getState('yaamp-algo');
+use app\models\Hashstats;
+use Yii;
 
-$s = 4*60*60;
+// Set JSON response header
+Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+$algo = Yii::$app->YiimpUtils->getCurrentAlgo();
 $t = time() - 7*24*60*60;
-$stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
+$interval = 4*60*60; // 4 hours
 
-$res = array();
-$first = 0;
-foreach($stats as $n)
-{
-	$i = floor($n->time/$s)*$s;
-	if(!$first) $first = $i;
+$data = Hashstats::getAggregatedEarningsData($algo, $t, $interval, 8);
 
-	if(!isset($res[$i]))
-		$res[$i] = 0;
-
-	$res[$i] += $n->earnings*8;
-}
-
-echo '[';
-
-foreach($res as $i=>$n)
-{
-	if($i != $first) echo ',';
-	$d = date('Y-m-d H:i:s', $i);
-	echo "[\"$d\",$n]";
-}
-
-echo ']';
+return $data;
 
 

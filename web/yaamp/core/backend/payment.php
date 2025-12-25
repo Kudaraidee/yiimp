@@ -54,7 +54,7 @@ function BackendCoinPayments($coin)
 	$users = getdbolist('db_accounts', "balance>$min_payout AND (payout_threshold IS NULL OR balance>payout_threshold) AND coinid={$coin->id} and !is_locked ORDER BY balance DESC");
 
 	// todo: enhance/detect payout_max from normal sendmany error
-	if($coin->symbol == 'BITC' || $coin->symbol == 'BNODE' || $coin->symbol == 'BOD' || $coin->symbol == 'DIME' || $coin->symbol == 'BTCRY' || $coin->symbol == 'IOTS' || $coin->symbol == 'ECC' || $coin->symbol == 'ADOT' || $coin->symbol == 'SAPP' || $coin->symbol == 'CURVE' || $coin->symbol == 'CBE' || $coin->symbol == 'PEPEW' || !empty($coin->payout_max))
+	if($coin->symbol == 'BITC' || $coin->symbol == 'BNODE' || $coin->symbol == 'BOD' || $coin->symbol == 'DIME' || $coin->symbol == 'BTCRY' || $coin->symbol == 'IOTS' || $coin->symbol == 'ECC' || $coin->symbol == 'ADOT' || $coin->symbol == 'SAPP' || $coin->symbol == 'CURVE' || $coin->symbol == 'CBE' || $coin->symbol == 'PEPEW' || $coin->symbol == 'LCC' || $coin->symbol == 'DGB' || $coin->symbol == 'FB' || $coin->symbol == 'BCH' || $coin->symbol == 'BTC' || $coin->symbol == 'BTCS' || $coin->symbol == 'PPC' || $coin->symbol == 'ROD' || $coin->symbol == 'CAS' || $coin->symbol == 'BKC' || $coin->symbol == 'BC2' || $coin->symbol == 'RBL' || !empty($coin->payout_max))
 	{
 		foreach($users as $user)
 		{
@@ -65,7 +65,8 @@ function BackendCoinPayments($coin)
 			while($user->balance > $min_payout && $amount > $min_payout)
 			{
 				debuglog("$coin->symbol sendtoaddress $user->username $amount");
-				$tx = $remote->sendtoaddress($user->username, round($amount, 8));
+				$precision = intval($coin->decimals ?: 8);
+				$tx = $remote->sendtoaddress($user->username, round($amount, $precision));
 				if(!$tx)
 				{
 					$error = $remote->error;

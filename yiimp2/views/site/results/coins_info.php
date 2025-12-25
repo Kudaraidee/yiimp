@@ -1,6 +1,7 @@
 <?php
 
 use app\models\Coins;
+use app\components\CspHelper;
 
 $algo = Yii::$app->session->get('yaamp-algo');
 //if($algo == 'all') return;
@@ -9,18 +10,18 @@ echo "<div class='main-left-box'>";
 echo "<div class='main-left-title'>Coin Information ($algo)</div>";
 echo "<div class='main-left-inner'>";
 
-echo <<<END
-<style type="text/css">
+echo CspHelper::style('
 td.symb, th.symb {
-	width: 50px;
-	max-width: 50px;
-	text-align: right;
+    width: 50px;
+    max-width: 50px;
+    text-align: right;
 }
 td.symb {
-	font-size: .8em;
+    font-size: .8em;
 }
-</style>
+');
 
+echo <<<END
 <table class="dataGrid2">
 <thead>
 <tr>

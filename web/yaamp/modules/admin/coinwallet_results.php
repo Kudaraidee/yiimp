@@ -112,8 +112,12 @@ foreach($coins as $coin)
 	if($coin->connections) echo " ($coin->connections)";
 	echo "<br><span style='font-size: .8em'>$coin->rpcencoding <span style='background-color:$algo_color;'>&nbsp; ($coin->algo) &nbsp;</span></span></td>";
 
-	$difficulty = Itoa2($coin->difficulty, 3);
-	if ($coin->difficulty > 1e20) $difficulty = '&nbsp;';
+	$difficulty = '&nbsp;';
+	if ($coin->difficulty > 0 && $coin->difficulty <= 1e20) {
+		$difficulty = Itoa2($coin->difficulty, 3);
+	} else if ($coin->difficulty == 0 || is_null($coin->difficulty)) {
+		$difficulty = '<span class="red">N/A</span>';
+	}
 
 	if(!empty($coin->errors))
 		echo '<td align="right" style="font-size: .9em;" class="red" title="'.$coin->errors.'"><b>'.$difficulty.'</b><br/>'.$coin->block_height.'</td>';
@@ -171,9 +175,9 @@ foreach($coins as $coin)
 	$available = bitcoinvaluetoa($coin->available * $coin->price);
 	echo '<td align="right" style="font-size: .9em;">'.$btc.'<br/>'.$available.'</td>';
 
-	$fiat = round($coin->balance * $coin->price * $mining->usdbtc, 2). ' $';
-	$available = round($coin->available * $coin->price * $mining->usdbtc, 2). ' $';
-	echo '<td align="right" style="font-size: .9em;">'.$fiat.'<br/>'.$available.'</td>';
+	$fiat = round($coin->balance * $coin->price * $mining->usdbtc, 2);
+	$available_fiat = round($coin->available * $coin->price * $mining->usdbtc, 2);
+	echo '<td align="right" style="font-size: .9em;">'.$fiat.'<br/>'.$available_fiat.'</td>';
 
 	$marketname = '';
 	$bestmarket = getBestMarket($coin);
@@ -194,16 +198,3 @@ echo '</table>';
 //////////////////////////////////////////
 
 echo "<br/>";
-
-
-
-
-
-
-
-
-
-
-
-
-

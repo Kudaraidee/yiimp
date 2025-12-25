@@ -7,6 +7,7 @@
 
 use app\models\Coins;
 use app\models\Workers;
+use app\models\Shares;
 
 $user = Yii::$app->YiimpUtils->getuserbyaddress(Yii::$app->getRequest()->getQueryParam('address'));
 if(!$user) return;
@@ -98,8 +99,8 @@ if(count($minercount))
 		$user_solo_ttf  = $user_solo_ttf ? Yii::$app->ConversionUtils->sectoa2($user_solo_ttf) : '';
 
 
-		$user_shared_rate = $user_shared_rate? Itoa2($user_shared_rate).'h/s': '-';
-		$user_solo_rate = $user_solo_rate? Itoa2($user_solo_rate).'h/s': '-';
+		$user_shared_rate = $user_shared_rate? Yii::$app->ConversionUtils->Itoa2($user_shared_rate).'h/s': '-';
+		$user_solo_rate = $user_solo_rate? Yii::$app->ConversionUtils->Itoa2($user_solo_rate).'h/s': '-';
 	
 		$shared_minercount = Workers::find()
 								->where(['userid'=>$userid,'algo'=>$algo])
@@ -249,7 +250,7 @@ if(count($workers))
 
 echo "</div>";
 
-echo "<p style='font-size: .8em'>
+echo "<p class='text-small'>
 		&nbsp;* approximate from the last 5 minutes submitted shares<br>
 		&nbsp;** extranonce.subscribe<br>
 		</p>";
