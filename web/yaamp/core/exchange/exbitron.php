@@ -20,6 +20,7 @@ function exbitron_api_query($method, $params='', $returnType='object')
 // just a template, needs to modify to work with api
 function exbitron_api_user($method, $url_params = [], $request_method='GET', $returnType='object') {
 	
+	require_once('/etc/yiimp/keys.php');
 	if (empty(EXCH_EXBITRON_SECRET)) return false;
 
 	$base = 'https://api.exbitron.com'; $path = '/api/v1/'.$method;

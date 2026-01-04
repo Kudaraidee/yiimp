@@ -29,7 +29,9 @@ function nestex_api_query($method = 'cg/tickers', $params = '', $returnType = 'a
 
 function nestex_api_user($method, $url_params = [], $request_method = 'GET', $returnType = 'array') {
 
-	if (empty(EXCH_NESTEX_SECRET)) return false;
+	require_once('/etc/yiimp/keys.php');
+	if (!defined('EXCH_NESTEX_SECRET') || empty(EXCH_NESTEX_SECRET)) return false;
+	if (!defined('EXCH_NESTEX_KEY') || empty(EXCH_NESTEX_KEY)) return false;
 	if (!is_array($url_params)) return false;
 
 	$base = 'https://trade.nestex.one'; 

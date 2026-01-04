@@ -1,0 +1,215 @@
+# Yiimp2 Dedicated System - Multi-Container Deployment
+# Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.10, 17.12, 17.13, 17.14
+
+services:
+  # Database Service
+  yiimp2-db:
+    image: mariadb:10.11
+    container_name: yiimp2-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-yiimp2}
+      MYSQL_DATABASE: ${DB_NAME:-yiimp2}
+      MYSQL_USER: ${DB_USER:-yiimp2}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-yiimp2}
+    volumes:
+      - yiimp2-db-data:/var/lib/mysql
+      - ./sql/yiimp2-init.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Memcached Service
+  yiimp2-memcached:
+    image: memcached:alpine
+    container_name: yiimp2-memcached
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+
+  # Web Frontend Service
+  yiimp2-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-web
+    container_name: yiimp2-web
+    depends_on:
+      yiimp2-db:
+        condition: service_healthy
+      yiimp2-memcached:
+        condition: service_started
+    environment:
+      # Database Configuration
+      DB_HOST: yiimp2-db
+      DB_NAME: ${DB_NAME:-yiimp2}
+      DB_USER: ${DB_USER:-yiimp2}
+      DB_PASSWORD: ${DB_PASSWORD:-yiimp2}
+      MEMCACHED_HOST: yiimp2-memcached
+      
+      # Security Configuration
+      YIIMP_COOKIE_VALIDATION_KEY: ${YIIMP_COOKIE_VALIDATION_KEY:-yiimp2}
+      YIIMP_FORCE_HTTPS: ${YIIMP_FORCE_HTTPS:-false}
+      
+      # Session Configuration
+      YIIMP_SESSION_TIMEOUT: ${YIIMP_SESSION_TIMEOUT:-3600}
+      YIIMP_SESSION_NAME: ${YIIMP_SESSION_NAME:-YIIMP2SESSID}
+      
+      # Application Configuration
+      YIIMP_DEBUG: ${YIIMP_DEBUG:-false}
+    volumes:
+      # Application configuration
+      - ./config/yiimp2/serverconfig.php:/etc/yiimp2/serverconfig.php:ro
+      # Nginx configuration
+      - ./config/nginx/yiimp2.conf:/etc/nginx/sites-available/yiimp2.conf:ro
+      # PHP-FPM configuration
+      - ./config/php-fpm/www.conf:/etc/php/8.3/fpm/pool.d/www.conf:ro
+      # Logs
+      - ./log/yiimp2:/var/log/yiimp2
+    ports:
+      - "8090:80"
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+
+  # Stratum Server - SHA256 (Low Difficulty for Small Miners)
+  yiimp2-stratum-sha256:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-stratum
+    container_name: yiimp2-stratum-sha256
+    depends_on:
+      yiimp2-db:
+        condition: service_healthy
+    volumes:
+      - ./config/yiimp2/stratum/sha256.conf:/etc/stratum.conf:ro
+    ports:
+      - "4333:3333"
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+    command: ["/etc/stratum.conf"]
+
+  # Stratum Server - SHA256 High (High Difficulty for ASICs/Large Miners)
+  yiimp2-stratum-sha256-high:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-stratum
+    container_name: yiimp2-stratum-sha256-high
+    depends_on:
+      yiimp2-db:
+        condition: service_healthy
+    volumes:
+      - ./config/yiimp2/stratum/sha256-high.conf:/etc/stratum.conf:ro
+    ports:
+      - "4334:3333"
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+    command: ["/etc/stratum.conf"]
+
+  # Stratum Server - Scrypt
+  yiimp2-stratum-scrypt:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-stratum
+    container_name: yiimp2-stratum-scrypt
+    depends_on:
+      yiimp2-db:
+        condition: service_healthy
+    volumes:
+      - ./config/yiimp2/stratum/scrypt.conf:/etc/stratum.conf:ro
+    ports:
+      - "4433:3333"
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+    command: ["/etc/stratum.conf"]
+
+  # Backend Service - Main Loop
+  yiimp2-backend-main:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    container_name: yiimp2-backend-main
+    depends_on:
+      yiimp2-db:
+        condition: service_healthy
+      yiimp2-memcached:
+        condition: service_started
+    environment:
+      DB_HOST: yiimp2-db
+      DB_NAME: ${DB_NAME:-yiimp2}
+      DB_USER: ${DB_USER:-yiimp2}
+      DB_PASSWORD: ${DB_PASSWORD:-yiimp2}
+      MEMCACHED_HOST: yiimp2-memcached
+    volumes:
+      - ./config/yiimp2/serverconfig.php:/etc/yiimp2/serverconfig.php:ro
+      - ./log/yiimp2:/var/log/yiimp2
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+    command: ["/var/www/yaamp/main-yiimp2.sh"]
+
+  # Backend Service - Loop2
+  yiimp2-backend-loop2:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    container_name: yiimp2-backend-loop2
+    depends_on:
+      yiimp2-db:
+        condition: service_healthy
+      yiimp2-memcached:
+        condition: service_started
+    environment:
+      DB_HOST: yiimp2-db
+      DB_NAME: ${DB_NAME:-yiimp2}
+      DB_USER: ${DB_USER:-yiimp2}
+      DB_PASSWORD: ${DB_PASSWORD:-yiimp2}
+      MEMCACHED_HOST: yiimp2-memcached
+    volumes:
+      - ./config/yiimp2/serverconfig.php:/etc/yiimp2/serverconfig.php:ro
+      - ./log/yiimp2:/var/log/yiimp2
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+    command: ["/var/www/yaamp/loop2-yiimp2.sh"]
+
+  # Backend Service - Blocks
+  yiimp2-backend-blocks:
+    build:
+      context: .
+      dockerfile: Dockerfile.yiimp2-backend
+    container_name: yiimp2-backend-blocks
+    depends_on:
+      yiimp2-db:
+        condition: service_healthy
+      yiimp2-memcached:
+        condition: service_started
+    environment:
+      DB_HOST: yiimp2-db
+      DB_NAME: ${DB_NAME:-yiimp2}
+      DB_USER: ${DB_USER:-yiimp2}
+      DB_PASSWORD: ${DB_PASSWORD:-yiimp2}
+      MEMCACHED_HOST: yiimp2-memcached
+    volumes:
+      - ./config/yiimp2/serverconfig.php:/etc/yiimp2/serverconfig.php:ro
+      - ./log/yiimp2:/var/log/yiimp2
+    networks:
+      - yiimp2-network
+    restart: unless-stopped
+    command: ["/var/www/yaamp/blocks-yiimp2.sh"]
+
+networks:
+  yiimp2-network:
+    driver: bridge
+    name: yiimp2-network
+
+volumes:
+  yiimp2-db-data:
+    name: yiimp2-db-data

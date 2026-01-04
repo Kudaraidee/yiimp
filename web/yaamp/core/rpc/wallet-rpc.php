@@ -42,6 +42,10 @@ class WalletRPC {
 				break;
 			default:
 				$this->type = 'Bitcoin';
+				// Build wallet URL for Bitcoin Core 0.17+ (e.g., Briskcoin 3.0)
+				if (empty($url) && !empty($coin->rpcwallet)) {
+					$url = 'wallet/' . $coin->rpcwallet;
+				}
 				$this->rpc = new Bitcoin($coin->rpcuser, $coin->rpcpasswd, $coin->rpchost, $coin->rpcport, $url);
 				$this->hasGetInfo = $coin->hasgetinfo;
 			}
@@ -51,6 +55,18 @@ class WalletRPC {
 			$user = $userOrCoin;
 			$this->rpc = new Bitcoin($user, $pw, $host, $port, $url);
 		}
+	}
+
+	/**
+	 * Build wallet URL path for Bitcoin Core 0.17+
+	 * @param object $coin
+	 * @return string|null
+	 */
+	private function buildWalletUrl($coin) {
+		if (!empty($coin->rpcwallet)) {
+			return 'wallet/' . $coin->rpcwallet;
+		}
+		return null;
 	}
 
 	function __call($method, $params)
@@ -392,7 +408,24 @@ class WalletRPC {
 					$res["testnet"] = "main" != arraySafeVal($miningInfo,"chain");
 					$walletInfo = $this->rpc->getwalletinfo();
 					$res["walletversion"] = arraySafeVal($walletInfo,"walletversion");
-					$res["balance"] = arraySafeVal($walletInfo,"balance");
+					
+					// For Bitcoin Core 0.21+ descriptor wallets, getwalletinfo doesn't return balance
+					// We need to use getbalances instead
+					if (isset($walletInfo["balance"])) {
+						$res["balance"] = $walletInfo["balance"];
+					} else {
+						// Try getbalances for newer wallets (Bitcoin Core 0.19+)
+						$balances = $this->rpc->getbalances();
+						if ($balances && isset($balances["mine"])) {
+							// Sum up trusted + untrusted_pending for total spendable balance
+							$res["balance"] = arraySafeVal($balances["mine"], "trusted", 0) 
+								+ arraySafeVal($balances["mine"], "untrusted_pending", 0);
+						} else {
+							// Fallback to getbalance (deprecated but still works in some versions)
+							$res["balance"] = $this->rpc->getbalance();
+						}
+					}
+					
 					$res["keypoololdest"] = arraySafeVal($walletInfo,"keypoololdest");
 					$res["keypoolsize"] = arraySafeVal($walletInfo,"keypoolsize");
 					$res["paytxfee"] = arraySafeVal($walletInfo,"paytxfee");
@@ -405,6 +438,55 @@ class WalletRPC {
 					$res["relayfee"] = arraySafeVal($networkInfo,"relayfee");
 				}
 				break;
+			
+			case 'getaccountaddress':
+				// getaccountaddress was removed in Bitcoin Core 0.18
+				// For newer wallets, use getnewaddress with label
+				$account = arraySafeVal($params, 0, '');
+				if ($this->hasGetInfo) {
+					// Old wallet, try original method
+					$res = $this->rpc->__call($method,$params);
+				} else {
+					// New wallet (0.18+), use getnewaddress with label
+					if (empty($account)) {
+						$res = $this->rpc->getnewaddress();
+					} else {
+						$res = $this->rpc->getnewaddress($account);
+					}
+				}
+				break;
+			
+			case 'listaccounts':
+				// listaccounts was removed in Bitcoin Core 0.18
+				// For newer wallets, use listlabels + getaddressesbylabel
+				if ($this->hasGetInfo) {
+					// Old wallet, try original method
+					$res = $this->rpc->__call($method,$params);
+				} else {
+					// New wallet (0.18+), return empty array as accounts are deprecated
+					// The pool should not rely on accounts anymore
+					$res = array();
+				}
+				break;
+			
+			case 'sendmany':
+				// sendmany account parameter was deprecated in 0.17, removed in 0.21
+				// params: [account, {address:amount}, minconf, comment, [addresses]]
+				$account = arraySafeVal($params, 0, '');
+				$amounts = arraySafeVal($params, 1, array());
+				$minconf = arraySafeVal($params, 2, 1);
+				$comment = arraySafeVal($params, 3, '');
+				
+				if ($this->hasGetInfo) {
+					// Old wallet, use original method with account
+					$res = $this->rpc->__call($method,$params);
+				} else {
+					// New wallet (0.21+), account parameter is ignored
+					// Call sendmany without account: sendmany "" {addresses} minconf comment
+					$res = $this->rpc->sendmany('', $amounts, $minconf, $comment);
+				}
+				break;
+			
 			default:
 				$res = $this->rpc->__call($method,$params);
         	}

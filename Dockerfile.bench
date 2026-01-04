@@ -1,0 +1,26 @@
+FROM ubuntu:24.04
+
+# Install Apache Bench and other testing tools
+RUN apt-get update && apt-get install -y \
+    apache2-utils \
+    curl \
+    bc \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create results directory
+RUN mkdir -p /results
+
+# Copy test scripts
+COPY test-nginx-performance.sh /test-nginx-performance.sh
+COPY analyze-php-fpm-config.sh /analyze-php-fpm-config.sh
+COPY analyze-nginx-config.sh /analyze-nginx-config.sh
+
+RUN chmod +x /test-nginx-performance.sh \
+    /analyze-php-fpm-config.sh \
+    /analyze-nginx-config.sh
+
+WORKDIR /
+
+# Default command runs performance tests
+CMD ["/test-nginx-performance.sh"]

@@ -1,0 +1,168 @@
+/**
+ * Algorithm Color Classes
+ * 
+ * This file contains CSS classes for algorithm-specific background colors.
+ * These classes replace inline style attributes to maintain CSP compliance.
+ * 
+ * Naming convention: .algo-bg-{algorithm-name}
+ * Colors are sourced from the algos database table.
+ */
+
+/* Core Algorithms */
+.algo-bg-scrypt { background-color: #c0c0e0; }
+.algo-bg-scryptn { background-color: #d0d0d0; }
+.algo-bg-neoscrypt { background-color: #a0d0f0; }
+.algo-bg-neoscrypt-xaya { background-color: #a0d0f0; }
+.algo-bg-quark { background-color: #c0c0c0; }
+.algo-bg-lyra2 { background-color: #f0d0a0; }
+.algo-bg-lyra2v2 { background-color: #f0d0a0; }
+.algo-bg-lyra2z { background-color: #80b0f0; }
+.algo-bg-lyra2z330 { background-color: #80b0f0; }
+
+/* X-Series Algorithms */
+.algo-bg-x11 { background-color: #f0f0a0; }
+.algo-bg-x11evo { background-color: #c0f0c0; }
+.algo-bg-x11k { background-color: #f0f0a0; }
+.algo-bg-x11kvs { background-color: #f0f0a0; }
+.algo-bg-x12 { background-color: #ffe090; }
+.algo-bg-x13 { background-color: #ffd880; }
+.algo-bg-x14 { background-color: #f0c080; }
+.algo-bg-x15 { background-color: #f0b080; }
+.algo-bg-x16r { background-color: #f0b080; }
+.algo-bg-x16rt { background-color: #f0b080; }
+.algo-bg-x16rv2 { background-color: #f0b080; }
+.algo-bg-x16s { background-color: #f0b080; }
+.algo-bg-x17 { background-color: #f0b0a0; }
+.algo-bg-x18 { background-color: #f0b0a0; }
+.algo-bg-x20r { background-color: #f0b0a0; }
+.algo-bg-x21s { background-color: #f0b0a0; }
+.algo-bg-x22i { background-color: #f0f0a0; }
+.algo-bg-x25x { background-color: #f0f0a0; }
+
+/* SHA Algorithms */
+.algo-bg-sha256 { background-color: #d0d0a0; }
+.algo-bg-sha256csm { background-color: #d0d0a0; }
+.algo-bg-sha256dt { background-color: #d0d0f0; }
+.algo-bg-sha256t { background-color: #d0d0f0; }
+.algo-bg-sha3d { background-color: #d0d0f0; }
+.algo-bg-sha512256d { background-color: #d0d0a0; }
+
+/* Equihash Variants */
+.algo-bg-equihash { background-color: #d0b0d0; }
+.algo-bg-equihash96 { background-color: #d0b0d0; }
+.algo-bg-equihash125 { background-color: #d0b0d0; }
+.algo-bg-equihash144 { background-color: #d0b0d0; }
+.algo-bg-equihash192 { background-color: #d0b0d0; }
+
+/* Yespower/Yescrypt Variants */
+.algo-bg-yescrypt { background-color: #e0d0e0; }
+.algo-bg-yescryptR8 { background-color: #e0d0e0; }
+.algo-bg-yescryptR16 { background-color: #e0d0e0; }
+.algo-bg-yescryptR32 { background-color: #e0d0e0; }
+.algo-bg-yespower { background-color: #e2d0d2; }
+.algo-bg-yespowerADVC { background-color: #e2d0d2; }
+.algo-bg-yespowerARWN { background-color: #e2d0d2; }
+.algo-bg-yespowerIC { background-color: #e2d0d2; }
+.algo-bg-yespowerIOTS { background-color: #e2d0d2; }
+.algo-bg-yespowerLITB { background-color: #e2d0d2; }
+.algo-bg-yespowerLTNCG { background-color: #e2d0d2; }
+.algo-bg-yespowerMGPC { background-color: #e2d0d2; }
+.algo-bg-yespowerR16 { background-color: #e2d0d2; }
+.algo-bg-yespowerRES { background-color: #e2d0d2; }
+.algo-bg-yespowerSUGAR { background-color: #e2d0d2; }
+.algo-bg-yespowerTIDE { background-color: #e2d0d2; }
+.algo-bg-yespowerURX { background-color: #e2d0d2; }
+
+/* Groestl Variants */
+.algo-bg-groestl { background-color: #a0f0a0; }
+.algo-bg-dmd-gr { background-color: #a0f0a0; }
+.algo-bg-myr-gr { background-color: #a0c0f0; }
+
+/* Blake Variants */
+.algo-bg-blake { background-color: #a0e0e0; }
+.algo-bg-blake2s { background-color: #a0e0e0; }
+.algo-bg-blakecoin { background-color: #a0e0e0; }
+
+/* Other Algorithms */
+.algo-bg-fresh { background-color: #e0f0e0; }
+.algo-bg-qubit { background-color: #d0a0f0; }
+.algo-bg-skein { background-color: #80a0a0; }
+.algo-bg-skein2 { background-color: #c8a060; }
+.algo-bg-keccak { background-color: #f0e0a0; }
+.algo-bg-nist5 { background-color: #c0e0e0; }
+.algo-bg-zr5 { background-color: #d0b0d0; }
+.algo-bg-c11 { background-color: #f0a0a0; }
+.algo-bg-drop { background-color: #d0e0f0; }
+.algo-bg-bmw { background-color: #e0c0c0; }
+.algo-bg-argon2 { background-color: #e0e0f0; }
+.algo-bg-argon2d1000 { background-color: #e2d0d2; }
+.algo-bg-decred { background-color: #f0d0f0; }
+.algo-bg-luffa { background-color: #c0f0f0; }
+.algo-bg-penta { background-color: #80c0c0; }
+.algo-bg-m7m { background-color: #d0a0a0; }
+.algo-bg-sib { background-color: #a0a0c0; }
+.algo-bg-vanilla { background-color: #f0f0f0; }
+.algo-bg-veltor { background-color: #ffffff; }
+.algo-bg-velvet { background-color: #aac0cc; }
+.algo-bg-whirlpool { background-color: #d0e0e0; }
+.algo-bg-xevan { background-color: #f0b0a0; }
+
+/* Phi Variants */
+.algo-bg-phi { background-color: #a0a0e0; }
+.algo-bg-phi2 { background-color: #a0a0e0; }
+.algo-bg-phi5 { background-color: #aba0e0; }
+.algo-bg-phihash { background-color: #e2d0d2; }
+
+/* GPU Mining Algorithms */
+.algo-bg-kawpow { background-color: #e2d0d2; }
+.algo-bg-firopow { background-color: #e2d0d2; }
+.algo-bg-ethash { background-color: #e2d0d2; }
+
+/* Specialized Algorithms */
+.algo-bg-timetravel { background-color: #f0b0d0; }
+.algo-bg-tribus { background-color: #c0d0d0; }
+.algo-bg-vitalium { background-color: #f0b0a0; }
+.algo-bg-renesis { background-color: #f0b0a0; }
+.algo-bg-polytimos { background-color: #dedefe; }
+.algo-bg-skunk { background-color: #dedefe; }
+.algo-bg-sonoa { background-color: #c8a060; }
+.algo-bg-pipe { background-color: #a0a0e0; }
+
+/* Newer Algorithms */
+.algo-bg-xelisv2-pepew { background-color: #e2d0d2; }
+.algo-bg-flex { background-color: #e2d0d2; }
+.algo-bg-rinhash { background-color: #e2d0d2; }
+.algo-bg-power2b { background-color: #e2d0d2; }
+.algo-bg-mike { background-color: #d0f0a0; }
+.algo-bg-megabtx { background-color: #d0f0a0; }
+.algo-bg-megamec { background-color: #d0f0a0; }
+.algo-bg-memehash { background-color: #d0f0a0; }
+.algo-bg-minotaur { background-color: #d0f0a0; }
+.algo-bg-minotaurx { background-color: #d0f0a0; }
+.algo-bg-rainforest { background-color: #d0f0a0; }
+.algo-bg-skydoge { background-color: #d0a0a0; }
+.algo-bg-padihash { background-color: #e2d0d2; }
+.algo-bg-pawelhash { background-color: #e2d0d2; }
+
+/* Additional Algorithms */
+.algo-bg-aurum { background-color: #f0e0a0; }
+.algo-bg-allium { background-color: #f0d0a0; }
+.algo-bg-aergo { background-color: #d0f0a0; }
+.algo-bg-balloon { background-color: #d0f0f0; }
+.algo-bg-bastion { background-color: #e0d0f0; }
+.algo-bg-bitcore { background-color: #f0a0d0; }
+.algo-bg-bcd { background-color: #d0a0f0; }
+.algo-bg-dedal { background-color: #a0f0d0; }
+.algo-bg-exosis { background-color: #f0d0e0; }
+.algo-bg-geek { background-color: #d0e0f0; }
+.algo-bg-globalhash { background-color: #e0f0d0; }
+.algo-bg-gr { background-color: #a0f0a0; }
+.algo-bg-hex { background-color: #f0a0a0; }
+.algo-bg-hmq1725 { background-color: #d0f0e0; }
+.algo-bg-hsr { background-color: #e0d0f0; }
+.algo-bg-jeonghash { background-color: #f0e0d0; }
+.algo-bg-jha { background-color: #d0e0e0; }
+
+/* Fallback for unknown algorithms */
+.algo-bg-unknown { background-color: #cccccc; }
+.algo-bg-default { background-color: #ffffff; }

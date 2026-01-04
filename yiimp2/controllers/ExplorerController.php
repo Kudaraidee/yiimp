@@ -3,170 +3,224 @@
 namespace app\controllers;
 
 use Yii;
-use yii\base\InlineAction;
 use yii\web\Controller;
-use app\components\rpc\WalletRPC;
+use yii\web\NotFoundHttpException;
 
 use app\models\Coins;
+use app\models\Blocks;
 
+/**
+ * ExplorerController handles blockchain exploration features
+ */
 class ExplorerController extends Controller
 {
-	public $defaultAction='index';
+    /**
+     * Displays list of all explorable coins
+     * 
+     * @return string
+     */
+    public function actionIndex()
+    {
+        // Get all visible coins with explorer enabled
+        $coins = Coins::find()
+            ->where(['visible' => 1, 'enable' => 1])
+            ->andWhere(['or', ['no_explorer' => 0], ['no_explorer' => null]])
+            ->orderBy(['name' => SORT_ASC])
+            ->all();
 
-	/////////////////////////////////////////////////
-	// dynamic reroute action on coin symbol
-	public function createAction($id)
-	{
-		if ($id === '') {
-			$id = $this->defaultAction;
-		}
-		$actionMap = $this->actions();
-		if (isset($actionMap[$id])) {
-			return Yii::createObject($actionMap[$id], [$id, $this]);
-		}
+        return $this->render('index', [
+            'coins' => $coins,
+        ]);
+    }
 
-		if (strlen($id) <= 10) {
-			$coin = Coins::findOne(['symbol' => $id]);
-			
-			if ($coin && ($coin->visible)) {
-				$id = $this->defaultAction;
-			}
-		}
-		if (preg_match('/^(?:[a-z0-9_]+-)*[a-z0-9_]+$/', $id)) {
-			$methodName = 'action' . str_replace(' ', '', ucwords(str_replace('-', ' ', $id)));
-			if (method_exists($this, $methodName)) {
-				$method = new \ReflectionMethod($this, $methodName);
-				if ($method->isPublic() && $method->getName() === $methodName) {
-					return new InlineAction($id, $this, $methodName);
-				}
-			}
-		}
+    /**
+     * Displays coin-specific explorer page
+     * 
+     * @param string $symbol Coin symbol
+     * @return string
+     */
+    public function actionCoin($symbol)
+    {
+        $coin = $this->findCoinBySymbol($symbol);
+        
+        if ($coin->no_explorer) {
+            throw new NotFoundHttpException('Block explorer is disabled for this coin.');
+        }
 
-		return null;
-	}
-	/////////////////////////////////////////////////
+        return $this->render('coin', [
+            'coin' => $coin,
+        ]);
+    }
 
-	// Hide coin id from explorer links... created by createUrl()
-	public function createUrl($route,$params=array(),$ampersand='&')
-	{
-		if ($route == '/explorer' && isset($params['id'])) {
-			$coin = getdbo('db_coins', intval($params['id']));
-			if ($coin && $coin->visible && !is_numeric($coin->symbol)) {
-				unset($params['id']);
-				$route = '/explorer/'.$coin->symbol.'?'.http_build_query($params,'',$ampersand);
-				$params = array();
-			}
-		}
-		return parent::createUrl($route, $params, $ampersand);
-	}
+    /**
+     * Displays block details
+     * 
+     * @param int $id Coin ID
+     * @param string $hash Block hash (optional)
+     * @param int $height Block height (optional)
+     * @return string
+     */
+    public function actionBlock($id, $hash = null, $height = null)
+    {
+        $coin = $this->findCoin($id);
+        
+        if ($coin->no_explorer) {
+            throw new NotFoundHttpException('Block explorer is disabled for this coin.');
+        }
 
-	/////////////////////////////////////////////////
+        // If height is provided, get hash from RPC
+        if ($height !== null && empty($hash)) {
+            $blockDetails = Yii::$app->ExplorerUtils->getBlockDetails($coin, null, intval($height));
+            if ($blockDetails && isset($blockDetails['hash'])) {
+                $hash = $blockDetails['hash'];
+            }
+        }
 
-	public function actionIndex()
-	{
-		if(isset($_COOKIE['mainbtc'])) return;
-		//if(!LimitRequest('explorer')) return;
+        if (empty($hash)) {
+            throw new NotFoundHttpException('Block hash or height is required.');
+        }
 
-		$id = (int) Yii::$app->getRequest()->getQueryParam('id');
-		$coin = Coins::findOne(['id'=>$id]);
-		if($coin && $coin->no_explorer) {
-			$link = $coin->link_explorer;
-			die("Block explorer disabled, please use <a href=\"$link\">$link</a>");
-		}
-		$height = (int) Yii::$app->getRequest()->getQueryParam('height');
-		if($coin && intval($height)>0)
-		{
-			$remote = new WalletRPC($coin);
-			$hash = $remote->getblockhash(intval($height));
-		} else {
-			$hash = Yii::$app->YiimpUtils->gethexparam('hash');
-		}
+        return $this->render('block', [
+            'coin' => $coin,
+            'hash' => $hash,
+        ]);
+    }
 
-		$txid = Yii::$app->YiimpUtils->gethexparam('txid');
-		$q = Yii::$app->YiimpUtils->gethexparam('q');
-		if (strlen($q) >= 32 && ctype_xdigit($q)) {
-			$remote = new WalletRPC($coin);
-			$block = $remote->getblock($q);
-			if ($block) {
-				$hash = $q;
-				$height = Yii::$app->ConversionUtils->objSafeVal($hash, 'height');
-			} else {
-				$txid = $q;
-			}
-		}
+    /**
+     * Displays transaction details
+     * 
+     * @param int $id Coin ID
+     * @param string $txid Transaction ID
+     * @return string
+     */
+    public function actionTx($id, $txid)
+    {
+        $coin = $this->findCoin($id);
+        
+        if ($coin->no_explorer) {
+            throw new NotFoundHttpException('Block explorer is disabled for this coin.');
+        }
 
-		if($coin && !empty($txid))
-		{
-			$remote = new WalletRPC($coin);
-			$tx = $remote->getrawtransaction($txid, 1);
-			if (!$tx) $tx = $remote->gettransaction($txid);
+        if (empty($txid)) {
+            throw new NotFoundHttpException('Transaction ID is required.');
+        }
 
-			$hash = Yii::$app->ConversionUtils->arraySafeVal($tx,'blockhash');
-		}
+        return $this->render('tx', [
+            'coin' => $coin,
+            'txid' => $txid,
+        ]);
+    }
 
-		if($coin && !empty($hash))
-			return $this->render('block', array('coin'=>$coin, 'hash'=>$hash));
+    /**
+     * Search for block or transaction by hash or height
+     * 
+     * @param int $id Coin ID
+     * @param string $query Search query (hash or height)
+     * @return mixed
+     */
+    public function actionSearch($id, $query)
+    {
+        $coin = $this->findCoin($id);
+        
+        if ($coin->no_explorer) {
+            throw new NotFoundHttpException('Block explorer is disabled for this coin.');
+        }
 
-		else if($coin)
-			return $this->render('coin', array('coin'=>$coin));
+        if (empty($query)) {
+            throw new NotFoundHttpException('Search query is required.');
+        }
 
-		else
-			return $this->render('index');
-	}
+        $query = trim($query);
 
-	// alias...
-	public function actionId()
-	{
-		return $this->actionIndex();
-	}
+        // Check if query is a numeric height
+        if (is_numeric($query)) {
+            $height = intval($query);
+            return $this->redirect(['block', 'id' => $coin->id, 'height' => $height]);
+        }
 
-	// redirect POST request with url cleanup...
-	public function actionSearch()
-	{
-		$height = getiparam('height');
-		$txid = gethexparam('txid');
-		$hash = gethexparam('hash');
-		$q = gethexparam('q');
-		$url = '/'; // defaults to home on invalid search
-		if (isset($_GET['SYM'])) {
-			// only for visible coins
-			$url = "/explorer/".$_GET['SYM']."?";
-		} else if (isset($_GET['id'])) {
-			// only for hidden coins
-			$url = "/explorer/".$_GET['id']."?";
-		}
-		if (!empty($height)) $url .= "&height=$height";
-		if (!empty($txid)) $url .= "&txid=$txid";
-		if (!empty($hash)) $url .= "&hash=$hash";
-		if (!empty($q)) $url .= "&q=$q";
+        // Validate hex string
+        if (!ctype_xdigit($query)) {
+            throw new NotFoundHttpException('Invalid search query. Must be a block height, block hash, or transaction ID.');
+        }
 
-		return $this->redirect(str_replace('?&', '?', $url));
-	}
+        // Try to determine if it's a block or transaction
+        $hashType = Yii::$app->ExplorerUtils->searchHash($coin, $query);
 
-	/**
-	 * Difficulty Graph
-	 */
-	public function actionGraph()
-	{
-		$id = (int) Yii::$app->getRequest()->getQueryParam('id');
-		$coin = Coins::findOne(['id' => $id]);
-		if ($coin)
-			return $this->renderPartial('graph', array('coin'=>$coin));
-		else
-			return "[]";
-	}
+        if ($hashType === 'block') {
+            return $this->redirect(['block', 'id' => $coin->id, 'hash' => $query]);
+        } elseif ($hashType === 'transaction') {
+            return $this->redirect(['tx', 'id' => $coin->id, 'txid' => $query]);
+        } else {
+            throw new NotFoundHttpException('Hash not found in blockchain.');
+        }
+    }
 
-	/**
-	 * Public nodes
-	 */
-	public function actionPeers()
-	{
-		$id = (int) Yii::$app->getRequest()->getQueryParam('id');
-		$coin = Coins::find()->where(['id'=>$id])->one();
-		if ($coin)
-			return $this->renderPartial('peers', array('coin'=>$coin));
-		else
-			return $this->goBack();
-	}
+    /**
+     * Displays peer connections for a coin
+     * 
+     * @param int $id Coin ID
+     * @return string
+     */
+    public function actionPeers($id)
+    {
+        $coin = $this->findCoin($id);
+        
+        return $this->render('peers', [
+            'coin' => $coin,
+        ]);
+    }
 
+    /**
+     * Displays blockchain statistics graphs
+     * 
+     * @param int $id Coin ID
+     * @return string
+     */
+    public function actionGraph($id)
+    {
+        $coin = $this->findCoin($id);
+        
+        return $this->renderPartial('graph', [
+            'coin' => $coin,
+        ]);
+    }
+
+    /**
+     * Finds coin by ID
+     * 
+     * @param int $id
+     * @return Coins
+     * @throws NotFoundHttpException
+     */
+    protected function findCoin($id)
+    {
+        $coin = Coins::findOne($id);
+        
+        if ($coin === null) {
+            throw new NotFoundHttpException('Coin not found.');
+        }
+        
+        return $coin;
+    }
+
+    /**
+     * Finds coin by symbol
+     * 
+     * @param string $symbol
+     * @return Coins
+     * @throws NotFoundHttpException
+     */
+    protected function findCoinBySymbol($symbol)
+    {
+        $coin = Coins::find()
+            ->where(['symbol' => strtoupper($symbol)])
+            ->orWhere(['symbol2' => strtoupper($symbol)])
+            ->one();
+        
+        if ($coin === null) {
+            throw new NotFoundHttpException('Coin not found.');
+        }
+        
+        return $coin;
+    }
 }

@@ -1,46 +1,19 @@
 <?php
 
-$algo = user()->getState('yaamp-algo');
+use app\models\Hashstats;
+use Yii;
 
-$s = 24*60*60;
+// Set JSON response header
+Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+$algo = Yii::$app->YiimpUtils->getCurrentAlgo();
 $t = time() - 60*24*60*60;
-$stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
+$interval = 24*60*60; // 24 hours (daily)
 
-$algo_unit_factor = yaamp_algo_mBTC_factor($algo);
+$algo_unit_factor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
 
-$res = array();
-foreach($stats as $n)
-{
-	if(!$s) continue;
-	$i = floor($n->time/$s)*$s;
+$data = Hashstats::getAggregatedBtcPerUnitData($algo, $t, $interval, $algo_unit_factor);
 
-	if(!isset($res[$i]))
-	{
-		$res[$i] = array();
-		$res[$i]['earnings'] = 0;
-		$res[$i]['hashrate'] = 0;
-	}
-
-	$res[$i]['earnings'] += $n->earnings;
-	$res[$i]['hashrate'] += $n->hashrate/24;
-}
-
-echo '[';
-
-$started = false;
-foreach($res as $i=>$n)
-{
-	if(!$n['hashrate']) continue;
-
-	$m = bitcoinvaluetoa($n['earnings'] * $algo_unit_factor * 1000000 / $n['hashrate']);
-	$d = date('Y-m-d H:i:s', $i);
-
-	if($started) echo ',';
-	echo "[\"$d\",$m]";
-
-	$started = true;
-}
-
-echo ']';
+return $data;
 
 

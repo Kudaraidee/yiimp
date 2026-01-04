@@ -1,0 +1,8 @@
+#Listen 80
+#Listen 8080
+# devel vhost for yii2 port
+Listen 8090
+
+#<IfModule ssl_module>
+#        Listen 443
+#</IfModule>

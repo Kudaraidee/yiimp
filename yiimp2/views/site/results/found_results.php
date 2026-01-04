@@ -3,13 +3,7 @@
 /** @var yii\web\View $this */
 
 use app\models\Blocks;
-
-function WriteBoxHeader($title)
-{
-	echo "<div class='main-left-box'>";
-	echo "<div class='main-left-title'>$title</div>";
-	echo "<div class='main-left-inner'>";
-}
+use app\components\ViewHelper;
 
 $showrental = (bool) YAAMP_RENTAL;
 
@@ -35,7 +29,7 @@ $count = Yii::$app->getRequest()->getQueryParam('count');
 $count = $count? (int)$count: 50;
 
 $algo_header = isset($r_algo) ? implode(',', $r_algo) : 'any algo';
-WriteBoxHeader("Last $count Blocks ($algo_header)");
+ViewHelper::renderBoxHeader("Last $count Blocks ($algo_header)");
 
 $coins_subquery = (new \yii\db\Query())
             ->select(['id'])

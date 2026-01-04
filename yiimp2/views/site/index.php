@@ -4,10 +4,16 @@
 
 use app\models\Coins;
 use app\models\Stratums;
-
-$this->registerJsFile('@web/js/auto_refresh.js', ['depends' => [yii\web\JqueryAsset::className()]]);
+use app\components\CspHelper;
 
 $homeUrl = Yii::$app->homeUrl;
+
+// Register homepage functions via external JS file
+$this->registerJsFile('@web/js/homepage-functions.js', ['depends' => [yii\web\JqueryAsset::className()]]);
+
+$this->registerJsFile('@web/js/auto_refresh.js', ['depends' => [yii\web\JqueryAsset::className()]]);
+$this->registerJsFile('@web/js/bookmarks.js', ['depends' => [yii\web\JqueryAsset::className()]]);
+$this->registerJsFile('@web/js/bookmark-autoload.js', ['depends' => [yii\web\JqueryAsset::className()]]);
 
 $height = '240px';
 
@@ -17,10 +23,9 @@ $min_sunday = $min_payout / 10;
 $payout_freq = (YAAMP_PAYMENTS_FREQ / 3600) . " hours";
 ?>
 
-<div id='resume_update_button' style='color: #444; background-color: #ffd; border: 1px solid #eea;
-    padding: 10px; margin-left: 20px; margin-right: 20px; margin-top: 15px; cursor: pointer; display: none;'
-    onclick='auto_page_resume();' align=center>
-    <b>Auto refresh is paused - Click to resume</b></div>
+<div id='resume_update_button' class='resume-update-button'>
+	<b>Auto refresh is paused - Click to resume</b>
+</div>
 
 <table cellspacing=20 width=100%>
 <tr><td valign=top width=50%>
@@ -66,7 +71,7 @@ $payout_freq = (YAAMP_PAYMENTS_FREQ / 3600) . " hours";
 <tbody>
 	<tr>
 		<td>
-			<select id="drop-stratum" style="border-style:solid; padding: 3px; font-family: monospace; border-radius: 5px;" onchange="generate()">
+			<select id="drop-stratum" class="code-block">
 
 			<!-- Add your stratum locations here -->
 			<option value="">Main Stratum</option>
@@ -78,7 +83,7 @@ $payout_freq = (YAAMP_PAYMENTS_FREQ / 3600) . " hours";
 		</td>
 
 		<td>
-			<select id="drop-coin" style="border-style:solid; padding: 3px; font-family: monospace; border-radius: 5px;" onchange="generate()">
+			<select id="drop-coin" class="code-block">
        <?php
 $list = Coins::find()
             ->where(['enable' => 1, 'visible' => 1, 'auto_ready' => 1])
@@ -122,13 +127,13 @@ if (!$list) {
 			</select>
 		</td>
 		<td>
-			<input id="text-wallet" type="text" size="30" placeholder="RF9D1R3Vt7CECzvb1SawieUC9cYmAY1qoj" style="border-style:solid; padding: 3px; font-family: monospace; border-radius: 5px;" onkeyup="generate()">
+			<input id="text-wallet" type="text" size="30" placeholder="RF9D1R3Vt7CECzvb1SawieUC9cYmAY1qoj" class="code-block">
 		</td>
 		<td>
-			<input id="text-rig-name" type="text" size="10" placeholder="001" style="border-style:solid; padding: 3px; font-family: monospace; border-radius: 5px;" onkeyup="generate()">
+			<input id="text-rig-name" type="text" size="10" placeholder="001" class="code-block">
 		</td>
 		<td>
-			<select id="drop-solo" style="border-style:solid; padding: 3px; font-family: monospace; border-radius: 5px;" onchange="generate()">
+			<select id="drop-solo" class="code-block">
 			<option value="">Shared</option>
 			<option value=",m=solo">Solo</option>
 			</select>
@@ -137,7 +142,7 @@ if (!$list) {
 </tbody>
 <tbody>
 	<tr>
-		<td colspan="5"><p class="main-left-box" style="padding: 3px; background-color: #ffffee; font-family: monospace;" id="output">-a  -o stratum+tcp://<?=YAAMP_STRATUM_URL?>:0000 -u . -p c=</p></td>
+		<td colspan="5"><p class="main-left-box" class="code-highlight" id="output">-a  -o stratum+tcp://<?=YAAMP_STRATUM_URL?>:0000 -u . -p c=</p></td>
 	</tr>
 </tbody>
 </table>
@@ -217,63 +222,42 @@ endif;
 <br><br><br><br><br><br><br><br><br><br>
 <br><br><br><br><br><br><br><br><br><br>
 
-<script>
+<?= CspHelper::beginScript() ?>
+// Event listeners for form elements
+document.addEventListener('DOMContentLoaded', function() {
+    var resumeBtn = document.getElementById('resume_update_button');
+    if (resumeBtn) {
+        resumeBtn.addEventListener('click', function() {
+            auto_page_resume();
+        });
+    }
+    
+    var dropStratum = document.getElementById('drop-stratum');
+    if (dropStratum) {
+        dropStratum.addEventListener('change', generate);
+    }
+    
+    var dropCoin = document.getElementById('drop-coin');
+    if (dropCoin) {
+        dropCoin.addEventListener('change', generate);
+    }
+    
+    var textWallet = document.getElementById('text-wallet');
+    if (textWallet) {
+        textWallet.addEventListener('keyup', generate);
+    }
+    
+    var textRigName = document.getElementById('text-rig-name');
+    if (textRigName) {
+        textRigName.addEventListener('keyup', generate);
+    }
+    
+    var dropSolo = document.getElementById('drop-solo');
+    if (dropSolo) {
+        dropSolo.addEventListener('change', generate);
+    }
+});
 
-function page_refresh()
-{
-    pool_current_refresh();
-    pool_history_refresh();
-	pool_coins_info_refresh();
-
-}
-
-function select_algo(algo)
-{
-    window.location.href = '<?php echo $homeUrl ?>site/algo?algo='+algo+'&r=/';
-}
-
-////////////////////////////////////////////////////
-
-function pool_current_ready(data)
-{
-    $('#pool_current_results').html(data);
-}
-
-function pool_current_refresh()
-{
-    var url = "<?php echo $homeUrl ?>site/current_results";
-    $.get(url, '', pool_current_ready);
-}
-
-////////////////////////////////////////////////////
-
-function pool_history_ready(data)
-{
-    $('#pool_history_results').html(data);
-}
-
-function pool_history_refresh()
-{
-    var url = "<?php echo $homeUrl ?>site/history_results";
-    $.get(url, '', pool_history_ready);
-}
-
-////////////////////////////////////////////////////
-
-function pool_coins_info_ready(data)
-{
-    $('#pool_coins_info').html(data);
-}
-
-function pool_coins_info_refresh()
-{
-    var url = "<?php echo $homeUrl ?>site/coins_info";
-    $.get(url, '', pool_coins_info_ready);
-}
-
-</script>
-
-<script>
 function getLastUpdated(){
     var stratum = document.getElementById('drop-stratum');
     var coin = document.getElementById('drop-coin');
@@ -282,10 +266,16 @@ function getLastUpdated(){
     var rigName = document.getElementById('text-rig-name').value.trim();
     var result = '';
 
-    var algo = coin.options[coin.selectedIndex].dataset.algo;
-    var port = coin.options[coin.selectedIndex].dataset.port;
-    var symbol = coin.options[coin.selectedIndex].dataset.symbol;
-    var extra = coin.options[coin.selectedIndex].dataset.extra; // Already contains "-p c=MTBC,mc=MTBC" if needed
+    // Check if coin dropdown has valid selection with dataset
+    var selectedOption = coin.options[coin.selectedIndex];
+    if (!selectedOption || !selectedOption.dataset || !selectedOption.dataset.algo) {
+        return '-a ALGO -o stratum+tcp://<?=YAAMP_STRATUM_URL?>:PORT -u WALLET_ADDRESS.WORKER_NAME -p c=COIN';
+    }
+
+    var algo = selectedOption.dataset.algo;
+    var port = selectedOption.dataset.port;
+    var symbol = selectedOption.dataset.symbol;
+    var extra = selectedOption.dataset.extra; // Already contains "-p c=MTBC,mc=MTBC" if needed
 
     result += algo + ' -o stratum+tcp://';
     result += stratum.value + '<?=YAAMP_STRATUM_URL?>:' + port + ' -u ';
@@ -304,4 +294,4 @@ function generate(){
     document.getElementById('output').innerHTML = result;
 }
 generate();
-</script>
+<?= CspHelper::endScript() ?>

@@ -1,0 +1,64 @@
+# Dockerfile for Yiimp2 Backend Scripts
+# Requirements: 20.3, 20.6, 20.7, 20.8
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install PHP CLI and dependencies for backend scripts
+RUN apt-get update && apt-get install -y \
+    php8.3-cli \
+    php8.3-bcmath \
+    php8.3-curl \
+    php8.3-gd \
+    php8.3-intl \
+    php8.3-mbstring \
+    php8.3-mysql \
+    php8.3-opcache \
+    php8.3-xml \
+    php8.3-zip \
+    php8.3-memcache \
+    bc \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Yii1 framework (required by backend scripts)
+COPY web/framework /var/www/framework
+
+# Copy backend scripts from web/yaamp
+COPY web/yaamp /var/www/yaamp
+
+# Copy yiimp2-specific backend scripts and runconsole
+COPY web/main-yiimp2.sh /var/www/yaamp/main-yiimp2.sh
+COPY web/loop2-yiimp2.sh /var/www/yaamp/loop2-yiimp2.sh
+COPY web/blocks-yiimp2.sh /var/www/yaamp/blocks-yiimp2.sh
+COPY web/runconsole-yiimp2.php /var/www/yaamp/runconsole-yiimp2.php
+
+# Create symlinks for Yii1 autoloader (class db_coins -> db_coinsModel.php)
+# Yii1 expects filename to match class name, but files have "Model" suffix
+RUN cd /var/www/yaamp/models && \
+    for file in *Model.php; do \
+        if [ -f "$file" ]; then \
+            base=$(basename "$file" Model.php); \
+            ln -sf "$file" "${base}.php"; \
+        fi; \
+    done
+
+# Make scripts executable
+RUN chmod +x /var/www/yaamp/main-yiimp2.sh \
+    && chmod +x /var/www/yaamp/loop2-yiimp2.sh \
+    && chmod +x /var/www/yaamp/blocks-yiimp2.sh
+
+# Create runtime and log directories
+RUN mkdir -p /var/www/yaamp/runtime \
+    && mkdir -p /var/log/yiimp2 \
+    && chown -R www-data:www-data /var/www/yaamp/runtime \
+    && chown -R www-data:www-data /var/log/yiimp2 \
+    && chmod -R 775 /var/www/yaamp/runtime \
+    && chmod -R 775 /var/log/yiimp2
+
+WORKDIR /var/www/yaamp
+
+# Set CMD to run specified backend script
+# This will be overridden in docker-compose.yml for each service
+CMD ["/bin/bash"]

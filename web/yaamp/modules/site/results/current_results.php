@@ -177,12 +177,35 @@ foreach ($algos as $item)
 			else	
 				echo "<td align='center' style='font-size: .8em;'>$users_total</td>";
             
-			$workers_coins = getdbocount('db_workers', "algo=:algo and pid=:pid and not password like '%m=solo%'", array(':algo' => $algo,':pid' => (is_null($port_db)?0 :$port_db->pid)));
-            $solo_workers_coins = getdbocount('db_workers', "algo=:algo and pid=:pid and password like '%m=solo%'", array(':algo' => $algo,':pid' => (is_null($port_db)?0 :$port_db->pid)));
-            if ($port_count == 1) 
-	    		echo "<td align='center' style='font-size: .8em;'>$workers_coins / $solo_workers_coins </td>";
-			else
-				echo "<td align='center' style='font-size: .8em;'>$workers / $solo_workers </td>";
+			// Count workers for this specific coin
+			// Workers are associated with coins through shares
+			$workers_coins = dboscalar(
+				"SELECT COUNT(DISTINCT w.id) FROM workers w 
+				 WHERE w.algo = :algo 
+				 AND NOT w.password LIKE '%m=solo%'
+				 AND w.id IN (
+					SELECT DISTINCT workerid FROM shares 
+					WHERE coinid = :coinid 
+					AND time > UNIX_TIMESTAMP() - 600
+					AND workerid > 0
+				 )",
+				array(':algo' => $algo, ':coinid' => $coin->id)
+			);
+			
+			$solo_workers_coins = dboscalar(
+				"SELECT COUNT(DISTINCT w.id) FROM workers w 
+				 WHERE w.algo = :algo 
+				 AND w.password LIKE '%m=solo%'
+				 AND w.id IN (
+					SELECT DISTINCT workerid FROM shares 
+					WHERE coinid = :coinid 
+					AND time > UNIX_TIMESTAMP() - 600
+					AND workerid > 0
+				 )",
+				array(':algo' => $algo, ':coinid' => $coin->id)
+			);
+			
+			echo "<td align='center' style='font-size: .8em;'>$workers_coins / $solo_workers_coins </td>";
 			
             $pool_hash = yaamp_coin_rate($coin->id);
             $pool_hash_sfx = $pool_hash ? Itoa2($pool_hash) . 'h/s' : '0 h/s';

@@ -1,7 +1,13 @@
 <?php
 
-require_once('/etc/yiimp/serverconfig.php');
-require_once('yaamp/defaultconfig.php');
+// For yiimp2 dedicated system, serverconfig is already loaded by runconsole-yiimp2.php
+// Skip loading if already loaded (for Docker Compose deployment)
+if (!defined('YAAMP_DBHOST')) {
+	require_once('/etc/yiimp/serverconfig.php');
+}
+if (!defined('YAAMP_PRODUCTION')) {
+	require_once('yaamp/defaultconfig.php');
+}
 
 class CronjobController extends CommonController
 {

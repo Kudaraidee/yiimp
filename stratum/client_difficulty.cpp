@@ -57,11 +57,13 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 		return;
 	}
 
+	if(client->difficulty_fixed)
+		return;
+
+	// More aggressive difficulty adjustment for high hashrate (ASICs)
+	// Target: ~10 shares per minute (YAAMP_SHAREPERSEC * 60)
 	if(client->shares_per_minute > 100)
 		client_change_difficulty(client, client->difficulty_actual*4);
-
-	else if(client->difficulty_fixed)
-		return;
 
 	else if(client->shares_per_minute > 75)
 		client_change_difficulty(client, client->difficulty_actual*3.5);
@@ -69,14 +71,18 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 	else if(client->shares_per_minute > 50)
 		client_change_difficulty(client, client->difficulty_actual*3);
 
-	else if(client->shares_per_minute > 25)
+	else if(client->shares_per_minute > 30)
 		client_change_difficulty(client, client->difficulty_actual*2);
 
 	else if(client->shares_per_minute > 20)
 		client_change_difficulty(client, client->difficulty_actual*1.5);
 
-	else if(client->shares_per_minute <  5)
+	// Slower decrease for ASICs (they need time to adjust)
+	else if(client->shares_per_minute < 3)
 		client_change_difficulty(client, client->difficulty_actual/2);
+	
+	else if(client->shares_per_minute < 5)
+		client_change_difficulty(client, client->difficulty_actual/1.5);
 }
 
 int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
@@ -85,7 +91,7 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 	client->shares_per_minute = YAAMP_SHAREPERSEC;
 
 	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 	{
 		uint256 share_target;
 		diff_to_target(share_target, difficulty);
@@ -120,7 +126,7 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 	char *p2 = strstr(client->password, "decred=");
 	if(!p || p2) return;
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 	{
 		client->difficulty_actual = g_stratum_difficulty;
 		diff_to_target(client->share_target, client->difficulty_actual);

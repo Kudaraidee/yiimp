@@ -13,6 +13,40 @@ use app\models\Coins;
 class SiteController extends Controller
 {
     /**
+     * Before action handler - log public page access for debugging
+     * 
+     * Requirements 1.1, 1.2, 4.1, 4.2, 4.5: Ensure public pages are accessible
+     * 
+     * @param \yii\base\Action $action
+     * @return bool
+     */
+    public function beforeAction($action)
+    {
+        if (!parent::beforeAction($action)) {
+            return false;
+        }
+        
+        // Log public page access for debugging (Requirements 1.1, 1.2, 4.1, 4.2, 4.5)
+        try {
+            Yii::info([
+                'message' => 'SiteController action accessed',
+                'controller' => $this->id,
+                'action' => $action->id,
+                'url' => Yii::$app->request->url ?? 'N/A',
+                'is_guest' => Yii::$app->user->isGuest,
+                'session_id' => Yii::$app->session->getId(),
+                'session_active' => Yii::$app->session->getIsActive(),
+                'has_session_cookie' => isset($_COOKIE[Yii::$app->session->getName()]),
+                'user_agent' => Yii::$app->request->getUserAgent(),
+            ], __METHOD__);
+        } catch (\Exception $e) {
+            // Ignore logging errors during error handling
+        }
+        
+        return true;
+    }
+    
+    /**
      * {@inheritdoc}
      */
     public function behaviors()
@@ -63,10 +97,15 @@ class SiteController extends Controller
     {
         $address = Yii::$app->getRequest()->getQueryParam('address');
         
-        if (!is_null($address))
-            return $this->render('wallet');
-        else
+        if (!is_null($address)) {
+            // Pass the address as username to the wallet view
+            return $this->render('wallet', [
+                'username' => $address,
+                'address' => $address,
+            ]);
+        } else {
             return $this->render('index');
+        }
     }
 
     /**
@@ -76,7 +115,13 @@ class SiteController extends Controller
      */
     public function actionMining()
     {
-        return $this->render('mining');
+        $algo = Yii::$app->request->get('algo', '');
+        $homeUrl = Yii::$app->homeUrl;
+        
+        return $this->render('mining', [
+            'algo' => $algo,
+            'homeUrl' => $homeUrl,
+        ]);
     }
 
     /**
@@ -90,6 +135,36 @@ class SiteController extends Controller
 	}
 
     /**
+     * About page action.
+     *
+     * @return string
+     */
+    public function actionAbout()
+	{
+		return $this->render('about');
+	}
+
+    /**
+     * Terms page action.
+     *
+     * @return string
+     */
+    public function actionTerms()
+	{
+		return $this->render('terms');
+	}
+
+    /**
+     * Privacy page action.
+     *
+     * @return string
+     */
+    public function actionPrivacy()
+	{
+		return $this->render('privacy');
+	}
+
+    /**
      * Benchmarks page action.
      *
      * @return string
@@ -97,6 +172,16 @@ class SiteController extends Controller
 	public function actionBenchmarks()
 	{
 		return $this->render('benchmarks');
+	}
+
+    /**
+     * Bookmarks page action.
+     *
+     * @return string
+     */
+	public function actionBookmarks()
+	{
+		return $this->render('bookmarks');
 	}
 
     /**
@@ -127,6 +212,11 @@ class SiteController extends Controller
     public function actionMiners()
 	{
 		return $this->render('miners');
+	}
+
+    public function actionMiners_results()
+	{
+		return $this->renderPartial('results/miners_results');
 	}
 
     // Home Tab : Pool Stats (algo) on the bottom right

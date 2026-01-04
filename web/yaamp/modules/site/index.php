@@ -1,6 +1,96 @@
 <?php
 $algo = user()->getState('yaamp-algo');
+?>
+<script>
+// Define functions immediately - they will check for jQuery when called
+window.page_refresh = function()
+{
+    if (typeof window.pool_current_refresh === 'function') {
+        window.pool_current_refresh();
+    }
+    if (typeof window.pool_history_refresh === 'function') {
+        window.pool_history_refresh();
+    }
+    if (typeof window.pool_coins_info_refresh === 'function') {
+        window.pool_coins_info_refresh();
+    }
+};
 
+window.select_algo = function(algo)
+{
+    window.location.href = '/site/algo?algo='+algo+'&r=/';
+};
+
+////////////////////////////////////////////////////
+
+window.pool_current_ready = function(data)
+{
+    if (typeof jQuery !== 'undefined') {
+        jQuery('#pool_current_results').html(data);
+    } else if (typeof $ !== 'undefined') {
+        $('#pool_current_results').html(data);
+    }
+};
+
+window.pool_current_refresh = function()
+{
+    if (typeof jQuery === 'undefined' && typeof $ === 'undefined') {
+        // jQuery not loaded yet, retry after a short delay
+        setTimeout(window.pool_current_refresh, 100);
+        return;
+    }
+    var url = "/site/current_results";
+    var jq = typeof jQuery !== 'undefined' ? jQuery : $;
+    jq.get(url, '', window.pool_current_ready);
+};
+
+////////////////////////////////////////////////////
+
+window.pool_history_ready = function(data)
+{
+    if (typeof jQuery !== 'undefined') {
+        jQuery('#pool_history_results').html(data);
+    } else if (typeof $ !== 'undefined') {
+        $('#pool_history_results').html(data);
+    }
+};
+
+window.pool_history_refresh = function()
+{
+    if (typeof jQuery === 'undefined' && typeof $ === 'undefined') {
+        // jQuery not loaded yet, retry after a short delay
+        setTimeout(window.pool_history_refresh, 100);
+        return;
+    }
+    var url = "/site/history_results";
+    var jq = typeof jQuery !== 'undefined' ? jQuery : $;
+    jq.get(url, '', window.pool_history_ready);
+};
+
+////////////////////////////////////////////////////
+
+window.pool_coins_info_ready = function(data)
+{
+    if (typeof jQuery !== 'undefined') {
+        jQuery('#pool_coins_info').html(data);
+    } else if (typeof $ !== 'undefined') {
+        $('#pool_coins_info').html(data);
+    }
+};
+
+window.pool_coins_info_refresh = function()
+{
+    if (typeof jQuery === 'undefined' && typeof $ === 'undefined') {
+        // jQuery not loaded yet, retry after a short delay
+        setTimeout(window.pool_coins_info_refresh, 100);
+        return;
+    }
+    var url = "/site/coins_info";
+    var jq = typeof jQuery !== 'undefined' ? jQuery : $;
+    jq.get(url, '', window.pool_coins_info_ready);
+};
+</script>
+<?php
 JavascriptFile("/extensions/jqplot/jquery.jqplot.js");
 JavascriptFile("/extensions/jqplot/plugins/jqplot.dateAxisRenderer.js");
 JavascriptFile("/extensions/jqplot/plugins/jqplot.barRenderer.js");
@@ -68,7 +158,9 @@ $payout_freq = (YAAMP_PAYMENTS_FREQ / 3600) . " hours";
 			<select id="drop-stratum" style="border-style:solid; padding: 3px; font-family: monospace; border-radius: 5px;" onchange="generate()">
 
 			<!-- Add your stratum locations here -->
-			<option value="">Main Stratum</option>
+			<option value="">Main Stratum EU</option>
+			<option value="usa.">USA Stratum</option>
+			<option value="asia.">Asia Stratum</option>
 			<!--<option value="mine.">Asia Stratum</option>
 			<option value="eu.">Europe Stratum</option>
 			<option value="cad.">CAD Stratum</option>
@@ -98,7 +190,7 @@ if (!$list) {
             ':symbol' => $symbol
         ]);
 
-        $port = $port_db ? $port_db->port : '0000';
+        $port = $port_db ? $port_db->port : '3333';
 
         // Add algorithm headings correctly
         if ($count == 0 || $algo != $algoheading) {
@@ -188,7 +280,7 @@ endif;
     <li><a href="http://www.twitter.com"><img src='/images/Twitter.png' /></a></li>
     <li><a href="http://www.youtube.com"><img src='/images/YouTube.png' /></a></li>
     <li><a href="http://www.github.com"><img src='/images/Github.png' /></a></li> -->
-    <li><a href="https://discord.gg/DrsrWQh3qC"><img src='/images/discord.png' /></a></li>
+    <li><a href="https://discord.gg/dXzCtfzsyW"><img src='/images/discord.png' /></a></li>
 </ul>
 
 </div></div><br>
@@ -213,62 +305,6 @@ endif;
 <br><br><br><br><br><br><br><br><br><br>
 <br><br><br><br><br><br><br><br><br><br>
 <br><br><br><br><br><br><br><br><br><br>
-
-<script>
-
-function page_refresh()
-{
-    pool_current_refresh();
-    pool_history_refresh();
-	pool_coins_info_refresh();
-
-}
-
-function select_algo(algo)
-{
-    window.location.href = '/site/algo?algo='+algo+'&r=/';
-}
-
-////////////////////////////////////////////////////
-
-function pool_current_ready(data)
-{
-    $('#pool_current_results').html(data);
-}
-
-function pool_current_refresh()
-{
-    var url = "/site/current_results";
-    $.get(url, '', pool_current_ready);
-}
-
-////////////////////////////////////////////////////
-
-function pool_history_ready(data)
-{
-    $('#pool_history_results').html(data);
-}
-
-function pool_history_refresh()
-{
-    var url = "/site/history_results";
-    $.get(url, '', pool_history_ready);
-}
-
-////////////////////////////////////////////////////
-
-function pool_coins_info_ready(data)
-{
-    $('#pool_coins_info').html(data);
-}
-
-function pool_coins_info_refresh()
-{
-    var url = "/site/coins_info";
-    $.get(url, '', pool_coins_info_ready);
-}
-
-</script>
 
 <script>
 function getLastUpdated(){
@@ -301,4 +337,18 @@ function generate(){
     document.getElementById('output').innerHTML = result;
 }
 generate();
+
+// Load pool data immediately when page loads
+$(document).ready(function() {
+    console.log('Page ready, loading pool data...');
+    if (typeof window.pool_current_refresh === 'function') {
+        window.pool_current_refresh();
+    }
+    if (typeof window.pool_history_refresh === 'function') {
+        window.pool_history_refresh();
+    }
+    if (typeof window.pool_coins_info_refresh === 'function') {
+        window.pool_coins_info_refresh();
+    }
+});
 </script>

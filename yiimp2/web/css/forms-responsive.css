@@ -1,0 +1,297 @@
+/* Responsive Form Enhancements */
+
+/* Form groups with better spacing */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+/* Responsive input groups */
+.input-group {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    width: 100%;
+}
+
+@media (max-width: 575.98px) {
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .input-group > .form-control,
+    .input-group > .input-group-text,
+    .input-group > .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .input-group > *:last-child {
+        margin-bottom: 0;
+    }
+}
+
+/* Responsive select elements */
+.form-select {
+    display: block;
+    width: 100%;
+    padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #212529;
+    background-color: #fff;
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 16px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+@media (max-width: 575.98px) {
+    .form-select {
+        font-size: 0.875rem;
+        padding: 0.5rem 2rem 0.5rem 0.75rem;
+    }
+}
+
+/* Responsive checkboxes and radios */
+.form-check {
+    display: block;
+    min-height: 1.5rem;
+    padding-left: 1.5em;
+    margin-bottom: 0.125rem;
+}
+
+@media (max-width: 575.98px) {
+    .form-check {
+        padding-left: 1.25em;
+    }
+}
+
+/* Responsive form validation */
+.invalid-feedback {
+    display: none;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875em;
+    color: #dc3545;
+}
+
+.was-validated .form-control:invalid ~ .invalid-feedback,
+.form-control.is-invalid ~ .invalid-feedback {
+    display: block;
+}
+
+@media (max-width: 575.98px) {
+    .invalid-feedback {
+        font-size: 0.8125rem;
+    }
+}
+
+/* Responsive form layouts */
+.form-horizontal .form-group {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.form-horizontal .form-group label {
+    flex: 0 0 auto;
+    width: 25%;
+    padding-right: 1rem;
+    padding-top: calc(0.375rem + 1px);
+    margin-bottom: 0;
+}
+
+.form-horizontal .form-group .form-control-wrapper {
+    flex: 1 1 auto;
+    width: 75%;
+}
+
+@media (max-width: 767.98px) {
+    .form-horizontal .form-group {
+        flex-direction: column;
+    }
+    
+    .form-horizontal .form-group label {
+        width: 100%;
+        padding-right: 0;
+        padding-top: 0;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-horizontal .form-group .form-control-wrapper {
+        width: 100%;
+    }
+}
+
+/* Responsive button groups in forms */
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+    }
+}
+
+/* Responsive fieldsets */
+fieldset {
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+}
+
+legend {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    line-height: inherit;
+    color: inherit;
+    white-space: normal;
+}
+
+@media (max-width: 575.98px) {
+    legend {
+        font-size: 1.25rem;
+    }
+}
+
+/* Responsive help text */
+.form-text {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.875em;
+    color: #6c757d;
+}
+
+@media (max-width: 575.98px) {
+    .form-text {
+        font-size: 0.8125rem;
+    }
+}
+
+/* Responsive floating labels */
+.form-floating {
+    position: relative;
+}
+
+.form-floating > .form-control,
+.form-floating > .form-select {
+    height: calc(3.5rem + 2px);
+    padding: 1rem 0.75rem;
+}
+
+.form-floating > label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    padding: 1rem 0.75rem;
+    pointer-events: none;
+    border: 1px solid transparent;
+    transform-origin: 0 0;
+    transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+}
+
+@media (max-width: 575.98px) {
+    .form-floating > .form-control,
+    .form-floating > .form-select {
+        height: calc(3rem + 2px);
+        padding: 0.875rem 0.75rem;
+    }
+    
+    .form-floating > label {
+        padding: 0.875rem 0.75rem;
+    }
+}
+
+/* Responsive search forms */
+.search-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .search-form {
+        flex-direction: column;
+    }
+    
+    .search-form .form-control {
+        width: 100%;
+    }
+    
+    .search-form .btn {
+        width: 100%;
+    }
+}
+
+/* Responsive filter forms */
+.filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.25rem;
+}
+
+@media (max-width: 767.98px) {
+    .filter-form {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .filter-form .form-group {
+        margin-bottom: 0;
+    }
+}
+
+/* Responsive inline forms */
+.form-inline {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+}
+
+.form-inline .form-control {
+    display: inline-block;
+    width: auto;
+    vertical-align: middle;
+}
+
+@media (max-width: 575.98px) {
+    .form-inline {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .form-inline .form-control {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-inline .btn {
+        width: 100%;
+    }
+}

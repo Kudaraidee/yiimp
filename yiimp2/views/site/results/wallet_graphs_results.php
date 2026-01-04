@@ -38,7 +38,7 @@ foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
 
 	echo <<<end
 <input type=hidden id=$algo class='graph_algo'>
-<div id='graph_results_$algo' style='height: 240px;'></div><br>
+<div id='graph_results_$algo' class='chart-container-240'></div><br>
 end;
 }
 

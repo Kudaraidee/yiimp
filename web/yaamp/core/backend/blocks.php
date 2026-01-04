@@ -33,21 +33,17 @@ function BackendBlockNew($coin, $db_block)
 	{
 		debuglog("Shared Mining Found Block : $coin->id height $db_block->height with $db_block->userid");
 
-		//Clear Share Solo Miner before calc
-		$solo_workers = getdbolist(
-			'db_workers',
-			"algo=:algo and password like '%m=solo%'", 
-			array(
-				':algo'=>$db_block->algo
-			)
+		// Get the last rewarded block for this coin to determine the time range
+		$last_shared_block = dborow(
+			"SELECT height, time FROM blocks WHERE coin_id=:coinid AND solo=0 AND category IN ('immature','generate') AND height < :height ORDER BY height DESC LIMIT 1",
+			array(':coinid'=>$coin->id, ':height'=>$db_block->height)
 		);
-	
-		foreach ($solo_workers as $solo_worker)
-		{
-			dborun("DELETE FROM shares WHERE algo=:algo AND workerid=:workerid AND $sqlCond",array(':algo'=>$coin->algo,':workerid'=>$solo_worker->id));
-		}
+		$timelast_shared = $last_shared_block ? (int)$last_shared_block['time'] : 0;
+		
+		debuglog("Shared Block: Using shares since time $timelast_shared for block height {$db_block->height}");
 
-		$sqlCond .= " AND valid = 1";
+		// Only use SHARED shares (solo=0) since the last shared block for this coin
+		$sqlCond .= " AND valid = 1 AND solo = 0 AND time >= $timelast_shared";
 
 		$total_hash_power = dboscalar("SELECT SUM(difficulty) FROM shares WHERE algo=:algo AND $sqlCond", array(':algo'=>$coin->algo));
 		if(!$total_hash_power) return;
@@ -106,21 +102,31 @@ function BackendBlockNew($coin, $db_block)
 
 			$user->last_earning = time();
 			$user->save();
-
-			$last_shared = dborow("SELECT height, time FROM blocks " . "WHERE coin_id=:id AND solo=0 AND category IN ('immature','generate') ORDER BY height DESC LIMIT 1", array(':id' => $coin->id));
-			$timelast_shared = (int) arraySafeVal($last_shared, 'time');
-      
-			$total_shared_difficulty = dboscalar("SELECT SUM(difficulty) FROM shares WHERE coinid=:coinid AND algo=:algo AND solo=0 AND time>=$timelast_shared", array(':algo'=>$coin->algo,':coinid'=>$coin->id));
-			$effort = round($total_shared_difficulty * 100 / $db_block->difficulty, 2);
-			$db_block->effort = $effort;
-			
-			$db_block->solo = 0;
-			$db_block->save();
 		}
+		
+		// Calculate effort based on shares since last shared block (outside the user loop)
+		$total_shared_difficulty = dboscalar("SELECT SUM(difficulty) FROM shares WHERE coinid=:coinid AND algo=:algo AND solo=0 AND time>=$timelast_shared", array(':algo'=>$coin->algo,':coinid'=>$coin->id));
+		$effort = round($total_shared_difficulty * 100 / $db_block->difficulty, 2);
+		$db_block->effort = $effort;
+		
+		$db_block->solo = 0;
+		$db_block->save();
 	}
 	else 
 	{
 		debuglog("Solo Mining Found Block : $coin->id height $db_block->height with $db_block->userid");
+
+		// Get the last solo block for this coin to determine the time range
+		$last_solo_block = dborow(
+			"SELECT height, time FROM blocks WHERE coin_id=:coinid AND solo=1 AND category IN ('immature','generate') AND height < :height ORDER BY height DESC LIMIT 1",
+			array(':coinid'=>$coin->id, ':height'=>$db_block->height)
+		);
+		$timelast_solo = $last_solo_block ? (int)$last_solo_block['time'] : 0;
+		
+		debuglog("Solo Block: Using shares since time $timelast_solo for block height {$db_block->height}");
+
+		// Only use SOLO shares (solo=1) since the last solo block for this coin
+		$sqlCond .= " AND solo = 1 AND time >= $timelast_solo";
 
 		//Solo Reward
 		$amount = $reward;
@@ -164,9 +170,7 @@ function BackendBlockNew($coin, $db_block)
 		$user->last_earning = time();
 		$user->save();
 		
-		$last_solo = dborow("SELECT height, time FROM blocks " . "WHERE coin_id=:id AND solo=1 AND category IN ('immature','generate') ORDER BY height DESC LIMIT 1", array(':id' => $coin->id));
-		$timelast_solo = (int) arraySafeVal($last_solo, 'time');
-      
+		// Calculate effort based on shares since last solo block
 		$total_solo_difficulty = dboscalar("SELECT SUM(difficulty) FROM shares WHERE coinid=:coinid AND algo=:algo AND solo=1 AND time>=$timelast_solo", array(':algo'=>$coin->algo,':coinid'=>$coin->id));
 		$effort = round($total_solo_difficulty * 100 / $db_block->difficulty, 2);
 		$db_block->effort = $effort;
@@ -471,6 +475,26 @@ function BackendBlockFind2($coinid = NULL)
 			$db_block->time = $transaction['time'];
 			$db_block->amount = (isset($transaction['amount']))? $transaction['amount'] : 0;
 			$db_block->algo = $coin->algo;
+
+			// Try to find the user who mined this block from shares
+			// This is critical for blocks discovered via wallet scanning (not stratum)
+			if (empty($db_block->userid)) {
+				$share = dborow(
+					"SELECT userid, workerid FROM shares WHERE coinid=:coin AND valid=1 AND time <= :time AND time >= :time - 3600 ".
+					"ORDER BY difficulty DESC LIMIT 1", 
+					array(
+						':coin' => $coin->id,
+						':time' => $transaction['time']
+					)
+				);
+				if ($share) {
+					$db_block->userid = (int)$share['userid'];
+					$db_block->workerid = (int)$share['workerid'];
+					debuglog("{$coin->symbol} block {$blockext['height']} assigned to user {$db_block->userid} from shares");
+				} else {
+					debuglog("WARNING: {$coin->symbol} block {$blockext['height']} found but no shares found to assign user!");
+				}
+			}
 
 			if (arraySafeVal($blockext,'nonce',0) != 0) {
 				$db_block->difficulty_user = hash_to_difficulty($coin, $transaction['blockhash']);

@@ -1,11 +1,11 @@
 <?php
 
-/*
-JavascriptFile("/extensions/jqplot/jquery.jqplot.js");
-JavascriptFile("/extensions/jqplot/plugins/jqplot.enhancedLegendRenderer.js");
-JavascriptFile("/extensions/jqplot/plugins/jqplot.dateAxisRenderer.js");
-JavascriptFile("/extensions/jqplot/plugins/jqplot.highlighter.js");
-*/
+use app\components\CspHelper;
+use app\assets\ChartHelperAsset;
+
+// Register Chart.js assets for CSP-compliant charting
+ChartHelperAsset::register($this);
+
 $refSymbol = 'BTC';
 if ($coin->symbol == 'BTC') $refSymbol = 'USD';
 
@@ -16,43 +16,19 @@ echo <<<end
 	width: 75%; height: 300px; float: right;
 	margin-bottom: 8px;
 }
-.jqplot-title {
+.chart-title {
 	margin-bottom: 4px;
-}
-.jqplot-cursor-tooltip,
-.jqplot-highlighter-tooltip {
-	background: rgba(220,220,220, .6) !important;
-	border: 1px solid gray;
-	padding: 2px 4px;
-	z-index: 100;
-}
-.jqplot-xaxis-tick {
-	margin-top: 4px;
-}
-.jqplot-y2axis-tick {
-	font-size: 7pt;
-	margin-top: -4px;
-	margin-left: 8px;
-	width: 36px;
-}
-.jqplot-seriesToggle {
-	cursor: pointer;
-}
-.jqplot-table-legend-swatch {
-	height: 8px;
-	width: 8px;
-	margin-top: 2px;
-	margin-left: 16px;
+	font-weight: bold;
 }
 </style>
 
 <div class="graph" id="graph_history_price"></div>
 <div class="graph" id="graph_history_balance"></div>
 
-<script type="text/javascript">
+<?= CspHelper::beginScript() ?>
 
 var last_graph_update, graph_need_update, graph_timeout = 0;
-var price_graph, balance_graph = '';
+var price_graph, balance_graph = null;
 
 function graph_refresh()
 {
@@ -67,10 +43,10 @@ function graph_refresh()
 	w = w - $('div#sums').width() - 32;
 	$('.graph').width(w);
 
-	var url = "/admin/graph_market_balance?id={$coin->id}";
+	var url = "<?= \yii\helpers\Url::to(['graph-market-balance', 'id' => $coin->id]) ?>";
 	$.get(url, '', graph_balance_data);
 
-	var url = "/admin/graph_market_prices?id={$coin->id}";
+	var url = "<?= \yii\helpers\Url::to(['graph-market-prices', 'id' => $coin->id]) ?>";
 	$.get(url, '', graph_price_data);
 }
 
@@ -83,175 +59,233 @@ function graph_resized()
 
 function graph_price_data(data)
 {
-	if (price_graph)
-	{
-		$('#graph_history_price *').unbind();
+	// Destroy existing chart
+	if (price_graph) {
 		price_graph.destroy();
+		price_graph = null;
 	}
 
-	var t = $.parseJSON(data);
-	price_graph = $.jqplot('graph_history_price', t.data,
-	{
-		title: '<b>Price history</b>',
-		animate: false, animateReplot: false,
-		axes: {
-			xaxis: {
-				show: true,
-				tickInterval: 600,
-				tickOptions: { fontSize: '7pt', escapeHTML: false },
-				renderer: $.jqplot.DateAxisRenderer
+	var t = JSON.parse(data);
+	
+	// Prepare datasets for Chart.js
+	var datasets = [];
+	var colors = ChartHelper.colors;
+	
+	for (var i = 0; i < t.data.length; i++) {
+		datasets.push({
+			label: t.labels[i] || ('Series ' + (i + 1)),
+			data: ChartHelper.formatTimeSeriesData(t.data[i]),
+			borderColor: colors[i % colors.length],
+			backgroundColor: 'transparent',
+			fill: false,
+			tension: 0.4,
+			pointRadius: 1,
+			pointHoverRadius: 4
+		});
+	}
+	
+	var container = document.getElementById('graph_history_price');
+	if (!container) return;
+	
+	container.innerHTML = '';
+	var canvas = document.createElement('canvas');
+	container.appendChild(canvas);
+	var ctx = canvas.getContext('2d');
+	
+	price_graph = new Chart(ctx, {
+		type: 'line',
+		data: { datasets: datasets },
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			plugins: {
+				title: {
+					display: true,
+					text: 'Price history',
+					font: { weight: 'bold' }
+				},
+				legend: {
+					display: true,
+					position: 'top',
+					labels: {
+						usePointStyle: true,
+						padding: 10
+					},
+					onClick: function(e, legendItem, legend) {
+						var index = legendItem.datasetIndex;
+						var ci = legend.chart;
+						var meta = ci.getDatasetMeta(index);
+						meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+						ci.update();
+					}
+				},
+				tooltip: {
+					mode: 'index',
+					intersect: false,
+					callbacks: {
+						title: function(context) {
+							if (context.length > 0) {
+								var date = new Date(context[0].parsed.x);
+								return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+							}
+							return '';
+						},
+						label: function(context) {
+							var label = context.dataset.label || '';
+							if (label) {
+								label += ': ';
+							}
+							if (context.parsed.y !== null) {
+								label += context.parsed.y.toFixed(8) + ' {$refSymbol}';
+							}
+							return label;
+						}
+					}
+				}
 			},
-			x2axis: {
-				// hidden (top) axis with higher granularity
-				syncTicks: 1,
-				tickInterval: 600,
-				tickOptions: { show: false },
-				renderer: $.jqplot.DateAxisRenderer
+			scales: {
+				x: {
+					type: 'time',
+					time: {
+						displayFormats: {
+							hour: 'HH:mm',
+							day: 'MMM d'
+						}
+					},
+					grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' },
+					ticks: { font: { size: 10 } }
+				},
+				y: {
+					min: t.rangeMin,
+					max: t.rangeMax,
+					grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' },
+					ticks: { font: { size: 10 } }
+				}
 			},
-			y2axis: {
-				min: t.rangeMin, max: t.rangeMax
-			}
-		},
-
-		seriesDefaults: {
-			xaxis: 'x2axis',
-			yaxis: 'y2axis',
-			markerOptions: { style: 'circle', size: 0.25 }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 0, shadowDepth: 0,
-			background: '#f0f0f0'
-		},
-
-		legend: {
-			labels: t.labels,
-			renderer: jQuery.jqplot.EnhancedLegendRenderer,
-			rendererOptions: { numberRows: 1 },
-			location: 'n',
-			show: true
-		},
-
-		highlighter: {
-			useAxesFormatters: false,
-			tooltipContentEditor: function(str, seriesIndex, pointIndex, jqPlot) {
-				var pt = jqPlot.series[seriesIndex].data[pointIndex];
-				var dt = new Date(0+pt[0]);
-				var date = $.jsDate.strftime(dt, '%d %b');
-				var time = $.jsDate.strftime(dt, '%H:%M');
-				return date+' '+time+' '+ t.labels[seriesIndex] + '<br/>' + pt[1]+' {$refSymbol}';
-			},
-			show: true
+			interaction: { mode: 'nearest', axis: 'x', intersect: false }
 		}
 	});
-	// limit visible axis ticks
-	var x2ticks = price_graph.axes.x2axis._ticks;
-	price_graph.axes.xaxis.ticks = [];
-	var tickInterval = price_graph.grid._width > 0 ? Math.round(90*300 / price_graph.grid._width, 0) : 1;
-	var label, day, lastDay;
-	for (var i=0; i < x2ticks.length; i++) {
-		if (i % tickInterval == 0) {
-			var dt = new Date(0+x2ticks[i].value);
-			day = '<b>'+$.jsDate.strftime(dt, '%#d %b')+'</b>';
-			if (x2ticks.length > 500 && day == lastDay) label = '';
-			else label = (day == lastDay) ? $.jsDate.strftime(dt, '%H:%M') : day;
-			lastDay = day;
-			price_graph.axes.xaxis.ticks.push([x2ticks[i].value, label]);
-		}
+	
+	// Register with ChartManager if available
+	if (typeof ChartManager !== 'undefined') {
+		ChartManager.register('graph_history_price', price_graph);
 	}
-	price_graph.axes.xaxis.ticks.push([x2ticks[x2ticks.length-1].value, '']);
-	price_graph.replot(false);
-	x2ticks = null;
 }
 
 function graph_balance_data(data)
 {
-	if (balance_graph)
-	{
-		$('#graph_history_balance *').unbind();
+	// Destroy existing chart
+	if (balance_graph) {
 		balance_graph.destroy();
+		balance_graph = null;
 	}
 
-	var t = $.parseJSON(data);
-	balance_graph = $.jqplot('graph_history_balance', t.data,
-	{
-		title: '<b>Balances</b>',
-		animate: false, animateReplot: false,
-		stackSeries: true,
-		axes: {
-			xaxis: {
-				show: true,
-				tickInterval: 600,
-				tickOptions: { fontSize: '7pt', escapeHTML: false },
-				showMinorTicks: false,
-				renderer: $.jqplot.DateAxisRenderer
+	var t = JSON.parse(data);
+	
+	// Prepare datasets for Chart.js (stacked area)
+	var datasets = [];
+	var colors = ChartHelper.colors;
+	
+	for (var i = 0; i < t.data.length; i++) {
+		datasets.push({
+			label: t.labels[i] || ('Series ' + (i + 1)),
+			data: ChartHelper.formatTimeSeriesData(t.data[i]),
+			backgroundColor: colors[i % colors.length],
+			borderColor: colors[i % colors.length],
+			fill: true,
+			tension: 0.4,
+			pointRadius: 0
+		});
+	}
+	
+	var container = document.getElementById('graph_history_balance');
+	if (!container) return;
+	
+	container.innerHTML = '';
+	var canvas = document.createElement('canvas');
+	container.appendChild(canvas);
+	var ctx = canvas.getContext('2d');
+	
+	balance_graph = new Chart(ctx, {
+		type: 'line',
+		data: { datasets: datasets },
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			plugins: {
+				title: {
+					display: true,
+					text: 'Balances',
+					font: { weight: 'bold' }
+				},
+				legend: {
+					display: true,
+					position: 'top',
+					labels: {
+						usePointStyle: true,
+						padding: 10
+					},
+					onClick: function(e, legendItem, legend) {
+						var index = legendItem.datasetIndex;
+						var ci = legend.chart;
+						var meta = ci.getDatasetMeta(index);
+						meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+						ci.update();
+					}
+				},
+				tooltip: {
+					mode: 'index',
+					intersect: false,
+					callbacks: {
+						title: function(context) {
+							if (context.length > 0) {
+								var date = new Date(context[0].parsed.x);
+								return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+							}
+							return '';
+						},
+						label: function(context) {
+							var label = context.dataset.label || '';
+							if (label) {
+								label += ': ';
+							}
+							if (context.parsed.y !== null) {
+								label += context.parsed.y.toFixed(8) + ' {$coin->symbol}';
+							}
+							return label;
+						}
+					}
+				},
+				filler: { propagate: false }
 			},
-			x2axis: {
-				// hidden (top) axis with higher granularity
-				syncTicks: 1,
-				tickInterval: 600,
-				tickOptions: { show: false },
-				renderer: $.jqplot.DateAxisRenderer
+			scales: {
+				x: {
+					type: 'time',
+					time: {
+						displayFormats: {
+							hour: 'HH:mm',
+							day: 'MMM d'
+						}
+					},
+					grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' },
+					ticks: { font: { size: 10 } }
+				},
+				y: {
+					stacked: true,
+					min: t.rangeMin,
+					max: t.rangeMax,
+					grid: { display: true, color: 'rgba(0, 0, 0, 0.1)' },
+					ticks: { font: { size: 10 } }
+				}
 			},
-			y2axis: {
-				syncTicks: 1,
-				min: t.rangeMin, max: t.rangeMax
-			}
-		},
-
-		seriesDefaults: {
-			xaxis: 'x2axis',
-			yaxis: 'y2axis',
-			fill: true
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 0, shadowDepth: 0,
-			background: '#f0f0f0'
-		},
-
-		legend: {
-			labels: t.labels,
-			renderer: jQuery.jqplot.EnhancedLegendRenderer,
-			rendererOptions: { numberRows: 1 },
-			location: 'n',
-			show: true
-		},
-
-		highlighter: {
-			useAxesFormatters: false,
-			tooltipContentEditor: function(str, seriesIndex, pointIndex, jqPlot) {
-				var pt = jqPlot.series[seriesIndex].data[pointIndex];
-				var dt = new Date(0+pt[0]);
-				var date = $.jsDate.strftime(dt, '%d %b');
-				var time = $.jsDate.strftime(dt, '%H:%M');
-				return date+' '+time+' '+ t.labels[seriesIndex] + '<br/>' + pt[1]+' {$coin->symbol}';
-			},
-			show: true
+			interaction: { mode: 'nearest', axis: 'x', intersect: false }
 		}
 	});
-	// limit visible axis ticks
-	var x2ticks = balance_graph.axes.x2axis._ticks;
-	balance_graph.axes.xaxis.ticks = [];
-	var tickInterval = balance_graph.grid._width > 0 ? Math.round(90*300 / balance_graph.grid._width, 0) : 1;
-	var label, day, lastDay;
-	for (var i=0; i < x2ticks.length; i++) {
-		if (i % tickInterval == 0) {
-			var dt = new Date(0+x2ticks[i].value);
-			day = '<b>'+$.jsDate.strftime(dt, '%#d %b')+'</b>';
-			if (x2ticks.length > 500 && day == lastDay) label = '';
-			else label = (day == lastDay) ? $.jsDate.strftime(dt, '%H:%M') : day;
-			lastDay = day;
-			balance_graph.axes.xaxis.ticks.push([x2ticks[i].value, label]);
-		}
+	
+	// Register with ChartManager if available
+	if (typeof ChartManager !== 'undefined') {
+		ChartManager.register('graph_history_balance', balance_graph);
 	}
-	balance_graph.axes.xaxis.ticks.push([x2ticks[x2ticks.length-1].value, '']);
-	balance_graph.replot(false);
-	x2ticks = null;
 }
-</script>
+<?= CspHelper::endScript() ?>
 end;
-
-// JavascriptReady("$(window).resize(graph_resized);");

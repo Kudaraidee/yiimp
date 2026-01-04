@@ -7,7 +7,12 @@ class YaampMemcache
 	public function __construct()
 	{
 		if(!function_exists("memcache_connect")) return;
-		$this->memcache = memcache_connect("127.0.0.1", 11211);
+		
+		// Use configured memcache host for Docker Compose, fallback to localhost
+		$host = defined('YAAMP_MEMCACHE_HOST') ? YAAMP_MEMCACHE_HOST : '127.0.0.1';
+		$port = defined('YAAMP_MEMCACHE_PORT') ? YAAMP_MEMCACHE_PORT : 11211;
+		
+		$this->memcache = memcache_connect($host, $port);
 	}
 
 	public function get($key)

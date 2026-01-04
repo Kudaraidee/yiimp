@@ -3,13 +3,7 @@
 use Yii;
 use app\models\Blocks;
 use app\models\Coins;
-
-function WriteBoxHeader($title)
-{
-	echo "<div class='main-left-box'>";
-	echo "<div class='main-left-title'>$title</div>";
-	echo "<div class='main-left-inner'>";
-}
+use app\components\ViewHelper;
 
 $algo = Yii::$app->session->get('yaamp-algo');
 
@@ -20,7 +14,7 @@ $count = Yii::$app->getRequest()->getQueryParam('count');
 $count = $count? $count: 20;
 
 
-WriteBoxHeader("Last $count Blocks found by $user->username");
+ViewHelper::renderBoxHeader("Last $count Blocks found by $user->username");
 $db_blocks = Blocks::find()
 				->where(['userid' => $user->id])
 				->orderBy('time desc')
@@ -61,7 +55,7 @@ span.solo
 <table class="dataGrid2">
 <thead>
 <tr>
-<th style='max-width:18px'></th>
+<th class='coin-icon-column'></th>
 <th data-sorter="text">Name</th>
 <th data-sorter="numeric" >Block</th>
 <th data-sorter="numeric" >Amount</th>
@@ -82,11 +76,12 @@ foreach($db_blocks as $db_block)
 
 	if(!$coin) continue;
 
-	if($db_block->category == 'stake' && !$this->admin) continue;
-	if($db_block->category == 'generated' && !$this->admin) continue; // mature stake income
+	$isAdmin = (!is_null(Yii::$app->user->identity)) && (Yii::$app->user->identity->is_admin);
+	if($db_block->category == 'stake' && !$isAdmin) continue;
+	if($db_block->category == 'generated' && !$isAdmin) continue; // mature stake income
 
 	if($db_block->category == 'immature')
-		echo "<tr style='background-color: #e0d3e8;'>";
+		echo "<tr class='ssrow row-immature'>";
 	else
 		echo "<tr class='ssrow'>";
 
@@ -95,17 +90,17 @@ foreach($db_blocks as $db_block)
 	$flags = $db_block->segwit ? '&nbsp;<img src="/images/ui/segwit.png" height="8px" valign="center" title="segwit"/>' : '';
 
 	echo '<td>';
-	if ($this->admin)
+	if ($isAdmin)
 		echo '<a href="/site/coin?id='.$coin->id.'"><b>'.$coin->name.'</b></a>';
 	else
 		echo '<b>'.$coin->name.'</b>';
 	echo '&nbsp;('.$coin->algo.')'.$flags.'</td>';
 
 
-	$d = datetoa2($db_block->time);
+	$d = Yii::$app->ConversionUtils->datetoa2($db_block->time);
 	echo '<td>'.$coin->createExplorerLink($db_block->height, array('height'=>$db_block->height)).'</td>';
 	echo '<td>'.$db_block->amount.'</td>';
-	echo '<td>'.round_difficulty($db_block->difficulty).'</td>';
+	echo '<td>'.Yii::$app->ConversionUtils->Itoa2($db_block->difficulty, 3).'</td>';
 	echo '<td data="'.$db_block->time.'"><b>'.$d.' ago</b></td>';
 
 	if ($db_block->effort)	

@@ -16,6 +16,14 @@ define('YIIMP_DBNAME', 'yaamp');
 define('YIIMP_DBUSER', 'root');
 define('YIIMP_DBPASSWORD', 'password');
 
+// Cookie Validation Key - REQUIRED for Yii2 security
+// This key is used by Yii2 to validate cookies and prevent tampering
+// Set via YIIMP_COOKIE_VALIDATION_KEY environment variable or define here
+// Generate with: openssl rand -hex 32
+// IMPORTANT: Keep this secret and never commit it to version control
+// If not set, a random key will be generated (not recommended for production)
+// define('YIIMP_COOKIE_VALIDATION_KEY', 'your-secret-key-here');
+
 define('YIIMP_SITE_URL', 'yiimp.ccminer.org');
 define('YIIMP_STRATUM_URL', YIIMP_SITE_URL); // change if your stratum server is on a different host
 define('YIIMP_SITE_NAME', 'YiiMP');

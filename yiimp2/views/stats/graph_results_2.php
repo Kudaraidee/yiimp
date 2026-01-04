@@ -1,19 +1,15 @@
 <?php
 
-$algo = user()->getState('yaamp-algo');
+use app\models\Hashstats;
+use Yii;
 
+// Set JSON response header
+Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+$algo = Yii::$app->YiimpUtils->getCurrentAlgo();
 $t = time() - 48*60*60;
-$stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
 
-echo '[';
+$data = Hashstats::getEarningsChartData($algo, $t, 24);
 
-foreach($stats as $i=>$n)
-{
-	$e = bitcoinvaluetoa($n->earnings*24);
-	if($i) echo ',';
-	$d = date('Y-m-d H:i:s', $n->time);
-	echo "[\"$d\",$e]";
-}
-
-echo ']';
+return $data;
 

@@ -1,20 +1,26 @@
 {
     "require": {
-        "php": ">=8.0",
-        "yiisoft/yii2": "~2.0.48",
-        "yiisoft/yii2-bootstrap5": "~2.0.2",
-        "yiisoft/yii2-symfonymailer": "~2.0.3"
+        "php": ">=8.4",
+        "yiisoft/yii2": "~2.0.53",
+        "yiisoft/yii2-bootstrap5": "^2.0.4",
+        "yiisoft/yii2-symfonymailer": "~2.0.4"
     },
     "require-dev": {
-        "yiisoft/yii2-debug": "~2.1.0",
-        "yiisoft/yii2-gii": "~2.2.0",
-        "yiisoft/yii2-faker": "~2.0.0",
-        "codeception/codeception": "^5.0.0 || ^4.0",
-        "codeception/lib-innerbrowser": "^4.0 || ^3.0 || ^1.1",
-        "codeception/module-asserts": "^3.0 || ^1.1",
+        "codeception/codeception": "^5.1",
+        "codeception/lib-innerbrowser": "^4.0",
+        "codeception/module-asserts": "^3.0",
+        "codeception/module-filesystem": "^3.0",
         "codeception/module-yii2": "^1.1",
-        "codeception/module-filesystem": "^3.0 || ^2.0 || ^1.1",
-        "codeception/verify": "^3.0 || ^2.2"
+        "codeception/verify": "^3.2",
+        "giorgiosironi/eris": "^1.0",
+        "yiisoft/yii2-debug": "~2.1.25",
+        "yiisoft/yii2-faker": "~2.0.5",
+        "yiisoft/yii2-gii": "~2.2.6"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "tests\\helpers\\": "tests/helpers/"
+        }
     },
     "config": {
         "allow-plugins": {

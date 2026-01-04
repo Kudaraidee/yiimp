@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 
-#include "blake3/blake3.h"
+#include "xelisv2-pepew/blake3.h"
 #include "xelisv2-pepew/chacha20.h"
 #include "xelisv2-pepew/aes.h"
 #include "sha3/sph_blake.h"

@@ -264,7 +264,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	if (is_firopow) {
 		sprintf(params, "[{\"mode\":\"template\"},\"%s\"]", coind->wallet);
 	}
-	else if (is_kawpow || is_phihash || is_meowpow) {
+	else if (is_kawpow || is_phihash) {
 		sprintf(params, "[]");
 	}
 	else {
@@ -634,12 +634,11 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	string merkleroot = merkle_with_first(templ->txsteps, doublehash);
 	strcpy(templ->merkleroot, merkleroot.c_str());
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash)
 	{
 		update_epoch(coind->id, templ->height);
 		templ->header_seed = get_kawpow_seed(templ->height);
-		if (is_kawpow || is_phihash || is_meowpow) 
-		{
+		if (is_kawpow) {
 			templ->header_hash = build_header_hash(templ);
 		}
 	}

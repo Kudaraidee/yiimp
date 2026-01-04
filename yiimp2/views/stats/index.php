@@ -2,8 +2,13 @@
 
 use yii\bootstrap5\ActiveForm;
 use yii\bootstrap5\Html;
+use app\components\CspHelper;
+use app\assets\ChartHelperAsset;
 
 /** @var yii\web\View $this */
+
+// Register Chart.js assets for CSP-compliant charting
+ChartHelperAsset::register($this);
 
 $algo = Yii::$app->session->get('yaamp-algo');
 $algo_unit = 'Mh';
@@ -123,26 +128,36 @@ $dtMax2 = $dtMin2 + 7 * $days;
 $dtMin3 = $dtMax1 - (8*4+1)*$days;
 $dtMax3 = $dtMin3 + (8*4) * $days;
 
-echo <<<end
+?>
 
-<div id='resume_update_button' style='color: #444; background-color: #ffd; border: 1px solid #eea;
-	padding: 10px; margin-left: 20px; margin-right: 20px; margin-top: 15px; cursor: pointer; display: none;'
-	onclick='auto_page_resume();' align=center>
+<div id="resume_update_button" class="resume-update-button d-none" align="center">
 	<b>Auto refresh is paused - Click to resume</b></div>
 
-<div align=right>
-Select Algo: <select id='algo_select'>$string</select>&nbsp;
+<div align="right">
+Select Algo: <select id="algo_select"><?= $string ?></select>&nbsp;
 </div>
 
-<script>
+<?= CspHelper::beginScript() ?>
 
-$('#algo_select').change(function(event)
-{
-	var algo = $('#algo_select').val();
-	window.location.href = '/site/algo?algo='+algo+'&r=/stats';
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+	var resumeBtn = document.getElementById('resume_update_button');
+	if (resumeBtn) {
+		resumeBtn.addEventListener('click', function() {
+			auto_page_resume();
+		});
+	}
+	
+	var algoSelect = document.getElementById('algo_select');
+	if (algoSelect) {
+		algoSelect.addEventListener('change', function(event) {
+			var algo = this.value;
+			window.location.href = '/site/algo?algo='+algo+'&r=/stats';
+		});
+	}
 });
 
-</script>
+<?= CspHelper::endScript() ?>
 
 <table width=100%><tr><td valign=top width=33%>
 
@@ -157,9 +172,9 @@ $('#algo_select').change(function(event)
 </ul>
 
 <br>
-<div id='graph_results_1' style='height: $height;'></div><br><br>
-<div id='graph_results_2' style='height: $height;'></div><br><br>
-<div id='graph_results_3' style='height: $height;'></div><br><br>
+<div id='graph_results_1' class='chart-container-240'></div><br><br>
+<div id='graph_results_2' class='chart-container-240'></div><br><br>
+<div id='graph_results_3' class='chart-container-240'></div><br><br>
 
 </div></div><br>
 
@@ -178,9 +193,9 @@ $('#algo_select').change(function(event)
 </ul>
 
 <br>
-<div id='graph_results_4' style='height: $height;'></div><br><br>
-<div id='graph_results_5' style='height: $height;'></div><br><br>
-<div id='graph_results_6' style='height: $height;'></div><br><br>
+<div id='graph_results_4' class='chart-container-240'></div><br><br>
+<div id='graph_results_5' class='chart-container-240'></div><br><br>
+<div id='graph_results_6' class='chart-container-240'></div><br><br>
 
 </div></div><br>
 
@@ -199,9 +214,9 @@ $('#algo_select').change(function(event)
 </ul>
 
 <br>
-<div id='graph_results_7' style='height: $height;'></div><br><br>
-<div id='graph_results_8' style='height: $height;'></div><br><br>
-<div id='graph_results_9' style='height: $height;'></div><br><br>
+<div id='graph_results_7' class='chart-container-240'></div><br><br>
+<div id='graph_results_8' class='chart-container-240'></div><br><br>
+<div id='graph_results_9' class='chart-container-240'></div><br><br>
 
 </div></div><br>
 
@@ -212,16 +227,17 @@ $('#algo_select').change(function(event)
 <br><br><br><br><br><br><br><br><br><br>
 <br><br><br><br><br><br><br><br><br><br>
 
-<script type="text/javascript">
+<?= CspHelper::beginScript() ?>
 
-var dtMin1 = new Date(1000*{$dtMin1});
-var dtMax1 = new Date(1000*{$dtMax1});
+// Time range boundaries for charts
+var dtMin1 = <?= $dtMin1 ?> * 1000;
+var dtMax1 = <?= $dtMax1 ?> * 1000;
 
-var dtMin2 = new Date(1000*{$dtMin2});
-var dtMax2 = new Date(1000*{$dtMax2});
+var dtMin2 = <?= $dtMin2 ?> * 1000;
+var dtMax2 = <?= $dtMax2 ?> * 1000;
 
-var dtMin3 = new Date(1000*{$dtMin3});
-var dtMax3 = new Date(1000*{$dtMax3});
+var dtMin3 = <?= $dtMin3 ?> * 1000;
+var dtMax3 = <?= $dtMax3 ?> * 1000;
 
 function page_refresh()
 {
@@ -236,367 +252,161 @@ function page_refresh()
 	main_refresh_9();
 }
 
-end;
+// Chart refresh functions
+function main_ready_1(data) { graph_init_1(data); }
+function main_refresh_1() { $.get("/stats/graph_results_1", '', main_ready_1); }
 
-for($i = 1; $i < 10; $i++)
-{
-	echo <<<end
-	///////////////////////////////////////////////////////////////////////
+function main_ready_2(data) { graph_init_2(data); }
+function main_refresh_2() { $.get("/stats/graph_results_2", '', main_ready_2); }
 
-	function main_ready_$i(data)
-	{
-		graph_init_$i(data);
-	}
+function main_ready_3(data) { graph_init_3(data); }
+function main_refresh_3() { $.get("/stats/graph_results_3", '', main_ready_3); }
 
-	function main_refresh_$i()
-	{
-		var url = "/stats/graph_results_$i";
-		$.get(url, '', main_ready_$i);
-	}
-end;
-}
+function main_ready_4(data) { graph_init_4(data); }
+function main_refresh_4() { $.get("/stats/graph_results_4", '', main_ready_4); }
 
-echo <<<end
+function main_ready_5(data) { graph_init_5(data); }
+function main_refresh_5() { $.get("/stats/graph_results_5", '', main_ready_5); }
 
+function main_ready_6(data) { graph_init_6(data); }
+function main_refresh_6() { $.get("/stats/graph_results_6", '', main_ready_6); }
+
+function main_ready_7(data) { graph_init_7(data); }
+function main_refresh_7() { $.get("/stats/graph_results_7", '', main_ready_7); }
+
+function main_ready_8(data) { graph_init_8(data); }
+function main_refresh_8() { $.get("/stats/graph_results_8", '', main_ready_8); }
+
+function main_ready_9(data) { graph_init_9(data); }
+function main_refresh_9() { $.get("/stats/graph_results_9", '', main_ready_9); }
+
+// Chart initialization functions using Chart.js
+// Last 48 Hours - Hashrate (Line Chart)
 function graph_init_1(data)
 {
-	$('#graph_results_1').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_1', [t],
-	{
-		title: '<b>Hashrate ({$algo_unit}/s)</b>',
-		axes: {
-			xaxis: {
-				min: dtMin1,
-				max: dtMax1,
-				tickInterval: 14400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.3f</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		seriesColors: [ "rgba(78, 180, 180, 0.8)" ],
-		series: [ { fill: true } ],
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createLineChart('graph_results_1', t, {
+		title: 'Hashrate (<?= $algo_unit ?>/s)',
+		xAxisMin: dtMin1,
+		xAxisMax: dtMax1,
+		xAxisFormat: 'HH:mm',
+		yAxisMin: 0,
+		fill: true,
+		backgroundColor: 'rgba(78, 180, 180, 0.3)',
+		borderColor: 'rgba(78, 180, 180, 0.8)'
 	});
 }
 
+// Last 48 Hours - BTC/Day (Bar Chart)
 function graph_init_2(data)
 {
-	$('#graph_results_2').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_2', [t],
-	{
-		title: '<b>BTC/Day</b>',
-		axes: {
-			xaxis: {
-				min: dtMin1,
-				max: dtMax1,
-				tickInterval: 14400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: {barWidth: 3}
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createBarChart('graph_results_2', t, {
+		title: 'BTC/Day',
+		xAxisMin: dtMin1,
+		xAxisMax: dtMax1,
+		xAxisFormat: 'HH:mm',
+		yAxisMin: 0
 	});
 }
 
+// Last 48 Hours - BTC/unit/d (Bar Chart)
 function graph_init_3(data)
 {
-	$('#graph_results_3').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_3', [t],
-	{
-		title: '<b>BTC/{$algo_unit}/d</b>',
-		axes: {
-			xaxis: {
-				min: dtMin1,
-				max: dtMax1,
-				tickInterval: 14400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: { barWidth: 3 }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createBarChart('graph_results_3', t, {
+		title: 'BTC/<?= $algo_unit ?>/d',
+		xAxisMin: dtMin1,
+		xAxisMax: dtMax1,
+		xAxisFormat: 'HH:mm',
+		yAxisMin: 0
 	});
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////
-
+// Last 7 Days - Hashrate (Line Chart)
 function graph_init_4(data)
 {
-	$('#graph_results_4').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_4', [t],
-	{
-		title: '<b>Hashrate ({$algo_unit}/s)</b>',
-		axes: {
-			xaxis: {
-				min: dtMin2,
-				max: dtMax2,
-				tickInterval: 86400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.3f</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		seriesColors: [ "rgba(78, 180, 180, 0.8)" ],
-		series: [ { fill: true } ],
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createLineChart('graph_results_4', t, {
+		title: 'Hashrate (<?= $algo_unit ?>/s)',
+		xAxisMin: dtMin2,
+		xAxisMax: dtMax2,
+		xAxisFormat: 'MMM d',
+		yAxisMin: 0,
+		fill: true,
+		backgroundColor: 'rgba(78, 180, 180, 0.3)',
+		borderColor: 'rgba(78, 180, 180, 0.8)'
 	});
 }
 
+// Last 7 Days - BTC/Day (Bar Chart)
 function graph_init_5(data)
 {
-	$('#graph_results_5').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_5', [t],
-	{
-		title: '<b>BTC/Day</b>',
-		axes: {
-			xaxis: {
-				min: dtMin2,
-				max: dtMax2,
-				tickInterval: 86400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: { barWidth: 3 }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createBarChart('graph_results_5', t, {
+		title: 'BTC/Day',
+		xAxisMin: dtMin2,
+		xAxisMax: dtMax2,
+		xAxisFormat: 'MMM d',
+		yAxisMin: 0
 	});
 }
 
+// Last 7 Days - BTC/unit/d (Bar Chart)
 function graph_init_6(data)
 {
-	$('#graph_results_6').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_6', [t],
-	{
-		title: '<b>BTC/{$algo_unit}/d</b>',
-		axes: {
-			xaxis: {
-				min: dtMin2,
-				max: dtMax2,
-				tickInterval: 86400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: { barWidth: 3 }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createBarChart('graph_results_6', t, {
+		title: 'BTC/<?= $algo_unit ?>/d',
+		xAxisMin: dtMin2,
+		xAxisMax: dtMax2,
+		xAxisFormat: 'MMM d',
+		yAxisMin: 0
 	});
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////
-
+// Last 30 Days - Hashrate (Line Chart)
 function graph_init_7(data)
 {
-	$('#graph_results_7').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_7', [t],
-	{
-		title: '<b>Hashrate ({$algo_unit}/s)</b>',
-		axes: {
-			xaxis: {
-				min: dtMin3,
-				max: dtMax3,
-				tickInterval: 4 * 24*60*60,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%m/%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.3f</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		seriesColors: [ "rgba(78, 180, 180, 0.8)" ],
-		series: [ { fill: true } ],
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createLineChart('graph_results_7', t, {
+		title: 'Hashrate (<?= $algo_unit ?>/s)',
+		xAxisMin: dtMin3,
+		xAxisMax: dtMax3,
+		xAxisFormat: 'MM/dd',
+		yAxisMin: 0,
+		fill: true,
+		backgroundColor: 'rgba(78, 180, 180, 0.3)',
+		borderColor: 'rgba(78, 180, 180, 0.8)'
 	});
 }
 
+// Last 30 Days - BTC/Day (Line Chart - smooth for 30 day view)
 function graph_init_8(data)
 {
-	$('#graph_results_8').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_8', [t],
-	{
-		title: '<b>BTC/Day</b>',
-		axes: {
-			xaxis: {
-				min: dtMin3,
-				max: dtMax3,
-				tickInterval: 4 * 24*60*60,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%m/%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createLineChart('graph_results_8', t, {
+		title: 'BTC/Day',
+		xAxisMin: dtMin3,
+		xAxisMax: dtMax3,
+		xAxisFormat: 'MM/dd',
+		yAxisMin: 0
 	});
 }
 
+// Last 30 Days - BTC/unit/d (Line Chart - smooth for 30 day view)
 function graph_init_9(data)
 {
-	$('#graph_results_9').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_9', [t],
-	{
-		title: '<b>BTC/{$algo_unit}/d</b>',
-		axes: {
-			xaxis: {
-				min: dtMin3,
-				max: dtMax3,
-				tickInterval: 4 * 24*60*60,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%m/%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
+	var t = JSON.parse(data);
+	ChartHelper.createLineChart('graph_results_9', t, {
+		title: 'BTC/<?= $algo_unit ?>/d',
+		xAxisMin: dtMin3,
+		xAxisMax: dtMax3,
+		xAxisFormat: 'MM/dd',
+		yAxisMin: 0
 	});
 }
 
-
-</script>
-end;
+<?= CspHelper::endScript() ?>
 
 

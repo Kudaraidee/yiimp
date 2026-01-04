@@ -7,6 +7,7 @@
 
 use app\models\Coins;
 use app\models\Blocks;
+use app\components\CspHelper;
 
 $memcache = Yii::$app->cache;
 $cachetime=30;
@@ -24,18 +25,18 @@ echo "<div class='main-left-box'>";
 echo "<div class='main-left-title'>Block Stats ($algo)</div>";
 echo "<div class='main-left-inner'>";
 
-echo <<<END
-<style type="text/css">
+echo CspHelper::style('
 td.symb, th.symb {
-	width: 50px;
-	max-width: 50px;
-	text-align: right;
+    width: 50px;
+    max-width: 50px;
+    text-align: right;
 }
 td.symb {
-	font-size: .8em;
+    font-size: .8em;
 }
-</style>
+');
 
+echo <<<END
 <table class="dataGrid2">
 <thead>
 <tr>
@@ -142,14 +143,34 @@ foreach($list as $item)
 		// blocks table may be purged before 7 days, so use same source as stat graphs
 		// TODO: add block count in hashstats or keep longer cleared blocks
 		if ($res3['t'] > ($t3 + 24*60*60)) $res3['a'] = '-';
-		$total3 = controller()->memcache->get_database_scalar("history_item3-$id-$algo-btc",
-			"SELECT SUM(earnings) as b FROM hashstats WHERE time>$t3 AND algo=:algo", array(':algo'=>$algo));
+		
+		$cacheKey = "history_item3-$id-$algo-btc";
+		$total3 = $memcache->get($cacheKey);
+		if ($total3 === false) {
+			$total3 = (new \yii\db\Query())
+				->select(['SUM(earnings) as b'])
+				->from('hashstats')
+				->where(['algo' => $algo])
+				->andWhere(['>', 'time', $t3])
+				->scalar();
+			$memcache->set($cacheKey, $total3, $cachetime);
+		}
 	}
 
 	if ($res4['a'] == $res3['a'] || count($list) == 1) {
 		$res4['a'] = '-';
-		$total4 = controller()->memcache->get_database_scalar("history_item4-$id-$algo-btc",
-			"SELECT SUM(earnings) as b FROM hashstats WHERE time>$t4 AND algo=:algo", array(':algo'=>$algo));
+		
+		$cacheKey = "history_item4-$id-$algo-btc";
+		$total4 = $memcache->get($cacheKey);
+		if ($total4 === false) {
+			$total4 = (new \yii\db\Query())
+				->select(['SUM(earnings) as b'])
+				->from('hashstats')
+				->where(['algo' => $algo])
+				->andWhere(['>', 'time', $t4])
+				->scalar();
+			$memcache->set($cacheKey, $total4, $cachetime);
+		}
 	}
 
 	$name = substr($coin->name, 0, 12);
@@ -160,10 +181,10 @@ foreach($list as $item)
 	echo '<td><b><a href="/site/block?id='.$id.'">'.$name.'</a></b></td>';
 	echo '<td class="symb">'.$coin->symbol.'</td>';
 
-	echo '<td align="right" style="font-size: .9em;">'.$res1['a'].'</td>';
-	echo '<td align="right" style="font-size: .9em;">'.$res2['a'].'</td>';
-	echo '<td align="right" style="font-size: .9em;">'.$res3['a'].'</td>';
-	echo '<td align="right" style="font-size: .9em;">'.$res4['a'].'</td>';
+	echo '<td align="right" class="text-smaller">'.$res1['a'].'</td>';
+	echo '<td align="right" class="text-smaller">'.$res2['a'].'</td>';
+	echo '<td align="right" class="text-smaller">'.$res3['a'].'</td>';
+	echo '<td align="right" class="text-smaller">'.$res4['a'].'</td>';
 
 	echo '</tr>';
 }
@@ -253,40 +274,40 @@ $total2 = Yii::$app->ConversionUtils->bitcoinvaluetoa($total2);
 $total3 = Yii::$app->ConversionUtils->bitcoinvaluetoa($total3);
 $total4 = Yii::$app->ConversionUtils->bitcoinvaluetoa($total4);
 
-echo '<tr class="ssrow" style="border-top: 2px solid #eee;">';
+echo '<tr class="ssrow" class="border-top-2">';
 echo '<td width="18px"><img width="16px" src="/images/btc.png"></td>';
 echo '<td colspan="2"><b>BTC Value</b></td>';
 
-echo '<td align="right" style="font-size: .9em;">'.$total1.'</td>';
-echo '<td align="right" style="font-size: .9em;">'.$total2.'</td>';
-echo '<td align="right" style="font-size: .9em;">'.$total3.'</td>';
-echo '<td align="right" style="font-size: .9em;">'.$total4.'</td>';
+echo '<td align="right" class="text-smaller">'.$total1.'</td>';
+echo '<td align="right" class="text-smaller">'.$total2.'</td>';
+echo '<td align="right" class="text-smaller">'.$total3.'</td>';
+echo '<td align="right" class="text-smaller">'.$total4.'</td>';
 
 echo "</tr>";
 
 ///////////////////////////////////////////////////////////////////////
 
-echo '<tr class="ssrow" style="border-top: 2px solid #eee;">';
+echo '<tr class="ssrow" class="border-top-2">';
 echo '<td width="18px"></td>';
 echo '<td colspan="2"><b>Avg Hashrate</b></td>';
 
-echo '<td align="right" style="font-size: .9em;">'.$hashrate1.'h/s</td>';
-echo '<td align="right" style="font-size: .9em;">'.$hashrate2.'h/s</td>';
-echo '<td align="right" style="font-size: .9em;">'.$hashrate3.'h/s</td>';
-echo '<td align="right" style="font-size: .9em;">'.$hashrate4.'h/s</td>';
+echo '<td align="right" class="text-smaller">'.$hashrate1.'h/s</td>';
+echo '<td align="right" class="text-smaller">'.$hashrate2.'h/s</td>';
+echo '<td align="right" class="text-smaller">'.$hashrate3.'h/s</td>';
+echo '<td align="right" class="text-smaller">'.$hashrate4.'h/s</td>';
 
 echo '</tr>';
 
 ///////////////////////////////////////////////////////////////////////
 
-echo '<tr class="ssrow" style="border-top: 2px solid #eee;">';
+echo '<tr class="ssrow" class="border-top-2">';
 echo '<td width="18px"></td>';
 echo '<td colspan="2"><b>mBTC/'.$algo_unit.'/d</b></td>';
 
-echo '<td align="right" style="font-size: .9em;">'.$btcmhday1.'</td>';
-echo '<td align="right" style="font-size: .9em;">'.$btcmhday2.'</td>';
-echo '<td align="right" style="font-size: .9em;">'.$btcmhday3.'</td>';
-echo '<td align="right" style="font-size: .9em;">'.$btcmhday4.'</td>';
+echo '<td align="right" class="text-smaller">'.$btcmhday1.'</td>';
+echo '<td align="right" class="text-smaller">'.$btcmhday2.'</td>';
+echo '<td align="right" class="text-smaller">'.$btcmhday3.'</td>';
+echo '<td align="right" class="text-smaller">'.$btcmhday4.'</td>';
 
 echo '</tr>';
 

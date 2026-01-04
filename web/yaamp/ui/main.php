@@ -10,13 +10,26 @@ echo <<<END
 <!--[if (gt IE 9)|!(IE)]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
 
 <head>
+<script src="https://web.cmp.usercentrics.eu/modules/autoblocker.js"></script>
+<script id="usercentrics-cmp" src="https://web.cmp.usercentrics.eu/ui/loader.js" data-settings-id="uhyxayek5s3Wwn" async></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-5JW693BKTS"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
 
+  gtag('config', 'G-5JW693BKTS');
+</script>
 <meta charset="utf-8">
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
 
-<meta name="description" content="Yii mining pools for alternative crypto currencies">
-<meta name="keywords" content="anonymous,mining,pool,maxcoin,bitcoin,altcoin,auto,switch,exchange,profit,decred,scrypt,x11,x13,x14,x15,lbry,lyra2re,neoscrypt,sha256,quark,skein2">
+<meta name="description" content="Your Pool Name - Cryptocurrency Mining Pool">
+<meta name="keywords" content="mining,pool,altcoin,sha256">
+<meta name="robots" content="index, follow">
+<meta name="googlebot" content="index, follow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 END;
 
@@ -32,6 +45,8 @@ echo CHtml::cssFile('/yaamp/ui/css/table.css');
 //echo CHtml::scriptFile('/extensions/jquery/js/jquery-ui-1.9.1.custom.min.js');
 
 $cs = app()->getClientScript();
+// Ensure jQuery loads in HEAD before any inline scripts
+$cs->registerCoreScript('jquery');
 $cs->registerCoreScript('jquery.ui');
 //$cs->registerScriptFile('/yaamp/ui/js/jquery.tablesorter.js', CClientScript::POS_END);
 
@@ -95,6 +110,7 @@ function showPageHeader()
 	showItemHeader(controller()->id=='stats', '/stats', 'Graphs');
 	showItemHeader($action=='miners', '/site/miners', 'Miners');
 	showItemHeader(controller()->id=='api', '/site/api', 'API');
+	showItemHeader($action=='privacypolicy', '/site/privacypolicy', 'Privacy Policy');
 	if (YIIMP_PUBLIC_EXPLORER)
 		showItemHeader(controller()->id=='explorer', '/explorer', 'Explorers');
 
@@ -149,9 +165,6 @@ function showPageFooter()
 	$year = date("Y", time());
 
 	echo "<p>&copy; $year ".YAAMP_SITE_NAME.' - '.
-		'<a href="https://github.com/Kudaraidee/yiimp">Open source Project</a></p>';
-
+		'<a href="https://github.com/your-repo/yiimp">Powered by Yiimp</a></p>';
 	echo '</div><!-- footer -->';
 }
-
-

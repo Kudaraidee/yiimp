@@ -1,213 +1,212 @@
 <?php
 
-use app\components\rpc\WalletRPC;
+use yii\helpers\Html;
+use yii\helpers\Url;
 
-if (!$coin) {
-	return Yii::$app->controller->goHome();
-}
+/* @var $this yii\web\View */
+/* @var $coin app\models\Coins */
 
-$this->title = $coin->name." block explorer";
+$this->title = $coin->name . ' Explorer';
+$this->params['breadcrumbs'][] = ['label' => 'Block Explorer', 'url' => ['index']];
+$this->params['breadcrumbs'][] = $this->title;
 
-$start = (int) Yii::$app->getRequest()->getQueryParam('start');
+// Get blockchain statistics
+$stats = Yii::$app->ExplorerUtils->getBlockchainStats($coin, 7);
+$recentBlocks = Yii::$app->ExplorerUtils->getRecentBlocks($coin, 10);
+$recentTxs = Yii::$app->ExplorerUtils->getRecentTransactions($coin, 10);
+?>
 
-echo <<<END
-<script type="text/javascript">
-$(function() {
-	$('#favicon').remove();
-	$('head').append('<link href="{$coin->image}" id="favicon" rel="shortcut icon">');
-});
-</script>
-<style type="text/css">
-table.dataGrid2 { margin-top: 0; }
-span.monospace { font-family: monospace; }
-.main-text-input { }
-.page .footer { width: auto; }
-</style>
-END;
+<div class="explorer-coin">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1>
+                <?php if (!empty($coin->image)): ?>
+                    <img src="<?= Html::encode($coin->image) ?>" alt="<?= Html::encode($coin->name) ?>" class="img-48 mr-12">
+                <?php endif; ?>
+                <?= Html::encode($coin->name) ?> (<?= Html::encode($coin->getOfficialSymbol()) ?>) Explorer
+            </h1>
+        </div>
+    </div>
 
-// version is used for multi algo coins
-// but each coin use different values...
-$multiAlgos = $coin->multialgos || Yii::$app->ExplorerUtils->versionToAlgo($coin, 0) !== false;
+    <!-- Blockchain Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Algorithm</h5>
+                    <p class="card-text display-6"><?= Html::encode($coin->algo) ?></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Difficulty</h5>
+                    <p class="card-text display-6"><?= $coin->difficulty ? number_format($coin->difficulty, 2) : 'N/A' ?></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Block Reward</h5>
+                    <p class="card-text display-6"><?= $coin->reward ? number_format($coin->reward, 8) : 'N/A' ?></p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Block Time</h5>
+                    <p class="card-text display-6"><?= $coin->block_time ? round($coin->block_time) . 's' : 'N/A' ?></p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-echo '<br/>';
-echo '<div class="main-left-box">';
-echo '<div class="main-left-title">'.$coin->name.' Explorer</div>';
-echo '<div class="main-left-inner" style="padding-left: 8px; padding-right: 8px;">';
+    <!-- Search Form -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Search Blockchain</h3>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="<?= Url::to(['search', 'id' => $coin->id]) ?>">
+                        <div class="input-group">
+                            <input type="text" name="query" class="form-control" placeholder="Enter block hash, transaction ID, or block height..." required>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">Search by block hash, transaction ID, or block height</small>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-echo '<table class="dataGrid2">';
+    <div class="row">
+        <!-- Recent Blocks -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Blocks</h3>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($recentBlocks)): ?>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Height</th>
+                                        <th>Hash</th>
+                                        <th>Time</th>
+                                        <th>Confirmations</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recentBlocks as $block): ?>
+                                    <tr>
+                                        <td>
+                                            <?= Html::a(
+                                                number_format($block->height),
+                                                ['block', 'id' => $coin->id, 'hash' => $block->hash],
+                                                ['class' => 'text-decoration-none']
+                                            ) ?>
+                                        </td>
+                                        <td>
+                                            <small><?= Html::a(
+                                                substr($block->hash, 0, 16) . '...',
+                                                ['block', 'id' => $coin->id, 'hash' => $block->hash],
+                                                ['class' => 'text-decoration-none', 'title' => $block->hash]
+                                            ) ?></small>
+                                        </td>
+                                        <td><small><?= Yii::$app->formatter->asRelativeTime($block->time) ?></small></td>
+                                        <td><?= $block->confirmations ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-muted">No recent blocks found.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
 
-echo "<thead>";
-echo "<tr>";
-echo "<th>Age</th>";
-echo "<th>Height</th>";
-echo "<th>Difficulty</th>";
-echo "<th>Type</th>";
-if ($multiAlgos) echo "<th>Algo</th>";
-echo "<th>Tx</th>";
-echo "<th>Conf</th>";
-echo "<th>Blockhash</th>";
-echo "</tr>";
-echo "</thead>";
+        <!-- Recent Transactions -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Transactions</h3>
+                </div>
+                <div class="card-body">
+                    <?php if (!empty($recentTxs)): ?>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Transaction ID</th>
+                                        <th>Height</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recentTxs as $tx): ?>
+                                    <tr>
+                                        <td>
+                                            <small><?= Html::a(
+                                                substr($tx['txid'], 0, 16) . '...',
+                                                ['tx', 'id' => $coin->id, 'txid' => $tx['txid']],
+                                                ['class' => 'text-decoration-none', 'title' => $tx['txid']]
+                                            ) ?></small>
+                                        </td>
+                                        <td><?= number_format($tx['height']) ?></td>
+                                        <td><small><?= Yii::$app->formatter->asRelativeTime($tx['time']) ?></small></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <p class="text-muted">No recent transactions found.</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
 
-$remote = new WalletRPC($coin);
-if (!$start || $start > $coin->block_height)
-	$start = $coin->block_height;
-for($i = $start; $i > max(1, $start-21); $i--)
-{
-	$hash = $remote->getblockhash($i);
-	if(!$hash) continue;
-
-	$block = $remote->getblock($hash);
-	if(!$block) continue;
-
-	$d = Yii::$app->ConversionUtils->datetoa2($block['time']);
-	$confirms = isset($block['confirmations'])? $block['confirmations']: '';
-	$tx = count($block['tx']);
-	$diff = $block['difficulty'];
-	$algo = Yii::$app->ExplorerUtils->versionToAlgo($coin, $block['version']);
-	$type = '';
-	if (Yii::$app->ConversionUtils->arraySafeval($block,'nonce',0) > 0) $type = 'PoW';
-	else if (isset($block['auxpow'])) $type = 'Aux';
-	else if (isset($block['mint']) || strstr(Yii::$app->ConversionUtils->arraySafeVal($block,'flags',''), 'proof-of-stake')) $type = 'PoS';
-
-	// nonce 256bits
-	if ($type == '' && $coin->symbol=='ZEC') $type = 'PoW';
-
-//	debuglog($block);
-	echo '<tr class="ssrow">';
-	echo '<td>'.$d.'</td>';
-
-	echo '<td>'.$coin->createExplorerLink($i, array('height'=>$i)).'</td>';
-
-	echo '<td>'.$diff.'</td>';
-	echo '<td>'.$type.'</td>';
-	if ($multiAlgos) echo "<td>$algo</td>";
-	echo '<td>'.$tx.'</td>';
-	echo '<td>'.$confirms.'</td>';
-
-	echo '<td style="overflow-x: hidden; max-width:800px;"><span class="monospace">';
-	echo $coin->createExplorerLink($hash, array('hash'=>$hash));
-	echo '</span></td>';
-
-	echo "</tr>";
-}
-
-echo "</table>";
-
-$pager = '';
-if ($start <= $coin->block_height - 20)
-	$pager  = $coin->createExplorerLink('<< Prev', array('start'=>min($coin->block_height,$start+20)));
-if ($start != $coin->block_height)
-	$pager .= '&nbsp; '.$coin->createExplorerLink('Now');
-if ($start > 20)
-	$pager .= '&nbsp; '.$coin->createExplorerLink('Next >>', array('start'=>max(1,$start-20)));
-
-$actionUrl = $coin->visible ? '/explorer/'.$coin->symbol : '/explorer/search?id='.$coin->id;
-
-echo <<<end
-<div id="pager" style="float: right; width: 200px; text-align: right; margin-right: 16px; margin-top: 8px;">$pager</div>
-<div id="form" style="width: 660px; height: 50px; overflow: hidden;">
-<form action="{$actionUrl}" method="POST" style="padding-top: 4px; width: 650px;">
-<input type="text" name="height" class="main-text-input" placeholder="Height" style="width: 80px;">
-<input type="text" name="txid" class="main-text-input" placeholder="Transaction hash" style="width: 450px; margin: 4px;">
-<input type="submit" value="Search" class="main-submit-button" >
-</form>
+    <!-- Additional Links -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Additional Information</h3>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <?= Html::a(
+                            '<i class="bi bi-diagram-3"></i> Peer Connections',
+                            ['peers', 'id' => $coin->id],
+                            ['class' => 'btn btn-outline-primary']
+                        ) ?>
+                        <?= Html::a(
+                            '<i class="bi bi-graph-up"></i> Blockchain Graphs',
+                            ['graph', 'id' => $coin->id],
+                            ['class' => 'btn btn-outline-primary']
+                        ) ?>
+                        <?php if (!empty($coin->block_explorer)): ?>
+                            <?= Html::a(
+                                '<i class="bi bi-box-arrow-up-right"></i> External Explorer',
+                                $coin->block_explorer,
+                                ['class' => 'btn btn-outline-secondary', 'target' => '_blank']
+                            ) ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-end;
-
-if ($start != $coin->block_height)
-	return;
-
-echo <<<end
-<div id="diff_graph" style="margin-right: 8px; margin-top: -16px;">
-<br><br><br><br><br><br><br><br><br><br><br><br><br><br>
-</div>
-
-<style type="text/css">
-.jqplot-title {
-	margin-bottom: 3px;
-}
-.jqplot-xaxis-tick {
-	margin-top: 4px;
-	font-size: 10px;
-}
-.jqplot-yaxis-tick {
-	font-size: 7pt;
-	margin-top: -4px;
-	margin-right: 8px;
-}
-</style>
-
-<script type="text/javascript" event="">
-
-var last_graph_update = 0;
-
-function graph_refresh()
-{
-	var now = Date.now()/1000;
-
-	if (now < last_graph_update + 900) return;
-	last_graph_update = now;
-
-	var url = "/explorer/graph?id={$coin->id}";
-	$.get(url, '', diff_graph_data);
-}
-
-function diff_graph_data_trace(data)
-{
-	 $('#diff_graph').html(data);
-}
-
-function diff_graph_data(data)
-{
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('diff_graph', t,
-	{
-		title: '<b>Network diff</b>',
-		axes: {
-			xaxis: {
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: { formatString: '%H:%M' }
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: { labelPosition: 'top', formatString: '%.3f' }
-			}
-		},
-
-		seriesDefaults:
-		{
-			markerOptions: { style: 'none' }
-		},
-
-		series:[
-			{
-				highlighter: { yvalues: 2, formatString: '<font size="1">%s %.3f<br/>Block %u</font>' }
-			},
-			{
-				showLine: false,
-				markerOptions: { style: 'circle', size: 6, color: 'silver' },
-				animation: { show: true },
-				highlighter: { yvalues: 3, formatString: '<font size="1">%s <span style="display:none;">%.1f</span>%g<br/>User block %u</font>' }
-			}
-		],
-
-		grid:
-		{
-			borderWidth: 1,
-			shadowWidth: 0,
-			shadowDepth: 0,
-			background: '#ffffff'
-		},
-
-		highlighter:
-		{
-			show: true
-		},
-
-	});
-}
-</script>
-end;
-
-Yii::$app->view->registerJs(" graph_refresh(); ", \yii\web\View::POS_READY, 'graph');

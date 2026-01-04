@@ -38,7 +38,7 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
     NavBar::begin([
         'brandLabel' => YAAMP_SITE_NAME,
         'brandUrl' => Yii::$app->homeUrl,
-        'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
+        'options' => ['class' => 'navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm']
     ]);
 
     $mining = Mining::find()->one();
@@ -58,10 +58,14 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
 
     if ((!is_null(Yii::$app->user->identity)) && (Yii::$app->user->identity->is_admin)) {
         $admin_navbar = [
-            '&nbsp;&nbsp;&nbsp;&nbsp;',
-            ['label' => 'Dashboard', 'url' => ['/admin/dashboard']],
-            ['label' => 'Wallets', 'url' => ['/admin/coinwallets']],
-            ['label' => 'Coins', 'url' => ['/admin/coinlist']],
+            ['label' => 'Admin', 'items' => [
+                ['label' => 'Dashboard', 'url' => ['/admin/dashboard']],
+                ['label' => 'Wallets', 'url' => ['/admin/coinwallets']],
+                ['label' => 'Coins', 'url' => ['/admin/coinlist']],
+                ['label' => 'Users', 'url' => ['/admin/user']],
+                ['label' => 'Workers', 'url' => ['/admin/worker']],
+                ['label' => 'Payments', 'url' => ['/admin/payments']],
+            ]],
              '<li class="nav-item">'
                     . Html::beginForm(['/admin/logout'])
                     . Html::submitButton(
@@ -80,11 +84,11 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
 
     $items = array_merge($items_navbar, $admin_navbar);
     echo Nav::widget([
-        'options' => ['class' => 'navbar-nav'],
+        'options' => ['class' => 'navbar-nav me-auto'],
         'items' => $items
     ]);
-    echo Html::tag('div', 'Next Payout: '.$nextpayment, 
-                    ['class' => 'navbar-text ms-auto' ]);
+    echo Html::tag('div', '<span class="d-none d-md-inline">Next Payout: </span>'.$nextpayment, 
+                    ['class' => 'navbar-text ms-auto text-light' ]);
     NavBar::end();
    ?>
 </header>

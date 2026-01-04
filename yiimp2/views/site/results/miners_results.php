@@ -1,50 +1,73 @@
 <?php
 
 use app\models\Workers;
-
-function WriteBoxHeader($title)
-{
-	echo "<div class='main-left-box'>";
-	echo "<div class='main-left-title'>$title</div>";
-	echo "<div class='main-left-inner'>";
-}
+use app\components\ViewHelper;
+use app\components\CspHelper;
 
 $algo = Yii::$app->session->get('yaamp-algo');
+if (!$algo) $algo = 'all';
 
 $target = Yii::$app->YiimpUtils->hashrate_constant($algo);
 $interval = Yii::$app->YiimpUtils->hashrate_step();
 $delay = time()-$interval;
 
-$total_workers = getdbocount('db_workers', "algo=:algo", array(':algo'=>$algo));
-$total_extranonce = getdbocount('db_workers', "algo=:algo and subscribe", array(':algo'=>$algo));
-$total_hashrate = controller()->memcache->get_database_scalar("current_hashrate-$algo",
-	//"SELECT SUM(difficulty) * $target / $interval / 1000 FROM shares WHERE valid AND time>$delay AND algo=:algo", array(':algo'=>$algo)
-	"SELECT hashrate FROM hashrate WHERE algo=:algo ORDER BY time DESC LIMIT 1", array(':algo'=>$algo)
-);
-$total_invalid = !$this->admin ? 0 : controller()->memcache->get_database_scalar("current_hashrate_bad-$algo",
-	//"SELECT SUM(difficulty) * $target / $interval / 1000 FROM shares WHERE NOT valid AND time>$delay AND algo=:algo", array(':algo'=>$algo)
-	"SELECT hashrate_bad FROM hashrate WHERE algo=:algo ORDER BY time DESC LIMIT 1", array(':algo'=>$algo)
-);
+$total_workers = Workers::find()->where(['algo' => $algo])->count();
+$total_extranonce = Workers::find()->where(['algo' => $algo])->andWhere(['subscribe' => 1])->count();
 
-WriteBoxHeader("Miners Version ($algo)");
+$total_hashrate = Yii::$app->cache->get("current_hashrate-$algo");
+if (!$total_hashrate) {
+	$total_hashrate = (new \yii\db\Query())
+		->select(['hashrate'])
+		->from('hashrate')
+		->where(['algo' => $algo])
+		->orderBy(['time' => SORT_DESC])
+		->limit(1)
+		->scalar();
+	Yii::$app->cache->set("current_hashrate-$algo", $total_hashrate);
+}
+
+// Determine if user is admin and if rejects column should be shown
+$isAdmin = false;
+if (!Yii::$app->user->isGuest && Yii::$app->user->identity !== null) {
+    $isAdmin = (bool) Yii::$app->user->identity->is_admin;
+}
+$showRejects = $isAdmin;
+$total_invalid = !$isAdmin ? 0 : Yii::$app->cache->get("current_hashrate_bad-$algo");
+if (!$total_invalid && $isAdmin) {
+	$total_invalid = (new \yii\db\Query())
+		->select(['hashrate_bad'])
+		->from('hashrate')
+		->where(['algo' => $algo])
+		->orderBy(['time' => SORT_DESC])
+		->limit(1)
+		->scalar();
+	Yii::$app->cache->set("current_hashrate_bad-$algo", $total_invalid);
+}
+
+try {
+	ViewHelper::renderBoxHeader("Miners Version ($algo)");
+} catch (\Error $e) {
+	Yii::error("ViewHelper not found: " . $e->getMessage(), __METHOD__);
+	echo '<div class="box"><div class="box-header"><h3>Miners Version (' . htmlspecialchars($algo) . ')</h3></div><div class="box-body">';
+}
 
 //showTableSorter('maintable2');
-echo <<<end
-<br/>
-<table id="maintable2" class="dataGrid2">
-<thead>
-<tr>
-<th>Version</th>
-<th align="right">Count</th>
-<th align="right">Donators</th>
-<th align="right" title="* Extranonce Subscribe">ES</th>
-<th align="right">Percent</th>
-<th align="right">Hashrate*</th>
-<th align="right" title="Rate per miner">Avg</th>
-<th align="right" class="rejects" style="display:none;">Reject</th>
-</tr>
-</thead><tbody>
-end;
+$tableClass = $showRejects ? 'dataGrid2 show-rejects' : 'dataGrid2';
+$rejectsStyle = $showRejects ? '' : ' style="display:none"';
+echo '<br/>';
+echo '<table id="maintable2" class="' . $tableClass . '">';
+echo '<thead>';
+echo '<tr>';
+echo '<th>Version</th>';
+echo '<th align="right">Count</th>';
+echo '<th align="right">Donators</th>';
+echo '<th align="right" title="* Extranonce Subscribe">ES</th>';
+echo '<th align="right">Percent</th>';
+echo '<th align="right">Hashrate*</th>';
+echo '<th align="right" title="Rate per miner">Avg</th>';
+echo '<th align="right" class="rejects"' . $rejectsStyle . '>Reject</th>';
+echo '</tr>';
+echo '</thead><tbody>';
 
 $error_tab = array(
 	20=>'Invalid nonce size',
@@ -59,35 +82,75 @@ $error_tab = array(
 
 $total_donators = 0;
 
-$versions = dbolist("select version, count(*) as c, sum(subscribe) as s from workers where algo=:algo group by version order by c desc", array(':algo'=>$algo));
+$versions = (new \yii\db\Query())
+	->select(['version', 'count(*) as c', 'sum(subscribe) as s'])
+	->from('workers')
+	->where(['algo' => $algo])
+	->groupBy('version')
+	->orderBy(['c' => SORT_DESC])
+	->all();
+
 foreach($versions as $item)
 {
 	$version = $item['version'];
 	$count = $item['c'];
 	$extranonce = $item['s'];
 
-	$hashrate = controller()->memcache->get_database_scalar("miners-valid-$algo-v$version",
-		"SELECT sum(difficulty) * $target / $interval / 1000 FROM shares WHERE valid AND time>$delay
-		 AND workerid IN (SELECT id FROM workers WHERE algo=:algo and version=:version)",
-		 array(':algo'=>$algo, ':version'=>$version)
-	);
+	$hashrate = Yii::$app->cache->get("miners-valid-$algo-v$version");
+	if (!$hashrate) {
+		$subquery = (new \yii\db\Query())
+			->select(['id'])
+			->from('workers')
+			->where(['algo' => $algo, 'version' => $version]);
+		
+		$hashrate = (new \yii\db\Query())
+			->select(["sum(difficulty) * $target / $interval / 1000"])
+			->from('shares')
+			->where(['valid' => 1])
+			->andWhere(['>', 'time', $delay])
+			->andWhere(['in', 'workerid', $subquery])
+			->scalar();
+		Yii::$app->cache->set("miners-valid-$algo-v$version", $hashrate);
+	}
 
-	if (!$hashrate && !$this->admin) continue;
+	if (!$hashrate && !$isAdmin) continue;
 
-	$invalid = !$total_invalid ? 0 : controller()->memcache->get_database_scalar("miners-invalid-$algo-v$version",
-		"SELECT SUM(difficulty) * $target / $interval / 1000 FROM shares WHERE not valid AND time>$delay
-		 AND workerid IN (SELECT id FROM workers WHERE algo=:algo AND version=:version)",
-		 array(':algo'=>$algo, ':version'=>$version)
-	);
+	$invalid = !$total_invalid ? 0 : Yii::$app->cache->get("miners-invalid-$algo-v$version");
+	if (!$invalid && $total_invalid) {
+		$subquery = (new \yii\db\Query())
+			->select(['id'])
+			->from('workers')
+			->where(['algo' => $algo, 'version' => $version]);
+		
+		$invalid = (new \yii\db\Query())
+			->select(["sum(difficulty) * $target / $interval / 1000"])
+			->from('shares')
+			->where(['valid' => 0])
+			->andWhere(['>', 'time', $delay])
+			->andWhere(['in', 'workerid', $subquery])
+			->scalar();
+		Yii::$app->cache->set("miners-invalid-$algo-v$version", $invalid);
+	}
 
 	$title = '';
 	foreach($error_tab as $i=>$s)
 	{
-		$invalid2 = !$total_invalid ? 0 : controller()->memcache->get_database_scalar("miners-invalid-$algo-v$version-err$i",
-			"SELECT sum(difficulty) * $target / $interval / 1000 from shares WHERE error=$i AND time>$delay
-			AND workerid in (SELECT id FROM workers WHERE algo=:algo AND version=:version)",
-			array(':algo'=>$algo, ':version'=>$version)
-		);
+		$invalid2 = !$total_invalid ? 0 : Yii::$app->cache->get("miners-invalid-$algo-v$version-err$i");
+		if (!$invalid2 && $total_invalid) {
+			$subquery = (new \yii\db\Query())
+				->select(['id'])
+				->from('workers')
+				->where(['algo' => $algo, 'version' => $version]);
+			
+			$invalid2 = (new \yii\db\Query())
+				->select(["sum(difficulty) * $target / $interval / 1000"])
+				->from('shares')
+				->where(['error' => $i])
+				->andWhere(['>', 'time', $delay])
+				->andWhere(['in', 'workerid', $subquery])
+				->scalar();
+			Yii::$app->cache->set("miners-invalid-$algo-v$version-err$i", $invalid2);
+		}
 
 		if($invalid2) {
 			$bad2 = round($invalid2*100/($hashrate+$invalid2), 2).'%';
@@ -95,11 +158,13 @@ foreach($versions as $item)
 		}
 	}
 
-	$donators = dboscalar(
-		"SELECT COUNT(*) AS donators FROM workers W LEFT JOIN accounts A ON A.id = W.userid".
-		" WHERE W.algo=:algo AND W.version=:version AND A.donation > 0",
-		array(':algo'=>$algo, ':version'=>$version)
-	);
+	$donators = (new \yii\db\Query())
+		->select(['COUNT(*) AS donators'])
+		->from('workers W')
+		->leftJoin('accounts A', 'A.id = W.userid')
+		->where(['W.algo' => $algo, 'W.version' => $version])
+		->andWhere(['>', 'A.donation', 0])
+		->scalar();
 	$total_donators += $donators;
 
 	$percent = $total_hashrate && $hashrate ? round($hashrate * 100 / $total_hashrate, 2).'%': '';
@@ -107,8 +172,8 @@ foreach($versions as $item)
 	$bad = ($hashrate+$invalid)? round($invalid*100/($hashrate+$invalid), 1).'%': '';
 	if (!$bad || $bad == '0%') $bad = '-';
 	$avg = intval($count) ? $hashrate / intval($count) : '';
-	$avg = $avg? Itoa2($avg).'H/s': '';
-	$hashrate = $hashrate? Itoa2($hashrate).'H/s': '';
+	$avg = $avg? Yii::$app->ConversionUtils->Itoa2($avg).'H/s': '';
+	$hashrate = $hashrate? Yii::$app->ConversionUtils->Itoa2($hashrate).'H/s': '';
 	$version = substr($version, 0, 30);
 
 	echo '<tr class="ssrow">';
@@ -122,7 +187,7 @@ foreach($versions as $item)
 		echo '<td align="right">'.$percent.'</td>';
 	echo '<td align="right">'.$hashrate.'</td>';
 	echo '<td align="right">'.$avg.'</td>';
-	echo '<td align="right" class="rejects" style="display:none;" title="'.$title.'">'.$bad.'</td>';
+	echo '<td align="right" class="rejects" title="'.$title.'"'.$rejectsStyle.'>'.$bad.'</td>';
 	echo '</tr>';
 }
 
@@ -131,10 +196,22 @@ echo "</tbody>";
 $title = '';
 foreach($error_tab as $i=>$s)
 {
-	$invalid2 = !$total_invalid ? 0 : controller()->memcache->get_database_scalar("miners-invalid-$algo-err$i",
-		"SELECT SUM(difficulty) * $target / $interval / 1000 FROM shares WHERE time>$delay AND algo=:algo AND error=$i ".
-		"AND workerid IN (SELECT id FROM workers WHERE algo=:algo)", array(':algo'=>$algo)
-	);
+	$invalid2 = !$total_invalid ? 0 : Yii::$app->cache->get("miners-invalid-$algo-err$i");
+	if (!$invalid2 && $total_invalid) {
+		$subquery = (new \yii\db\Query())
+			->select(['id'])
+			->from('workers')
+			->where(['algo' => $algo]);
+		
+		$invalid2 = (new \yii\db\Query())
+			->select(["SUM(difficulty) * $target / $interval / 1000"])
+			->from('shares')
+			->where(['error' => $i])
+			->andWhere(['>', 'time', $delay])
+			->andWhere(['in', 'workerid', $subquery])
+			->scalar();
+		Yii::$app->cache->set("miners-invalid-$algo-err$i", $invalid2);
+	}
 
 	if($invalid2) {
 		$bad2 = round($invalid2*100/($total_hashrate+$invalid2), 2);
@@ -143,8 +220,8 @@ foreach($error_tab as $i=>$s)
 }
 
 $bad = ($total_hashrate+$total_invalid) && $total_invalid ? round($total_invalid*100/($total_hashrate+$total_invalid), 1).'%': '';
-$avg = intval($total_workers) ? Itoa2($total_hashrate / intval($total_workers)).'H/s' : '';
-$total_hashrate = Itoa2($total_hashrate).'H/s';
+$avg = intval($total_workers) ? Yii::$app->ConversionUtils->Itoa2($total_hashrate / intval($total_workers)).'H/s' : '';
+$total_hashrate = Yii::$app->ConversionUtils->Itoa2($total_hashrate).'H/s';
 
 echo '<tr class="ssrow">';
 echo '<th><b>Total</b></th>';
@@ -154,19 +231,20 @@ echo '<th align="right">'.$total_extranonce.'</th>';
 echo '<th align="right"></th>';
 echo '<th align="right">'.$total_hashrate.'</th>';
 echo '<th align="right">'.$avg.'</th>';
-echo '<th align="right" title="'.$title.'" class="rejects" style="display:none;">'.$bad.'</th>';
+echo '<th align="right" title="'.$title.'" class="rejects"'.$rejectsStyle.'>'.$bad.'</th>';
 echo '</tr>';
 
 echo "</table>";
 
-echo "<p style='font-size: .8em'>
+echo "<p class='text-small'>
 		&nbsp;* approximate from the last 5 minutes submitted shares<br>
 		</p>";
 
-echo "<br></div></div><br>";
-
-if ($this->admin) {
-	// show reject column
-	echo '<script type="text/javascript">jQuery(".rejects").show();</script>';
+try {
+	ViewHelper::renderBoxFooter();
+} catch (\Error $e) {
+	echo "</div></div><br>";
 }
+
+// No inline script needed - rejects column visibility is controlled by CSS class on table
 

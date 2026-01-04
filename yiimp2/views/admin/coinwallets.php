@@ -1,88 +1,65 @@
 <?php
 
-/** @var yii\web\View $this */
+use yii\helpers\Html;
+use yii\grid\GridView;
+use yii\helpers\Url;
 
-echo Yii::$app->ViewUtils->getAdminSideBarLinks();
+$this->title = 'Coin Management';
+?>
+<div class="admin-coinwallets">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><?= Html::encode($this->title) ?></h1>
+        <?= Html::a('Add New Coin', ['coin-create'], ['class' => 'btn btn-success']) ?>
+    </div>
 
-echo '&nbsp;<a href="/admin/emptymarkets">Empty Markets</a>&nbsp;';
-
-$server = Yii::$app->getRequest()->getQueryParam('server');
-
-echo <<<end
-<div align="right" style="margin-top: -14px; margin-bottom: 6px;">
-Select Server:
-<select id="server_select">
-<option value="">all</option>
-end;
-
-$serverlist =  (new \yii\db\Query())
-				->select('rpchost')
-				->DISTINCT(true)
-				->from('coins')
-				->where(['installed' => 1])
-				->orderBy('rpchost')
-				->all();
-foreach ($serverlist as $srv)   {
-	echo '<option value="'.$srv['rpchost'].'">'.$srv['rpchost'].'</option>';
-}
-
-echo <<<end
-</select>&nbsp;
-<input class="search" type="search" data-column="all" style="width: 140px;" placeholder="Search..." />
+    <?= GridView::widget([
+        'dataProvider' => $dataProvider,
+        'tableOptions' => ['class' => 'table table-striped table-bordered'],
+        'columns' => [
+            'id',
+            'name',
+            'symbol',
+            'algo',
+            [
+                'attribute' => 'enable',
+                'format' => 'boolean',
+                'filter' => [0 => 'Disabled', 1 => 'Enabled'],
+            ],
+            [
+                'attribute' => 'auto_ready',
+                'label' => 'Auto Exchange',
+                'format' => 'boolean',
+            ],
+            [
+                'attribute' => 'balance',
+                'format' => ['decimal', 8],
+            ],
+            [
+                'class' => 'yii\grid\ActionColumn',
+                'template' => '{view} {update} {delete}',
+                'buttons' => [
+                    'view' => function ($url, $model) {
+                        return Html::a('View', ['coin', 'id' => $model->id], [
+                            'class' => 'btn btn-sm btn-info',
+                            'title' => 'View',
+                        ]);
+                    },
+                    'update' => function ($url, $model) {
+                        return Html::a('Edit', ['coin-update', 'id' => $model->id], [
+                            'class' => 'btn btn-sm btn-primary',
+                            'title' => 'Update',
+                        ]);
+                    },
+                    'delete' => function ($url, $model) {
+                        return Html::a('Delete', ['uninstall-coin', 'id' => $model->id], [
+                            'class' => 'btn btn-sm btn-danger',
+                            'title' => 'Delete',
+                            'data-method' => 'post',
+                            'data-confirm' => 'Are you sure you want to uninstall this coin?',
+                        ]);
+                    },
+                ],
+            ],
+        ],
+    ]); ?>
 </div>
-
-<div id='main_results'>
-<br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br><br><br><br>
-</div>
-
-<br><a href='/admin/coincreate'><img width=16 src=''><b>CREATE COIN</b></a>
-<!-- br><a href='/admin/updateprice'><img width=16 src=''><b>UPDATE PRICE</b></a -->
-<!-- br><a href='/admin/dopayments'><img width=16 src=''><b>DO PAYMENTS</b></a -->
-
-<br><br><br>
-
-end;
-
-Yii::$app->view->registerJs("
-$('#server_select').change(function(event)
-{
-	var server = $('#server_select').val();
-	clearTimeout(main_timeout);
-	window.location.href = '/admin/coinwallets?server='+server;
-});
-
-$(function()
-{
-	main_refresh();
-});
-
-var main_delay=30000;
-var main_timeout;
-var lastSearch = false;
-
-function main_ready(data)
-{
-	$('#main_results').html(data);
-	$('#server_select').val('{$server}');
-
-	if (lastSearch !== false) {
-		$('input.search').val(lastSearch);
-		$('table.dataGrid').trigger('search');
-	}
-
-	main_timeout = setTimeout(main_refresh, main_delay);
-}
-
-function main_refresh()
-{
-	var url = \"/admin/coinwallet_results?server=$server\";
-
-	clearTimeout(main_timeout);
-	lastSearch = $('input.search').val();
-	$.get(url, '', main_ready);
-}
-");

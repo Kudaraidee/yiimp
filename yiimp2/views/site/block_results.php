@@ -5,6 +5,7 @@
 use Yii;
 use app\models\Blocks;
 use app\models\Coins;
+use app\models\Accounts;
 
 $id = (int) Yii::$app->getRequest()->getQueryParam('id');
 $db_blocks = Blocks::find()
@@ -70,8 +71,9 @@ foreach($db_blocks as $db_block)
 
 	if(!$coin) continue;
 
-	if($db_block->category == 'stake' && !$this->admin) continue;
-	if($db_block->category == 'generated' && !$this->admin) continue; // mature stake income
+	$isAdmin = (!is_null(Yii::$app->user->identity)) && (Yii::$app->user->identity->is_admin);
+	if($db_block->category == 'stake' && !$isAdmin) continue;
+	if($db_block->category == 'generated' && !$isAdmin) continue; // mature stake income
 
 //	$remote = new WalletRPC($coin);
 
@@ -81,7 +83,7 @@ foreach($db_blocks as $db_block)
 // 	$db_block->category = $tx['details'][0]['category'];
 
 	if($db_block->category == 'immature')
-		echo "<tr style='background-color: #e0d3e8;'>";
+		echo "<tr class='row-immature'>";
 	else
 		echo "<tr class='ssrow'>";
 
@@ -90,7 +92,7 @@ foreach($db_blocks as $db_block)
 	$flags = $db_block->segwit ? '&nbsp;<img src="/images/ui/segwit.png" height="8px" valign="center" title="segwit"/>' : '';
 
 	echo '<td>';
-	if ($this->admin)
+	if ($isAdmin)
 		echo '<a href="/site/coin?id='.$coin->id.'"><b>'.$coin->name.'</b></a>';
 	else
 		echo '<b>'.$coin->name.'</b>';
@@ -99,7 +101,7 @@ foreach($db_blocks as $db_block)
 //	$db_block->confirmations = $blockext['confirmations'];
 //	$db_block->save();
 
-	$d = datetoa2($db_block->time);
+	$d = Yii::$app->ConversionUtils->datetoa2($db_block->time);
 	echo '<td data="'.$db_block->time.'"><b>'.$d.' ago</b></td>';
 	echo '<td>'.$coin->createExplorerLink($db_block->height, array('height'=>$db_block->height)).'</td>';
 	echo '<td>'.$db_block->amount.'</td>';
@@ -140,20 +142,20 @@ foreach($db_blocks as $db_block)
 
 	echo "</td>";
 
-	echo '<td>'.round_difficulty($db_block->difficulty).'</td>';
+	echo '<td>'.Yii::$app->ConversionUtils->Itoa2($db_block->difficulty, 3).'</td>';
 	$diff_user = $db_block->difficulty_user;
 	if (!$diff_user && substr($db_block->blockhash,0,4) == '0000')
-		$diff_user = hash_to_difficulty($coin, $db_block->blockhash);
-	echo '<td>'.round_difficulty($diff_user).'</td>';
+		$diff_user = Yii::$app->YiimpUtils->hash_to_difficulty($coin, $db_block->blockhash);
+	echo '<td>'.Yii::$app->ConversionUtils->Itoa2($diff_user, 3).'</td>';
 
 	$finder = '';
 	if (!empty($db_block->userid)) {
-		$user = getdbo('db_accounts', $db_block->userid);
+		$user = Accounts::find()->where(['id' => $db_block->userid])->one();
 		$finder = $user ? substr($user->username, 0, 7).'...' : '';
 	}
 	
 	echo '<td>'.$finder.'</td>';
-	echo '<td style="font-size: .8em; font-family: monospace;">';
+	echo '<td class="text-small" class="font-mono">';
 	echo $coin->createExplorerLink($db_block->blockhash, array('hash'=>$db_block->blockhash));
 	echo "</td>";
 	echo "</tr>";

@@ -168,6 +168,13 @@ function BackendCleanDatabase()
 	// drop shares for blocks already processed
 	dborun("DELETE FROM shares WHERE time<$delay AND blockrewarded > 0");
 
+	// cleanup inactive workers (no shares in last 24 hours)
+	$worker_delay = time() - 24*60*60;
+	$inactive_workers = dborun("DELETE FROM workers WHERE id NOT IN (SELECT DISTINCT workerid FROM shares WHERE time > $worker_delay AND workerid > 0)");
+	if ($inactive_workers > 0) {
+		debuglog("Cleaned up $inactive_workers inactive workers");
+	}
+
 	// clear workerid for disconnected workers
 	dborun("UPDATE shares SET workerid = 0 WHERE workerid > 0 AND workerid NOT IN (SELECT id FROM workers)");
 

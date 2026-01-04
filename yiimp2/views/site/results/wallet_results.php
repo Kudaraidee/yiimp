@@ -5,13 +5,8 @@
 use app\models\Coins;
 use app\models\Mining;
 use app\models\Payouts;
-
-function WriteBoxHeader($title)
-{
-	echo "<div class='main-left-box'>";
-	echo "<div class='main-left-title'>$title</div>";
-	echo "<div class='main-left-inner'>";
-}
+use app\components\ViewHelper;
+use app\components\CspHelper;
 
 $mining = Mining::find()->one();
 
@@ -22,20 +17,20 @@ $show_details = Yii::$app->getRequest()->getQueryParam('showdetails');
 $user = Yii::$app->YiimpUtils->getuserbyaddress(Yii::$app->getRequest()->getQueryParam('address'));
 if(!$user) return;
 
-WriteBoxHeader("Wallet: $user->username");
+ViewHelper::renderBoxHeader("Wallet: $user->username");
 
 $refcoin = Coins::find()->where(['id' => $user->coinid])->one();
 if(!$refcoin)
 {
 	if($user->coinid != null)
-		echo "<div style='color: red; padding: 10px; '>This wallet address is not valid.
+		echo "<div class='text-danger p-2'>This wallet address is not valid.
 			You will not receive payments using this address.</div>";
 
 	$refcoin = Coins::find()->where(['symbol' => 'BTC'])->one();
 
 } elseif (!YAAMP_ALLOW_EXCHANGE && $user->coinid == 6 && $defaultalgo != 'sha256') {
 
-	echo "<div style='color: red; padding: 10px; '>This pool does not convert/trade currencies.
+	echo "<div class='text-danger p-2'>This pool does not convert/trade currencies.
 		You will not receive payments using this BTC address.</div>";
 	return;
 }
@@ -110,12 +105,12 @@ if($show_details)
 
 			echo "<tr class='ssrow'>";
 			echo "<td width=18><img width=16 src='$coin->image'></td>";
-			echo "<td><b><a href='/site/block?id=$coin->id' title='$coin->version'>$name</a></b><span style='font-size: .8em'> ($coin->algo)</span></td>";
+			echo "<td><b><a href='/site/block?id=$coin->id' title='$coin->version'>$name</a></b><span class='text-small'> ($coin->algo)</span></td>";
 
-			echo "<td align=right style='font-size: .8em;'>$unconfirmed</td>";
-			echo "<td align=right style='font-size: .8em;'>$confirmed</td>";
-			echo "<td align=right style='font-size: .8em;'>$total</td>";
-			echo "<td align=right style='font-size: .8em;'>$value $refcoin->symbol</td>";
+			echo "<td align=right class='text-small'>$unconfirmed</td>";
+			echo "<td align=right class='text-small'>$confirmed</td>";
+			echo "<td align=right class='text-small'>$total</td>";
+			echo "<td align=right class='text-small'>$value $refcoin->symbol</td>";
 
 			echo "</tr>";
 		}
@@ -139,14 +134,14 @@ if(!$show_details && $total_unsold > 0)
 {
 	echo '
 	<tr><td colspan="6" align="right">
-		<label style="font-size: .8em;">
-			<input type="checkbox" onclick="javascript:main_wallet_refresh_details()">
+		<label class="text-small">
+			<input type="checkbox" id="show-details-checkbox">
 			Show Details
 		</label>
 	</td></tr>';
 }
 
-echo '<tr class="ssrow" style="border-top: 3px solid #eee;">';
+echo '<tr class="ssrow" class="border-top-3">';
 
 echo '<td valign="top"><img width="16" src="'.$refcoin->image.'"></td>';
 echo '<td valign="top"><b>';
@@ -156,12 +151,12 @@ if($refcoin->symbol == 'BTC')
 else
 	echo '<a href="/site/block?id='.$refcoin->id.'">'.$refcoin->name.'</a>';
 
-echo '<br/><span style="font-size: .8em;"">(total pending)</span></b></td>';
+echo '<br/><span class="text-small"">(total pending)</span></b></td>';
 
-echo '<td valign="top" align="right" style="font-size: .8em;">'.$unconfirmed.'</td>';
-echo '<td valign="top" align="right" style="font-size: .8em;">'.$confirmed.'</td>';
-echo '<td valign="top" align="right" style="font-size: .8em;"></td>';
-echo '<td valign="top" align="right" style="font-size: .8em;">'.$total_unsold.' '.$refcoin->symbol.'</td>';
+echo '<td valign="top" align="right" class="text-small">'.$unconfirmed.'</td>';
+echo '<td valign="top" align="right" class="text-small">'.$confirmed.'</td>';
+echo '<td valign="top" align="right" class="text-small"></td>';
+echo '<td valign="top" align="right" class="text-small">'.$total_unsold.' '.$refcoin->symbol.'</td>';
 
 echo "</tr>";
 
@@ -173,28 +168,28 @@ if ($user->donation > 0) {
 } else if ($user->no_fees == 1) {
 	$fees_notice = 'Currently mining without pool fees.';
 }
-echo '<tr><td colspan="6" style="text-align:right; font-size: .8em;"><b>'.$fees_notice.'</b></td></tr>';
+echo '<tr><td colspan="6" class="text-right-small"><b>'.$fees_notice.'</b></td></tr>';
 
 // ////////////////////////////////////////////////////////////////////////////
 
 $balance = Yii::$app->ConversionUtils->bitcoinvaluetoa($user->balance);
 
-echo "<tr class='ssrow' style='border-top: 1px solid #eee;'>";
+echo "<tr class='ssrow border-top-thick'>";
 echo "<td><img width=16 src='$refcoin->image'></td>";
 echo "<td colspan=3><b>Balance</b></td>";
-echo "<td align=right style='font-size: .8em;'><b></b></td>";
-echo "<td align=right style='font-size: .9em;'><b>$balance $refcoin->symbol</b></td>";
+echo "<td align=right class='text-small'><b></b></td>";
+echo "<td align=right class='text-small'><b>$balance $refcoin->symbol</b></td>";
 echo "</tr>";
 
 ////////////////////////////////////////////////////////////////////////////
 
 $total_unpaid = Yii::$app->ConversionUtils->bitcoinvaluetoa($balance + $total_unsold);
 
-echo "<tr class='ssrow' style='border-top: 3px solid #eee;'>";
+echo "<tr class='ssrow border-top-thick'>";
 echo "<td><img width=16 src='$refcoin->image'></td>";
 echo "<td colspan=3><b>Total Unpaid</b></td>";
-echo "<td align=right style='font-size: .8em;'></td>";
-echo "<td align=right style='font-size: .9em;'>$total_unpaid $refcoin->symbol</td>";
+echo "<td align=right class='text-small'></td>";
+echo "<td align=right class='text-small'>$total_unpaid $refcoin->symbol</td>";
 echo "</tr>";
 
 ////////////////////////////////////////////////////////////////////////////
@@ -211,11 +206,11 @@ if (!$total_paid) {
 
 $total_paid = Yii::$app->ConversionUtils->bitcoinvaluetoa($total_paid);
 
-echo "<tr class='ssrow' style='border-top: 1px solid #eee;'>";
+echo "<tr class='ssrow border-top-thick'>";
 echo "<td><img width=16 src='$refcoin->image'></td>";
 echo "<td colspan=3><b>Total Paid</b></td>";
-echo "<td align=right style='font-size: .8em;'></td>";
-echo "<td align=right style='font-size: .9em;'><a href='javascript:main_wallet_tx()'>$total_paid $refcoin->symbol</a></td>";
+echo "<td align=right class='text-small'></td>";
+echo "<td align=right class='text-small'><a href='javascript:main_wallet_tx()'>$total_paid $refcoin->symbol</a></td>";
 echo "</tr>";
 
 ////////////////////////////////////////////////////////////////////////////
@@ -224,18 +219,18 @@ echo "</tr>";
 
 $total_earned = Yii::$app->ConversionUtils->bitcoinvaluetoa($total_unsold + $balance + $total_paid);
 
-echo "<tr class='ssrow' style='border-top: 3px solid #eee;'>";
+echo "<tr class='ssrow border-top-thick'>";
 echo "<td><img width=16 src='$refcoin->image'></td>";
 echo "<td colspan=3><b>Total Earned</b></td>";
-echo "<td align=right style='font-size: .8em;'></td>";
-echo "<td align=right style='font-size: .9em;'>$total_earned $refcoin->symbol</td>";
+echo "<td align=right class='text-small'></td>";
+echo "<td align=right class='text-small'>$total_earned $refcoin->symbol</td>";
 echo "</tr>";
 
 echo "</table>";
 
-echo "</div>";
+ViewHelper::renderBoxFooter();
 
-echo '<p style="font-size: .8em; margin-top: 0; padding-left: 4px;">';
+echo '<p class="text-small" class="mt-0-pl-4">';
 echo '* approximate from current exchange rates<br/>';
 if ($refcoin->symbol == 'BTC') {
 	$usd = number_format($mining->usdbtc, 2, '.', ' ');
@@ -244,15 +239,15 @@ if ($refcoin->symbol == 'BTC') {
 echo '</p>';
 
 if ($refcoin->payout_min) {
-	echo '<p style="font-size: .8em; padding-left: 4px;">';
+	echo '<p class="text-small" class="pl-4">';
 	echo '<b>Note:</b> Minimum payout for this wallet is '.($refcoin->payout_min).' '.$refcoin->symbol;
 	echo '</p>';
 }
 
-echo '</div><br/>';
+echo '<br/>';
 
 $header = "Last 24 Hours Payouts: ".$user->username;
-WriteBoxHeader($header);
+ViewHelper::renderBoxHeader($header);
 
 $t = time()-24*60*60;
 $list = Payouts::find()
@@ -285,7 +280,7 @@ foreach($list as $payout)
 	$payout_tx = substr($payout->tx, 0, 36).'...';
 	$link = $refcoin->createExplorerLink($payout_tx, array('txid'=>$payout->tx), array(), true);
 
-	echo '<td style="font-family: monospace;">'.$link.'</td>';
+	echo '<td class="font-mono">'.$link.'</td>';
 	echo '</tr>';
 
 	$total += $payout->amount;
@@ -313,11 +308,11 @@ $list_extra = Payouts::find()
 if (!empty($list_extra)) {
 
 	echo <<<end
-	<tr class="ssrow" style="color: darkred;">
+	<tr class="ssrow" class="text-darkred">
 	<th colspan="3"><b>Extra payouts detected in the last 24H to explain negative balances (buggy Wallets)</b></th>
 	</tr>
 	<tr class="ssrow">
-	<td colspan="3" style="font-size: .9em; padding-bottom: 8px;">
+	<td colspan="3" class="text-smaller" class="pb-8">
 	Some wallets (UFO,LYB) have a problem and don't always confirm a transaction in the requested time.<br/>
 	<!-- Please be honest and continue mining to handle these extra transactions sent to you. --><br/>
 	</th>
@@ -340,7 +335,7 @@ end;
 		$payout_tx = substr($payout->tx, 0, 36).'...';
 		$link = $refcoin->createExplorerLink($payout_tx, array('txid'=>$payout->tx), array(), true);
 
-		echo '<td style="font-family: monospace;">'.$link.'</td>';
+		echo '<td class="font-mono">'.$link.'</td>';
 		echo '</tr>';
 
 		$total += $payout->amount;
@@ -349,7 +344,7 @@ end;
 	$amount = Yii::$app->ConversionUtils->bitcoinvaluetoa($total);
 
 	echo <<<end
-	<tr class="ssrow" style="color: darkred;">
+	<tr class="ssrow" class="text-darkred">
 	<td align="right">Total:</td>
 	<td align="right"><b>{$amount}</b></td>
 	<td></td>
@@ -359,6 +354,20 @@ end;
 
 
 echo "</table><br>";
-echo "</div>";
+ViewHelper::renderBoxFooter();
 
-echo "</div><br>";
+echo "<br>";
+
+?>
+
+<?= CspHelper::beginScript() ?>
+// Event listener for show details checkbox
+document.addEventListener('DOMContentLoaded', function() {
+	var showDetailsCheckbox = document.getElementById('show-details-checkbox');
+	if (showDetailsCheckbox) {
+		showDetailsCheckbox.addEventListener('click', function() {
+			main_wallet_refresh_details();
+		});
+	}
+});
+<?= CspHelper::endScript() ?>

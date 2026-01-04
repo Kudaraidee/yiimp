@@ -14,6 +14,7 @@ use app\models\Orders;
 use app\models\Stats;
 use app\models\Stratums;
 use app\models\Workers;
+use app\components\DynamicStyleManager;
 
 $mining = Mining::find()->one();
 
@@ -91,18 +92,16 @@ foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
 	$algos[] = array($norm, $algo);
 }
 
-function cmp($a, $b)
-{
+// Use anonymous function to avoid redeclaration
+usort($algos, function($a, $b) {
 	return $a[0] < $b[0];
-}
-
-usort($algos, 'cmp');
+});
 foreach($algos as $item)
 {
 	$norm = $item[0];
 	$algo = $item[1];
 
-	$algo_color = Yii::$app->YiimpUtils->getAlgoColors($algo);
+	$algoColorClass = DynamicStyleManager::getAlgoColorClass($algo);
 	$algo_norm = Yii::$app->YiimpUtils->get_algo_norm($algo);
 
 	$coins = Coins::find()->where(['enable' => 1, 'auto_ready' => 1, 'algo' => $algo])->count();
@@ -203,53 +202,53 @@ foreach($algos as $item)
 	$ts = $isup ? Yii::$app->ConversionUtils->datetoa2($stratum->started) : '';
 
 	echo '<tr class="ssrow">';
-	echo '<td style="background-color: '.$algo_color.'"><b>';
-	echo Html::a($algo, '/site/gomining?algo='.$algo);
+	echo '<td class="' . $algoColorClass . '"><b>';
+	echo Html::a($algo, ['/site/gomining', 'algo' => $algo]);
 	echo '</b></td>';
-	echo '<td align="left" style="font-size: .8em;" data="'.$ts.'">'.$isup.'&nbsp;'.$time.'</td>';
-	echo '<td align="right" style="font-size: .8em;">'.(empty($coins) ? '-' : $coins).'</td>';
-	echo '<td align="right" style="font-size: .8em;">'.(empty($count) ? '-' : $count).'</td>';
-	echo '<td align="right" style="font-size: .8em;">'.(empty($fees) ? '-' : "$fees %").'</td>';
-	echo '<td align="right" style="font-size: .8em;" data="'.$hashrate.'">'.$hashrate_sfx.'</td>';
-	echo '<td align="right" style="font-size: .8em;" class="rental">'.$hashrate_jobs.'</td>';
+	echo '<td align="left" class="text-small" data="'.$ts.'">'.$isup.'&nbsp;'.$time.'</td>';
+	echo '<td align="right" class="text-small">'.(empty($coins) ? '-' : $coins).'</td>';
+	echo '<td align="right" class="text-small">'.(empty($count) ? '-' : $count).'</td>';
+	echo '<td align="right" class="text-small">'.(empty($fees) ? '-' : "$fees %").'</td>';
+	echo '<td align="right" class="text-small" data="'.$hashrate.'">'.$hashrate_sfx.'</td>';
+	echo '<td align="right" class="text-small rental">'.$hashrate_jobs.'</td>';
 
 	if ($bad > 10)
-		echo '<td align="right" style="font-size: .8em; color: white; background-color: #d9534f">'.$bad.'%</td>';
+		echo '<td align="right" class="text-small" class="badge-danger">'.$bad.'%</td>';
 	else if($bad > 5)
-		echo '<td align="right" style="font-size: .8em; color: white; background-color: #f0ad4e">'.$bad.'%</td>';
+		echo '<td align="right" class="text-small" class="badge-warning">'.$bad.'%</td>';
 	else
-		echo '<td align="right" style="font-size: .8em;">'.(empty($bad) ? '-' : "$bad %").'</td>';
+		echo '<td align="right" class="text-small">'.(empty($bad) ? '-' : "$bad %").'</td>';
 
 	if ($norm>0)
-		echo '<td align=right style="font-size: .8em;" title="normalized '.$norm.'">'.($price == 0.0 ? '-' : $price).'</td>';
+		echo '<td align=right class="text-small" title="normalized '.$norm.'">'.($price == 0.0 ? '-' : $price).'</td>';
 	else
-		echo '<td align=right style="font-size: .8em;">'.($price == 0.0 ? '-' : $price).'</td>';
+		echo '<td align=right class="text-small">'.($price == 0.0 ? '-' : $price).'</td>';
 
-	echo '<td align="right" style="font-size: .8em;" class="rental">'.$rent.'</td>';
+	echo '<td align="right" class="text-small rental">'.$rent.'</td>';
 
 	// Norm
-	echo '<td align="right" style="font-size: .8em;">'.($norm == 0.0 ? '-' : $norm).'</td>';
+	echo '<td align="right" class="text-small">'.($norm == 0.0 ? '-' : $norm).'</td>';
 
 	// 24E
-	echo '<td align="right" style="font-size: .8em;">'.($avgprice == 0.0 ? '-' : $avgprice).'</td>';
+	echo '<td align="right" class="text-small">'.($avgprice == 0.0 ? '-' : $avgprice).'</td>';
 
 	// 24A
-	$style = '';
+	$perfClass = '';
 	if ($btcmhday1 != '-')
 	{
 		$avgprice = (double) $avgprice;
 		$btcmhd = (double) $btcmhday1;
 
 		if($btcmhd > $avgprice*1.1)
-			$style = 'color: white; background-color: #5cb85c;';
+			$perfClass = 'perf-excellent';
 		else if($btcmhd*1.3 < $avgprice)
-			$style = 'color: white; background-color: #d9534f;';
+			$perfClass = 'perf-poor';
 		else if($btcmhd*1.2 < $avgprice)
-			$style = 'color: white; background-color: #e4804e;';
+			$perfClass = 'perf-bad';
 		else if($btcmhd*1.1 < $avgprice)
-			$style = 'color: white; background-color: #f0ad4e;';
+			$perfClass = 'perf-warning';
 	}
-	echo '<td align="right" style="font-size: .8em; '.$style.'">'.$btcmhday1.'</td>';
+	echo '<td align="right" class="text-small ' . $perfClass . '">'.$btcmhday1.'</td>';
 
 	echo '</tr>';
 }
@@ -261,16 +260,16 @@ $total_hashrate = Yii::$app->ConversionUtils->Itoa2($total_hashrate).'h/s';
 
 echo '<tr class="ssfooter">';
 echo '<td colspan="2"></td>';
-echo '<td align="right" style="font-size: .8em;">'.$total_coins.'</td>';
-echo '<td align="right" style="font-size: .8em;">'.$total_workers.'</td>';
-echo '<td align="right" style="font-size: .8em;"></td>';
-echo '<td align="right" style="font-size: .8em;">'.$total_hashrate.'</td>';
-echo '<td align="right" style="font-size: .8em;" class="rental"></td>';
-echo '<td align="right" style="font-size: .8em;">'.($bad ? $bad.'%' : '').'</td>';
-echo '<td align="right" style="font-size: .8em;"></td>';
-echo '<td align="right" style="font-size: .8em;" class="rental"></td>';
-echo '<td align="right" style="font-size: .8em;"></td>';
-echo '<td align="right" style="font-size: .8em;"></td>';
+echo '<td align="right" class="text-small">'.$total_coins.'</td>';
+echo '<td align="right" class="text-small">'.$total_workers.'</td>';
+echo '<td align="right" class="text-small"></td>';
+echo '<td align="right" class="text-small">'.$total_hashrate.'</td>';
+echo '<td align="right" class="text-small rental"></td>';
+echo '<td align="right" class="text-small">'.($bad ? $bad.'%' : '').'</td>';
+echo '<td align="right" class="text-small"></td>';
+echo '<td align="right" class="text-small rental"></td>';
+echo '<td align="right" class="text-small"></td>';
+echo '<td align="right" class="text-small"></td>';
 echo '</tr>';
 
 echo '</table><br>';
@@ -289,7 +288,7 @@ echo '<tr>';
 echo '<th></th>';
 
 foreach($markets as $market)
-	echo '<th align="right"><a href="/admin/runExchange?id='.$market->id.'">'.$market->name.'</a></th>';
+	echo '<th align="right">' . \yii\helpers\Html::a($market->name, ['run-exchange', 'id' => $market->id]) . '</th>';
 
 echo '<th align="right">Total</th>';
 
@@ -304,9 +303,9 @@ foreach($markets as $market)
 	$balance = Yii::$app->ConversionUtils->bitcoinvaluetoa($market->balance);
 
 	if($balance > 0.250)
-		echo '<td align="right" style="color: white; background-color: #5cb85c">'.$balance.'</td>';
+		echo '<td align="right" class="badge-success">'.$balance.'</td>';
 	else if($balance > 0.200)
-		echo '<td align="right" style="color: white; background-color: #f0ad4e">'.$balance.'</td>';
+		echo '<td align="right" class="badge-warning">'.$balance.'</td>';
 	else if($balance == 0.0)
 		echo '<td align="right">-</td>';
 	else
@@ -317,7 +316,7 @@ foreach($markets as $market)
 
 $total_balance = Yii::$app->ConversionUtils->bitcoinvaluetoa($total_balance);
 
-echo '<td align="right" style="color: white; background-color: #eaa228">'.$total_balance.'</td>';
+echo '<td align="right" class="badge-orange">'.$total_balance.'</td>';
 echo '</tr>';
 
 // ----------------------------------------------------------------------------------------------------
@@ -336,9 +335,9 @@ if (YAAMP_ALLOW_EXCHANGE) {
 		$salebalances[$exchange] = $onsell;
 
 		if($onsell > 0.2)
-			echo '<td align="right" style="color: white; background-color: #d9534f">'.$onsell.'</td>';
+			echo '<td align="right" class="badge-danger">'.$onsell.'</td>';
 		else if($onsell > 0.1)
-			echo '<td align="right" style="color: white; background-color: #f0ad4e">'.$onsell.'</td>';
+			echo '<td align="right" class="badge-warning">'.$onsell.'</td>';
 		else if($onsell == 0.0)
 			echo '<td align="right">-</td>';
 		else
@@ -412,7 +411,7 @@ foreach($altmarkets as $row)
 			WHERE M.name='$exchange' AND IFNULL(M.deleted,0)=0 AND INSTR(C.symbol,'-')=0
 		");*/
 		$balance = Yii::$app->ConversionUtils->bitcoinvaluetoa($balance);
-		echo '<td align="right"><a href="/admin/balances?exch='.$exchange.'">'.$balance.'</a></td>';
+		echo '<td align="right">' . \yii\helpers\Html::a($balance, ['balances', 'exch' => $exchange]) . '</td>';
 	}
 	$alt_balances[$exchange] = $balance;
 	$total_altcoins += $balance;
@@ -490,12 +489,11 @@ foreach($list as $market)
 
 	$marketurl = Yii::$app->YiimpUtils->getMarketUrl($coin, $market->name);
 
-//	echo '<tr class="ssrow">';
-	$algo_color = Yii::$app->YiimpUtils->getAlgoColors($coin->algo);
-	echo '<tr style="background-color: '.$algo_color.';">';
+	$algoColorClass = DynamicStyleManager::getAlgoColorClass($coin->algo);
+	echo '<tr class="ssrow ' . $algoColorClass . '">';
 
 	echo '<td><img width="16px" src="'.$coin->image.'"></td>';
-	echo '<td><b><a href="/admin/coin?id='.$coin->id.'">'.$coin->name.' ('.$coin->symbol.')</a></b></td>';
+	echo '<td><b>' . \yii\helpers\Html::a($coin->name . ' (' . $coin->symbol . ')', ['coin', 'id' => $coin->id]) . '</b></td>';
 
 	echo '<td><b><a href="'.$marketurl.'" target="_blank">'.$market->name.'</a></b></td>';
 
@@ -505,7 +503,7 @@ foreach($list as $market)
 	echo '<td>'.$sent.' ago</td>';
 	echo '<td>'.$traded.' ago</td>';
 
-	echo '<td><a href="/admin/clearmarket?id='.$market->id.'">clear</a></td>';
+	echo '<td>' . \yii\helpers\Html::a('clear', ['clear-market', 'id' => $market->id]) . '</td>';
 	echo '</tr>';
 }
 
@@ -546,8 +544,8 @@ foreach($orders as $order)
 
 	$marketurl = Yii::$app->YiimpUtils->getMarketUrl($coin, $order->market);
 
-	$algo_color = Yii::$app->YiimpUtils->getAlgoColors($coin->algo);
-	echo '<tr class="ssrow" style="background-color: '.$algo_color.';">';
+	$algoColorClass = DynamicStyleManager::getAlgoColorClass($coin->algo);
+	echo '<tr class="ssrow ' . $algoColorClass . '">';
 
 	$created = Yii::$app->ConversionUtils->datetoa2($order->created). ' ago';
 	$price = $order->price? Yii::$app->ConversionUtils->bitcoinvaluetoa($order->price): '';
@@ -562,19 +560,19 @@ foreach($orders as $order)
 	$amount = round($order->amount, 3);
 
 	echo '<td><img width="16px" src="'.$coin->image.'"></td>';
-	echo '<td><b><a href="/admin/coin?id='.$coin->id.'">'.$coin->name.'</a></b></td>';
+	echo '<td><b>' . \yii\helpers\Html::a($coin->name, ['coin', 'id' => $coin->id]) . '</b></td>';
 	echo '<td><b><a href="'.$marketurl.'" target="_blank">'.$order->market.'</a></b></td>';
 
-	echo '<td style="font-size: .8em">'.$created.'</td>';
-	echo '<td style="font-size: .8em">'.$amount.'</td>';
-	echo '<td style="font-size: .8em">'.$price.'</td>';
-	echo '<td style="font-size: .8em">'."$bid ({$bidpercent}%)".'</td>';
-	echo $bidvalue>0.01? '<td style="font-size: .8em;"><b>'.$bidvalue.'</b></td>': '<td style="font-size: .8em;">'.$bidvalue.'</td>';
+	echo '<td class="text-small">'.$created.'</td>';
+	echo '<td class="text-small">'.$amount.'</td>';
+	echo '<td class="text-small">'.$price.'</td>';
+	echo '<td class="text-small">'."$bid ({$bidpercent}%)".'</td>';
+	echo $bidvalue>0.01? '<td class="text-small"><b>'.$bidvalue.'</b></td>': '<td class="text-small">'.$bidvalue.'</td>';
 
 	echo '<td>';
-	echo '<a href="/admin/cancelorder?id='.$order->id.'" title="Cancel the order on the exchange!">cancel</a> ';
-	echo '<a href="/admin/clearorder?id='.$order->id.'" title="Clear the order from the DB, NOT FROM THE EXCHANGE!">clear</a> ';
-//	echo '<a href="/admin/sellorder?id='.$order->id.'">sell</a>';
+	echo \yii\helpers\Html::a('cancel', ['cancel-order', 'id' => $order->id], ['title' => 'Cancel the order on the exchange!']) . ' ';
+	echo \yii\helpers\Html::a('clear', ['clear-order', 'id' => $order->id], ['title' => 'Clear the order from the DB, NOT FROM THE EXCHANGE!']) . ' ';
+//	echo \yii\helpers\Html::a('sell', ['sell-order', 'id' => $order->id]);
 	echo '</td>';
 	echo '</tr>';
 }
@@ -586,8 +584,8 @@ echo '<tr>';
 echo '<td></td>';
 echo '<td>Total</td>';
 echo '<td colspan="3"></td>';
-echo '<td style="font-size: .8em;"><b>'.$totalvalue.'</b></td>';
-echo '<td style="font-size: .8em;"><b>'."$totalbid ({$bidpercent}%)</b></td>";
+echo '<td class="text-small"><b>'.$totalvalue.'</b></td>';
+echo '<td class="text-small"><b>'."$totalbid ({$bidpercent}%)</b></td>";
 echo '<td></td>';
 echo '</tr>';
 }
@@ -600,8 +598,8 @@ echo '</td><td>&nbsp;&nbsp;</td><td valign="top">';
 
 //////////////////////////////////////////////////////////////////////////////////
 
-function cronstate2text($state)
-{
+// Helper function as closure to avoid redeclaration
+$cronstate2text = function($state) {
 	switch($state - 1)
 	{
 		case 0:
@@ -623,13 +621,13 @@ function cronstate2text($state)
 		default:
 			return '';
 	}
-}
+};
 
 $state_main = (int) Yii::$app->cache->get('cronjob_main_state');
 $btc = Coins::find()->where(['symbol' => 'BTC'])->one();
 if (!$btc) $btc = json_decode('{"id": 6, "balance": 0}');
 
-echo '<span style="font-weight: bold; color: red;">';
+echo '<span class="text-bold-red">';
 for($i=0; $i<10; $i++)
 {
 	if($i != $state_main-1 && $state_main>0)
@@ -646,7 +644,7 @@ $loop2_time = Yii::$app->ConversionUtils->sectoa(time()-Yii::$app->cache->get("c
 $main_time2 = Yii::$app->ConversionUtils->sectoa(time()-Yii::$app->cache->get("cronjob_main_time_start"));
 
 $main_time = Yii::$app->ConversionUtils->sectoa(Yii::$app->cache->get("cronjob_main_time"));
-$main_text = cronstate2text($state_main);
+$main_text = $cronstate2text($state_main);
 
 echo "*** main  ($main_time) $state_main $main_text ($main_time2), loop2 ($loop2_time), block ($block_time)<br>";
 
@@ -707,9 +705,9 @@ echo '<br/>';
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-echo '<div style="height: 160px;" id="graph_results_negative"></div>';
-//echo '<div style="height: 160px;' id="graph_results_profit"></div>';
-echo '<div style="height: 200px;" id="graph_results_assets"></div>';
+echo '<div class="h-160" id="graph_results_negative"></div>';
+// Removed inline style - now using chart-container-160 class
+echo '<div class="h-200" id="graph_results_assets"></div>';
 
 ///////////////////////////////////////////////////////////////////////////
 $db_blocks = Blocks::find()->orderBy('time desc')->limit(50)->all();
@@ -737,16 +735,16 @@ foreach($db_blocks as $db_block)
 
 		$reward = Yii::$app->ConversionUtils->bitcoinvaluetoa($db_block->amount);
 
-		$algo_color = Yii::$app->YiimpUtils->getAlgoColors($db_block->algo);
-		echo '<tr style="background-color: '.$algo_color.';">';
+		$algoColorClass = DynamicStyleManager::getAlgoColorClass($db_block->algo);
+		echo '<tr class="' . $algoColorClass . '">';
 		echo '<td width="18px"><img width="16px" src="/images/btc.png"></td>';
 		echo '<td><b>Rental</b> ('.$db_block->algo.')</td>';
-		echo '<td align="right" style="font-size: .8em"><b>$reward BTC</b></td>';
-		echo '<td align="right" style="font-size: .8em"></td>';
-		echo '<td align="right" style="font-size: .8em"></td>';
-		echo '<td align="right" style="font-size: .8em">'.$d.' ago</td>';
-		echo '<td align="right" style="font-size: .8em">';
-		echo '<span style="padding: 2px; color: white; background-color: #5cb85c;">Confirmed</span>';
+		echo '<td align="right" class="text-small"><b>$reward BTC</b></td>';
+		echo '<td align="right" class="text-small"></td>';
+		echo '<td align="right" class="text-small"></td>';
+		echo '<td align="right" class="text-small">'.$d.' ago</td>';
+		echo '<td align="right" class="text-small">';
+		echo '<span class="badge-success">Confirmed</span>';
 		echo '</td>';
 		echo '</tr>';
 		continue;
@@ -762,36 +760,36 @@ foreach($db_blocks as $db_block)
 	$height = number_format($db_block->height, 0, '.', ' ');
 	$diff = Yii::$app->ConversionUtils->Itoa2($db_block->difficulty, 3);
 
-	$algo_color = Yii::$app->YiimpUtils->getAlgoColors($coin->algo);
-	echo '<tr style="background-color: '.$algo_color.';">';
+	$algoColorClass = DynamicStyleManager::getAlgoColorClass($coin->algo);
+	echo '<tr class="' . $algoColorClass . '">';
 	echo '<td width="18px"><img width="16px" src="'.$coin->image.'"></td>';
 	$flags = $db_block->segwit ? '&nbsp;<img src="/images/ui/segwit.png" height="8px" valign="center" title="segwit">' : '';
-	echo '<td><b><a href="/admin/coin?id='.$coin->id.'">'.$coin->name.'</a></b>'.$flags.'</td>';
+	echo '<td><b>' . \yii\helpers\Html::a($coin->name, ['coin', 'id' => $coin->id]) . '</b>'.$flags.'</td>';
 
-	echo '<td align="right" style="font-size: .8em">'.$db_block->amount.' '.$coin->symbol.'</td>';
-	echo '<td align="right" style="font-size: .8em" title="found '.$db_block->difficulty_user.'">'.$diff.'</td>';
+	echo '<td align="right" class="text-small">'.$db_block->amount.' '.$coin->symbol.'</td>';
+	echo '<td align="right" class="text-small" title="found '.$db_block->difficulty_user.'">'.$diff.'</td>';
 
-	echo '<td align="right" style="font-size: .8em">'.$height.'</td>';
-	echo '<td align="right" style="font-size: .8em">'.$d.' ago</td>';
-	echo '<td align="right" style="font-size: .8em">';
+	echo '<td align="right" class="text-small">'.$height.'</td>';
+	echo '<td align="right" class="text-small">'.$d.' ago</td>';
+	echo '<td align="right" class="text-small">';
 
 	if($db_block->category == 'orphan')
-		echo '<span class="block orphan" style="padding: 2px; color: white; background-color: #d9534f;">Orphan</span>';
+		echo '<span class="block orphan" class="badge-danger">Orphan</span>';
 
 	else if($db_block->category == 'immature')
-		echo '<span class="block immature" style="padding: 2px; color: white; background-color: #f0ad4e">Immature ('.$db_block->confirmations.')</span>';
+		echo '<span class="block immature" class="badge-warning">Immature ('.$db_block->confirmations.')</span>';
 
 	else if($db_block->category == 'stake')
-		echo '<span class="block stake" style="padding: 2px; color: white; background-color: #a0a0a0">Stake ('.$db_block->confirmations.')</span>';
+		echo '<span class="block stake" class="badge-gray">Stake ('.$db_block->confirmations.')</span>';
 
 	else if($db_block->category == 'generated')
-		echo '<span class="block staked" style="padding: 2px; color: white; background-color: #a0a0a0">Confirmed</span>';
+		echo '<span class="block staked" class="badge-gray">Confirmed</span>';
 
 	else if($db_block->category == 'generate')
-		echo '<span class="block generate" style="padding: 2px; color: white; background-color: #5cb85c">Confirmed</span>';
+		echo '<span class="block generate" class="badge-success">Confirmed</span>';
 
 	else if($db_block->category == 'new')
-		echo '<span class="block new" style="padding: 2px; color: white; background-color: #ad4ef0">New</span>';
+		echo '<span class="block new" class="badge-purple">New</span>';
 
 	echo '</td>';
 	echo '</tr>';

@@ -21,6 +21,10 @@ function BackendStatsUpdate()
 
 	dborun("DELETE FROM stratums WHERE time<$t");
 	dborun("DELETE FROM workers WHERE pid NOT IN (SELECT pid FROM stratums)");
+	
+	// cleanup workers with no recent shares (last 30 minutes)
+	$worker_timeout = time() - 30*60;
+	dborun("DELETE FROM workers WHERE id NOT IN (SELECT DISTINCT workerid FROM shares WHERE time > $worker_timeout AND workerid > 0)");
 
 	// todo: cleanup could be done once per day or week...
 	dborun("DELETE FROM hashstats WHERE IFNULL(hashrate,0) = 0 AND IFNULL(earnings,0) = 0");

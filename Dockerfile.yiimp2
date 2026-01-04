@@ -1,0 +1,75 @@
+FROM ubuntu:24.04 AS baseimage
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN set -xe \
+    && : "---------- Fix possible vulnerabilities ----------" \
+    && apt-get update && apt-get dist-upgrade -y \
+    && : "---------- add tools ----------" \
+    && apt-get install -y git bc dumb-init supervisor cron logrotate vim less nano mc memcached apache2 libapache2-mod-php sudo \
+    && : "---------- Persistent dependencies ----------" \
+    && apt-get install -y libgd-dev libicu-dev libmariadb-dev-compat libxml2-dev libonig-dev libcurl4-openssl-dev libssl-dev libxslt1-dev libzip-dev libz-dev libmemcached-dev \
+    && : "---------- php extensions ----------" \
+    && apt-get install -y php-dev php-bcmath php-curl php-exif php-gd php-intl php-memcache php-memcached php-opcache php-mbstring php-mysqli php-soap php-shmop php-sysvshm php-sysvsem php-sysvmsg php-xml php-xsl php-zip \
+    && apt-get clean
+
+RUN set -xe \
+    && : "---------- Copy latest composer ----------"
+COPY --from=docker.io/library/composer:latest /usr/bin/composer /usr/bin/composer
+
+RUN set -xe \
+    && : "---------- Modify apache config ----------" \
+    && a2enmod remoteip \
+    && a2enmod rewrite \
+    && a2enmod ssl
+
+# Configure Apache with yiimp2-specific ports and vhost
+COPY config/ports.conf.yiimp2 /etc/apache2/ports.conf
+COPY config/001-yiimp2.conf /etc/apache2/sites-available/
+RUN a2ensite 001-yiimp2 && a2dissite 000-default
+
+RUN echo "RemoteIPHeader x-forwarded-for" >> /etc/apache2/apache2.conf \
+    && echo "RemoteIPInternalProxy 127.0.0.1" >> /etc/apache2/apache2.conf
+
+# create default log directory
+RUN mkdir -p /var/log/yiimp
+
+# Build devel image
+FROM baseimage AS image-devel
+
+RUN set -xe \
+    && : "---------- changes only on devel env e.g. enable xdebug ----------"
+
+# Install Xdebug from apt repo
+RUN set -xe \
+    && : "---------- Install Xdebug from apt repo ----------" \
+    && apt-get install -y php-xdebug
+
+COPY config/xdebug.ini /usr/local/etc/php/conf.d/
+
+# Copy yiimp2 application for development
+COPY --chown=www-data:www-data yiimp2/ /var/yiimp2/
+
+# Install Composer dependencies (including dev dependencies)
+WORKDIR /var/yiimp2/
+RUN sudo -u www-data composer install
+
+WORKDIR /var/yiimp2/
+CMD ["apache2-foreground"]
+
+# Build production image
+FROM baseimage AS image-prod
+
+# Copy yiimp2 application
+COPY --chown=www-data:www-data yiimp2/ /var/yiimp2/
+
+# Install Composer dependencies
+WORKDIR /var/yiimp2/
+RUN sudo -u www-data composer install --no-dev --optimize-autoloader
+
+# Configure supervisor with yiimp2-specific configuration
+COPY config/supervisord.conf.yiimp2 /etc/supervisor/conf.d/supervisord.conf
+
+WORKDIR /var/yiimp2/
+
+CMD ["/usr/bin/supervisord"]

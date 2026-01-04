@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "x16rt.h"
+#include "sha256-d.h"
 #include <sha3/sph_blake.h>
 #include <sha3/sph_bmw.h>
 #include <sha3/sph_groestl.h>

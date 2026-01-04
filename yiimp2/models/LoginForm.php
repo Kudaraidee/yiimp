@@ -55,11 +55,59 @@ class LoginForm extends Model
 
     /**
      * Logs in a user using the provided username and password.
+     * 
+     * Implements session ID regeneration after authentication (Requirement 3.1)
+     * to prevent session fixation attacks.
+     * 
      * @return bool whether the user is logged in successfully
      */
     public function login()
     {
         if ($this->validate()) {
+            // Regenerate session ID after successful authentication (Requirement 3.1)
+            // This prevents session fixation attacks by invalidating the old session ID
+            // while preserving session data (Requirements 3.2, 3.3, 3.4)
+            try {
+                $oldSessionId = Yii::$app->session->getId();
+                
+                // Regenerate session ID (Requirements 3.1, 3.3, 3.4, 3.5)
+                Yii::$app->session->regenerateID();
+                
+                $newSessionId = Yii::$app->session->getId();
+                
+                // Log session regeneration for security audit (Requirement 6.1)
+                Yii::info([
+                    'event' => 'session_regeneration',
+                    'reason' => 'successful_authentication',
+                    'username' => $this->username,
+                    'old_session_id' => substr($oldSessionId, 0, 20) . '...',
+                    'new_session_id' => substr($newSessionId, 0, 20) . '...',
+                    'session_id_changed' => $oldSessionId !== $newSessionId,
+                    'ip_address' => Yii::$app->request->getUserIP(),
+                    'user_agent' => Yii::$app->request->getUserAgent(),
+                ], 'session.regenerate');
+                
+                // Verify session ID actually changed
+                if ($oldSessionId === $newSessionId) {
+                    Yii::warning([
+                        'event' => 'session_regeneration_failed',
+                        'reason' => 'session_id_unchanged',
+                        'username' => $this->username,
+                        'session_id' => substr($oldSessionId, 0, 20) . '...',
+                    ], 'session.regenerate');
+                }
+            } catch (\Exception $e) {
+                // Log regeneration failure but don't block login
+                Yii::error([
+                    'event' => 'session_regeneration_error',
+                    'reason' => 'exception_during_regeneration',
+                    'username' => $this->username,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ], 'session.regenerate');
+            }
+            
+            // Proceed with login
             return Yii::$app->user->login($this->getUser(), $this->rememberMe ? 3600*24*30 : 0);
         }
         return false;
