@@ -97,8 +97,9 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 	if (is_ethash || is_etchash)
 	{
-		// Ethereum Stratum uses difficulty (2^256 / diff boundary), not the
-		// Bitcoin-style compact target used by the other special algorithms.
+		// Ethereum Stratum uses the ethash difficulty scale: target is
+		// 2^224 / difficulty (i.e. 2^256 / (difficulty * 2^32)), matching
+		// Rigel and miningcore. Not the Bitcoin-style compact target.
 		uint8_t target_be[32];
 		ethash_diff_to_target(difficulty, target_be);
 		client->share_target = ethash_be_to_uint256(target_be);

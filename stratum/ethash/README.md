@@ -60,7 +60,7 @@ printf 'delete yaamp_algo_list\r\ndelete yaamp_visible_algos\r\ndelete yaamp_unv
 - RPC host/port/user/pass ชี้ไปยัง node ที่รองรับ Ethash/Etchash
 - `master_wallet` = address ที่ node ใช้เป็น beneficiary
 - `block_time` / `network_ttf` = ค่าเฉลี่ยจริงของเชน (เช่น ~11 วิสำหรับ Larissa)
-- `powlimit_bits` = 0 — difficulty แบบ Ethereum เป็นจำนวน hash ที่คาดหวัง ไม่ต้องคูณ 2^32 แบบ Bitcoin (ตั้งที่ coin หรือปล่อยให้ค่าจากตาราง `algos` ใน migration ด้านบน)
+- `powlimit_bits` = 0 — ไม่ใช้ compact target แบบ Bitcoin; stratum ใช้ ethash target = 2^224 / difficulty (ตั้งที่ coin หรือปล่อยให้ค่าจากตาราง `algos` ใน migration ด้านบน)
 - `reward` = ผลตอบแทนต่อบล็อกจริง ตรวจจาก node/explorer แล้วอัปเดตเป็นระยะ (เช่น Larissa ลดทุกสัปดาห์)
 - symbol/contract/info อื่น ๆ ตามเหรียญที่ต้องการ เช่น `ETC` สำหรับ etchash
 
@@ -168,7 +168,7 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 > stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
 >
 > - `eth_submitLogin` → ใช้ username/password แบบเดียวกับ `mining.authorize`
-> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` โดย target คือ `floor((2^256-1) / difficulty)` Rigel รับ difficulty เป็นตัวเลขและ T-Rex คำนวณ `(2^256-1) / target` ทั้งคู่จึงแสดงค่าที่ตั้งไว้ (เช่น `d=8` → ทั้งคู่โชว์ `8.00`) รองรับ difficulty ทศนิยม เช่น `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม และ `-p d=...` มีผลจริงทั้ง Rigel และ T-Rex (ไม่ถูก range check แบบ Bitcoin-style) แนะนำ `difficulty = 8` ขึ้นไปเพื่อลดจำนวน share ที่ไหลเข้าพูล
+> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` โดย target คือ `floor(2^224 / difficulty)` ตามสเกล ethash มาตรฐาน (raw difficulty = `difficulty × 2^32`) Rigel รับ difficulty เป็นตัวเลขแล้วโชว์ `34.36G (8.00)` สำหรับ `d=8`, T-Rex อ่าน target แล้วโชว์ raw difficulty `34.36G` — สองตัวจริง ๆ แล้วขุดที่ difficulty เดียวกัน รองรับ difficulty ทศนิยม เช่น `d=0.1` หรือ `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม และ `-p d=...` มีผลจริงทั้ง Rigel และ T-Rex (ไม่ถูก range check แบบ Bitcoin-style) ค่า `difficulty` ใน config คือค่าหลังหาร 2^32 เช่น `0.1` → raw 429.5M เหมาะกับการ์ดระดับ 1050 Ti (~1 share/นาที)
 > - `eth_submitHashrate` → ตอบ `true`
 > - `eth_submitWork` → pool ตรวจ mix digest ด้วย `ethash_hash()` เอง บันทึก share และส่งบล็อกให้ node ด้วย `eth_submitWork` ถ้าเจอ block
 >
@@ -184,7 +184,7 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 
 - `mining.subscribe` → `{"mining_notify":[{"method":"mining.set_difficulty","params":{"difficulty":16}},{"method":"mining.notify","params":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":true}}],"extranonce":"..."}`
   (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce` โดย `mining_notify` แต่ละตัวเป็น object ที่มี `method` กับ `params` ไม่ใช่ array; ถ้าตอบเป็น array แบบดั้งเดิมหรือใช้ `params` เป็น array Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage`)
-- `mining.set_difficulty` → difficulty แบบ 2^256 / target เป็น **JSON number** (เช่น `[0.5]`); การส่งเป็น string `["0.5"]` ทำให้ Rigel reject notification แล้ว reconnect
+- `mining.set_difficulty` → difficulty แบบ `2^224 / target` (raw = difficulty × 2^32) เป็น **JSON number** (เช่น `[0.1]`); การส่งเป็น string `["0.1"]` ทำให้ Rigel reject notification แล้ว reconnect
 - `mining.notify` → `[jobId, seedHash, headerHash, true]`
 - `mining.submit` → `[worker, jobId, nonce]`
   pool รองรับทั้ง nonce แบบเต็ม 16 hex (Rigel/ethminer รวม extranonce ไว้แล้ว) และแบบ 8 hex ต่อท้าย extranonce1

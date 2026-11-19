@@ -296,10 +296,21 @@ void job_broadcast(YAAMP_JOB *job)
 
 	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 
-	uint64_t coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
+	double coin_diff;
+	if (is_ethash || is_etchash)
+	{
+		// eth_getWork gives a 256-bit target, not Bitcoin's compact nbits.
+		// ethash_build_template() already converted it to the network
+		// difficulty (2^224 / target) on coind.
+		coin_diff = job->coind ? job->coind->difficulty : 0;
+	}
+	else
+	{
+		uint64_t coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
 
-	if (templ->nbits && !coin_target) coin_target = 0xFFFF000000000000ULL; // under decode_compact min diff
-	double coin_diff = target_to_diff(coin_target);
+		if (templ->nbits && !coin_target) coin_target = 0xFFFF000000000000ULL; // under decode_compact min diff
+		coin_diff = target_to_diff(coin_target);
+	}
 
 	humanize_double(formated_jobspeed, sizeof("-XXX.YPh/s"), job->speed, "h/s",
 					HN_AUTOSCALE, HN_NOSPACE | HN_DECIMAL);
