@@ -430,6 +430,13 @@ class CoinService
 
     private function getBlockTemplate(Coins $coin, WalletRPC $remote): mixed
     {
+        // Kiiro Core requires both explicit segwit rule support and the pool
+        // wallet in the GBT request. Without these it returns -8 and the
+        // backend incorrectly marks the coin auto_ready=false.
+        if ($coin->algo === 'firopow' || $coin->symbol === 'KIIRO') {
+            $wallet = json_encode((string) $coin->master_wallet, JSON_UNESCAPED_SLASHES);
+            return $remote->getblocktemplate('{"mode":"template","rules":["segwit"]},' . $wallet);
+        }
         if ($coin->usemweb) {
             return $remote->getblocktemplate('{"rules":["segwit","mweb"]}');
         }

@@ -469,10 +469,11 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		sprintf(outputs_count, "%02x", outputs);
 		strcat(templ->coinb2, outputs_count);
 		if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
-		strcat(templ->coinb2, script_dests);
 
-		// Do not subtract the extra outputs: coinbasevalue is the miner's share.
+		// Miner/pool output first, then the additive Firo-family payees.
+		// coinbasevalue is already the miner's 20% share, so do not subtract.
 		job_pack_tx(coind, templ->coinb2, available, NULL);
+		strcat(templ->coinb2, script_dests);
 
 		strcat(templ->coinb2, "00000000"); // locktime
 		coind->reward = (double)available/100000000*coind->reward_mul;

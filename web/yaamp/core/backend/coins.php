@@ -166,8 +166,14 @@ function BackendCoinsUpdate()
 				$coin->auxpow = true;
 		}
 
+        // Kiiro Core requires explicit segwit rule support and the pool wallet
+        // in the GBT request; otherwise it rejects the call and the backend
+        // would clear auto_ready.
+        if ($coin->algo == 'firopow' || $coin->symbol == 'KIIRO') {
+            $template = $remote->getblocktemplate('{"mode":"template","rules":["segwit"]},' . json_encode((string) $coin->master_wallet));
+        }
         // Change for segwit
-		if ($coin->usemweb) {
+		else if ($coin->usemweb) {
 			$template = $remote->getblocktemplate('{"rules":["segwit","mweb"]}');
 		}
 
