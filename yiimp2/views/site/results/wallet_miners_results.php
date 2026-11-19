@@ -170,9 +170,13 @@ if(count($workers))
 				? $utils->coin_solo_rate($rowCoinid)
 				: $utils->coin_shared_rate($rowCoinid);
 
-			// same scale as the old wallet TTF: network difficulty / pool hashrate
-			$ttf = ($userRate && $poolRate && $rowCoin->difficulty > 0)
-				? $rowCoin->difficulty * 0x100000000 / $poolRate : 0;
+			// same formula as the Pool page: hashes needed for a block / pool rate
+			// coin_nethash() honours each coin's powlimit_bits (LRS uses 0), so the
+			// legacy difficulty * 2^32 shortcut gives wildly wrong values there.
+			$blocktime = $rowCoin->block_time ?: max(min($rowCoin->actual_ttf, 60), 30);
+			$networkHash = $utils->coin_nethash($rowCoin);
+			$ttf = ($userRate && $poolRate && $networkHash)
+				? $networkHash / $poolRate * $blocktime : 0;
 			$ttfText = $ttf ? $conv->sectoa2($ttf) : '-';
 
 			$userDiff = isset($userShareMap[$rowCoinid][$solo]) ? $userShareMap[$rowCoinid][$solo] : 0;
@@ -182,6 +186,8 @@ if(count($workers))
 
 			$rateText = $userRate ? $conv->Itoa2($userRate).'h/s' : '-';
 			$tip = 'diff '.number_format((float) $rowCoin->difficulty, 2)
+				.' · network '.($networkHash ? $conv->Itoa2($networkHash).'h/s' : '-')
+				.' · block '.$blocktime.'s'
 				.' · pool '.($poolRate ? $conv->Itoa2($poolRate).'h/s' : '-')
 				.' · you '.($userRate ? $conv->Itoa2($userRate).'h/s' : '-');
 

@@ -103,7 +103,7 @@
               <td style="text-align:right">2</td>
               <td style="text-align:right">100%</td>
               <td style="text-align:right"><b>123.1 Mh/s</b></td>
-              <td style="text-align:right" class="ttf" title="diff 12.4T · pool 1.83 Gh/s · you 123.1 Mh/s">18 days</td>
+              <td style="text-align:right" class="ttf" title="diff 614.5G · network 55.9 Gh/s · pool 88 Mh/s · you 88 Mh/s">2 hours</td>
             </tr>
             <tr class="ssrow">
               <td><span class="coin"><img src="" alt="">ETC <span class="algo">ethash</span></span></td>
@@ -129,8 +129,9 @@
           แถวจะปรากฏเฉพาะเหรียญที่มี shares/worker ใช้งานอยู่
         </p>
         <p class="hint">
-          TTF ต่อแถว = <code>coin.difficulty × 2^32 / pool_coin_rate(coinid, mode)</code>
-          (หรือคูณ block time ตามสูตรหน้า Pool ถ้าต้องการให้ตรงกับ TTF***)
+          TTF ต่อแถว = <code>coin_nethash(coin) / pool_coin_rate(coinid, mode) × block_time</code>
+          (สูตรเดียวกับ TTF*** ในหน้า Pool — สำคัญเพราะบางเหรียญ เช่น LRS มี <code>powlimit_bits = 0</code>
+          การใช้ <code>difficulty × 2^32</code> จะให้ค่าเพี้ยนหลักแสนปี)
         </p>
 
         <br>
