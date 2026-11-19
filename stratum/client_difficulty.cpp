@@ -160,10 +160,11 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 	}
 	else if (is_ethash || is_etchash)
 	{
-		// Ethash/ethproxy miners use the full 256-bit target. The generic
-		// 64-bit diff_to_target() range check below rejects normal values such
-		// as d=2, which silently falls back to g_stratum_difficulty.
-		double diff = client_normalize_difficulty(atof(p+2), client);
+		// Ethash/ethproxy miners use the full 256-bit target. An explicit d=
+		// must be used as-is: client_normalize_difficulty() clamps to the
+		// Bitcoin-style g_stratum_min_diff (difficulty/2), which silently
+		// turned d=2 into 8 on a pool configured with difficulty = 16.
+		double diff = atof(p+2);
 		if (diff > 0 && isfinite(diff))
 		{
 			uint8_t be[32];
