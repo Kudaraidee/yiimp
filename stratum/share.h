@@ -31,10 +31,12 @@ class YAAMP_SHARE: public YAAMP_OBJECT
 {
 public:
 	int jobid;
-	char extranonce2[64];
-	char ntime[32];
-	char nonce[64];
-	char nonce1[64];
+	// Progpow/Firo submits reuse these fields for the 64-char header hash and
+	// mixhash, so keep enough room for the hex string plus NUL terminator.
+	char extranonce2[128];
+	char ntime[128];
+	char nonce[128];
+	char nonce1[128];
 };
 
 inline void share_delete(YAAMP_OBJECT *object)

@@ -267,9 +267,13 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     string_lower(header);
     string_lower(mixhash);
 
+    // share_add() stores the third error argument as ntime. Progpow-style
+    // submits carry header/mixhash instead, so always pass a real ntime here.
+    char *submit_ntime = (char *)"";
+
     YAAMP_JOB* job = (YAAMP_JOB*)object_find(&g_list_job, jobid, true);
     if (!job) {
-        client_submit_error(client, NULL, 21, "Invalid job id", header, mixhash, nonce);
+        client_submit_error(client, NULL, 21, "Invalid job id", header, submit_ntime, nonce);
         return true;
     } else if (job->deleted) {
         client_send_result(client, "true");
@@ -278,6 +282,7 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     }
 
     int coinid = job->coind->id;
+    if (job->templ) submit_ntime = job->templ->ntime;
 
     // KIIRO/Miningcore requires the worker to echo the exact header hash from
     // mining.notify. Reject a mismatched header before crediting a share that
@@ -288,32 +293,32 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
             job->templ->header_hash.ToString().c_str());
         string_lower(expected_header);
         if (strcmp(header, expected_header)) {
-            client_submit_error(client, job, 20, "Invalid header hash", header, mixhash, nonce);
+            client_submit_error(client, job, 20, "Invalid header hash", header, submit_ntime, nonce);
             return true;
         }
     }
 
     //! sanity check nonce
     if (strlen(nonce) != YAAMP_KAWPOW_NONCE_SIZE * 2 || !ishexa(nonce, YAAMP_KAWPOW_NONCE_SIZE * 2)) {
-        client_submit_error(client, job, 20, "Invalid nonce size", header, mixhash, nonce);
+        client_submit_error(client, job, 20, "Invalid nonce size", header, submit_ntime, nonce);
         return true;
     }
 
     //! make sure nonce matches prefix
     if (!kawpow_check_nonceprefix(client, nonce)) {
-        client_submit_error(client, job, 20, "Invalid nonce prefix", header, mixhash, nonce);
+        client_submit_error(client, job, 20, "Invalid nonce prefix", header, submit_ntime, nonce);
         return true;
     }
 
     //! sanity check header/mixhash
     if ((strlen(header) != 64 || !ishexa(header, 64)) || (strlen(mixhash) != 64 || !ishexa(mixhash, 64))) {
-        client_submit_error(client, job, 20, "Invalid header/mixhash", header, mixhash, nonce);
+        client_submit_error(client, job, 20, "Invalid header/mixhash", header, submit_ntime, nonce);
         return true;
     }
 
     YAAMP_SHARE* share = share_find(job->id, header, mixhash, nonce, client->username);
     if (share) {
-        client_submit_error(client, job, 22, "Duplicate share", header, mixhash, nonce);
+        client_submit_error(client, job, 22, "Duplicate share", header, submit_ntime, nonce);
         return true;
     }
 
@@ -339,7 +344,7 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     stratumlog("client %d on job %d sent diff %0.3f powhash %s\n", client->userid, job->id, share_diff,hash.ToString().c_str());
 
     if (hash > target) {
-        client_submit_error(client, job, 26, "Low difficulty share", header, mixhash, nonce);
+        client_submit_error(client, job, 26, "Low difficulty share", header, submit_ntime, nonce);
         return true;
     }
 
