@@ -120,6 +120,30 @@ void coinbase_aux(YAAMP_JOB_TEMPLATE *templ, char *aux_script)
 	}
 }
 
+// KIIRO (Firo-family) pays masternode/community/developer/datamining outputs
+// as *additional* outputs. Its coinbasevalue is already the miner's 20% share,
+// so these amounts must NOT be subtracted from the pool output. Miningcore's
+// KiiroJob does the same and reads raw scriptPubKeys from the template.
+static void kiiro_pack_payee(YAAMP_COIND *coind, char *dest, json_value *json_result,
+	const char *name, unsigned int &outputs)
+{
+	json_value *obj = json_get_object(json_result, name);
+	if (!obj) {
+		json_value *arr = json_get_array(json_result, name);
+		if (arr && arr->u.array.length > 0 && arr->u.array.values[0]->type == json_object)
+			obj = arr->u.array.values[0];
+	}
+	if (!obj) return;
+
+	const char *script = json_get_string(obj, "script");
+	json_int_t amount = json_get_int(obj, "amount");
+	if (!script || !amount) return;
+
+	outputs++;
+	script_pack_tx(coind, dest, amount, script);
+	debuglog("KIIRO coinbase output %s: %.8f\n", name, (double)amount / 100000000);
+}
+
 void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *json_result)
 {
 	//================= Alien coins/algos/encodings
@@ -422,6 +446,31 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         coind->reward = (double)available/100000000*coind->reward_mul;
         return;
     }
+
+	else if(!strcmp(coind->symbol, "KIIRO")) // Firo-family: additive outputs, raw scripts
+	{
+		char outputs_count[4] = { 0 };
+		char script_dests[4096] = { 0 };
+		unsigned int outputs = 1; // pool/miner output
+
+		if (templ->has_segwit_txs) outputs++;
+		kiiro_pack_payee(coind, script_dests, json_result, "znode", outputs);
+		kiiro_pack_payee(coind, script_dests, json_result, "community", outputs);
+		kiiro_pack_payee(coind, script_dests, json_result, "developer", outputs);
+		kiiro_pack_payee(coind, script_dests, json_result, "datamining", outputs);
+
+		sprintf(outputs_count, "%02x", outputs);
+		strcat(templ->coinb2, outputs_count);
+		if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
+		strcat(templ->coinb2, script_dests);
+
+		// Do not subtract the extra outputs: coinbasevalue is the miner's share.
+		job_pack_tx(coind, templ->coinb2, available, NULL);
+
+		strcat(templ->coinb2, "00000000"); // locktime
+		coind->reward = (double)available/100000000*coind->reward_mul;
+		return;
+	}
 
 	else if(!strcmp(coind->symbol, "HXX")) //hardcoded everything
 	{
