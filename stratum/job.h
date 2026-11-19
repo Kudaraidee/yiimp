@@ -96,6 +96,12 @@ struct YAAMP_JOB_TEMPLATE
 	uint256 header_hash;
 	uint256 header_seed;
 	//////////////////////////////////////////////////
+
+	// Ethash / Etchash work from eth_getWork (0x-prefixed big endian hashes).
+	char eth_header[80];
+	char eth_seed[80];
+	char eth_target[80];
+	int eth_epoch;
 };
 
 #define YAAMP_JOB_MAXSUBIDS		200

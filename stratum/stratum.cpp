@@ -89,6 +89,8 @@ bool is_kawpow = false;
 bool is_firopow = false;
 bool is_phihash = false;
 bool is_meowpow = false;
+bool is_ethash = false;
+bool is_etchash = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -161,6 +163,8 @@ YAAMP_ALGO g_algos[] =
 	{"equihash144", equi_hash, 0x100, 0, 0},
 	{"equihash192", equi_hash, 0x100, 0, 0},
 	{"equihash96", equi_hash, 0x100, 0, 0},
+	{"etchash", sha256_double_hash, 1, 0, 0},
+	{"ethash", sha256_double_hash, 1, 0, 0},
 	{"firopow", sha256_double_hash, 1, 0, 0},
 	{"flex", flex_hash, 1, 0, sha3d_hash_hex},
 	{"fresh", fresh_hash, 0x100, 0, 0},
@@ -350,6 +354,9 @@ int main(int argc, char **argv)
 	char *new_log_directory = iniparser_getstring(ini, "STRATUM:logdir", NULL);
 	if (new_log_directory) { strcpy(g_log_directory, new_log_directory); }
 
+	if (!strcmp(g_stratum_algo, "ethash") || !strcmp(g_stratum_algo, "etchash"))
+		ethash_params_load(ini);
+
 	g_stratum_nicehash_difficulty = iniparser_getdouble(ini, "STRATUM:nicehash", 16);
 	g_stratum_nicehash_min_diff = iniparser_getdouble(ini, "STRATUM:nicehash_diff_min", g_stratum_nicehash_difficulty/2);
 	g_stratum_nicehash_max_diff = iniparser_getdouble(ini, "STRATUM:nicehash_diff_max", g_stratum_nicehash_difficulty*8192);
@@ -398,6 +405,14 @@ int main(int argc, char **argv)
 	else if (!strcmp(g_current_algo->name,"meowpow"))
 	{
 		is_meowpow = true;
+	}
+	else if (!strcmp(g_current_algo->name,"ethash"))
+	{
+		is_ethash = true;
+	}
+	else if (!strcmp(g_current_algo->name,"etchash"))
+	{
+		is_etchash = true;
 	}
 
 //	struct rlimit rlim_files = {0x10000, 0x10000};

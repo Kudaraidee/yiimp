@@ -19,13 +19,14 @@ SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/
 	firopow/lib/progpow.cpp firopow/overrides.cpp firopow/hash.cpp \
 	phihash/lib/progpow.cpp phihash/hash.cpp \
 	meowpow/lib/progpow.cpp meowpow/hash.cpp
+SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/work.cpp
 
 CFLAGS += -DHAVE_CURL
 SOURCES += rpc_curl.cpp
 #LDCURL = $(shell /usr/bin/pkg-config --static --libs libcurl)
 #LDFLAGS += $(LDCURL)
 
-OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o)
+OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o)
 OUTPUT=stratum
 
 CODEDIR1=algos
@@ -36,8 +37,8 @@ CODEDIR4=secp256k1
 
 .PHONY: projectcode1 projectcode2 projectcode3 projectcode4
 
-all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 $(SOURCES) $(SOURCES_KAWPOW) $(OUTPUT)
-buildonly: projectcode1 projectcode2 projectcode3 projectcode4 $(SOURCES) $(SOURCES_KAWPOW) $(OUTPUT)
+all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(OUTPUT)
+buildonly: projectcode1 projectcode2 projectcode3 projectcode4 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(OUTPUT)
 
 gitsubmodules:
 	git submodule init && git submodule update
@@ -56,6 +57,7 @@ ifeq ($(wildcard $(CODEDIR4)/.libs/libsecp256k1.a), )
 endif
 
 $(SOURCES): stratum.h util.h
+$(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/work.h
 
 $(OUTPUT): $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDLIBS) $(LDFLAGS) -o $@
@@ -90,7 +92,8 @@ clean:
 	rm -f kawpow/lib/ethash/*.o
 	rm -f firopow/*.o
 	rm -f firopow/lib/*.o
-	
+	rm -f ethash/*.o
+
 install: clean all
 	strip -s stratum
 	cp stratum /usr/local/bin/

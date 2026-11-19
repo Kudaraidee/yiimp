@@ -29,6 +29,7 @@ or as single command
 * the container has only default config built in so you have to link the live-config inside
 * create 2 folders - one for config, 1 for logfiles
 * use the config folder in repo as templates - modify supervisor-conf to your needs (which process to autostart and add stratum-processes if needed)
+* for Ethash/Etchash setup (SQL, config, node requirements, miner ports) see [stratum/ethash/README.md](stratum/ethash/README.md)
 * use "serverconfig.sample.php" as config template , rename to serverconfig.php and move config-dir
 * to access logfiles export the log-directory and the apache logfiles into the created log-folder
 

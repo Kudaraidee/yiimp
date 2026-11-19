@@ -255,6 +255,20 @@ static void decred_fix_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, j
 
 YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 {
+	// Ethereum nodes do not implement getblocktemplate; work comes from
+	// eth_getWork and the miner is paid through the node's beneficiary.
+	if (is_ethash || is_etchash)
+	{
+		YAAMP_JOB_TEMPLATE *eth_templ = new YAAMP_JOB_TEMPLATE;
+		memset(eth_templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+		if (!ethash_build_template(coind, eth_templ))
+		{
+			delete eth_templ;
+			return NULL;
+		}
+		return eth_templ;
+	}
+
 	if(coind->usememorypool)
 		return coind_create_template_memorypool(coind);
 
@@ -676,10 +690,14 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 
 	YAAMP_JOB *job_last = coind->job;
 
+	bool same_eth_work = job_last && job_last->templ &&
+		!strcmp(templ->eth_header, job_last->templ->eth_header);
+
 	if(	!force && job_last && job_last->templ && job_last->templ->created + 45 > time(NULL) &&
-		templ->height == job_last->templ->height &&
+		(is_ethash || is_etchash ? same_eth_work :
+		(templ->height == job_last->templ->height &&
 		templ->txcount == job_last->templ->txcount &&
-		strcmp(templ->coinb2, job_last->templ->coinb2) == 0)
+		strcmp(templ->coinb2, job_last->templ->coinb2) == 0)))
 	{
 //		debuglog("coind_create_job %s %d same template %x \n", coind->name, coind->height, coind->job->id);
 		for(int i=0; i<templ->auxs_size; i++) {
@@ -716,10 +734,19 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 	}
 
 	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
-	uint64_t coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
+	if (is_ethash || is_etchash)
+	{
+		uint8_t target_be[32];
+		if (ethash_parse_hex_target(templ->eth_target, target_be))
+			ethash_target_to_diff(target_be, &coind->difficulty);
+	}
+	else
+	{
+		uint64_t coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
 
-	if (templ->nbits && !coin_target) coin_target = 0xFFFF000000000000ULL; // under decode_compact min diff
-	coind->difficulty = target_to_diff_coin(coin_target, coind->powlimit_bits - ((is_equihash)? 0 : 16));
+		if (templ->nbits && !coin_target) coin_target = 0xFFFF000000000000ULL; // under decode_compact min diff
+		coind->difficulty = target_to_diff_coin(coin_target, coind->powlimit_bits - ((is_equihash)? 0 : 16));
+	}
 
 //	stratumlog("%s %d diff %g %llx %s\n", coind->name, height, coind->difficulty, coin_target, templ->nbits);
 

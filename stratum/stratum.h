@@ -77,6 +77,8 @@ extern bool is_kawpow;
 extern bool is_firopow;
 extern bool is_phihash;
 extern bool is_meowpow;
+extern bool is_ethash;
+extern bool is_etchash;
 
 extern int g_tcp_port;
 
@@ -152,6 +154,9 @@ extern volatile bool g_exiting;
 #include "firopow/hash.h"
 #include "firopow/overrides.h"
 #include "phihash/hash.h"
+#include "ethash/params.h"
+#include "ethash/context.h"
+#include "ethash/work.h"
 
 extern YAAMP_DB *g_db;
 extern YAAMP_ALGO g_algos[];

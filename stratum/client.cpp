@@ -25,7 +25,7 @@ bool client_suggest_target(YAAMP_CLIENT *client, json_value *json_params)
 bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 {
 	//if(client_find_my_ip(client->sock->ip)) return false;
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_ethash || is_etchash)
 		get_nonce_prefix(client->extranonce1_default);
 	else
 		get_next_extraonce1(client->extranonce1_default);
@@ -127,7 +127,15 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		debuglog("new client with nonce %s\n", client->extranonce1);
 	}
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_ethash || is_etchash)
+	{
+		// EthereumStratum/1.0.0 (NiceHash): the third element of the first
+		// array is the protocol identifier ethminer uses for autodetection.
+		client_send_result(client,
+			"[[[\"mining.set_difficulty\",\"%.3g\"],[\"mining.notify\",\"%s\"],\"EthereumStratum/1.0.0\"],\"%s\",4]",
+			client->difficulty_actual, client->notify_id, client->extranonce1);
+	}
+	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
 	{
 		kawpow_send_nonceprefix(client);
 	}

@@ -85,7 +85,21 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 	client->shares_per_minute = YAAMP_SHAREPERSEC;
 
 	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_ethash || is_etchash)
+	{
+		// Ethereum Stratum uses difficulty (2^256 / diff boundary), not the
+		// Bitcoin-style compact target used by the other special algorithms.
+		uint8_t target_be[32];
+		ethash_diff_to_target(difficulty, target_be);
+		client->share_target = ethash_be_to_uint256(target_be);
+		client->next_target = client->share_target;
+
+		if(difficulty >= 1)
+			client_call(client, "mining.set_difficulty", "[%.0f]", difficulty);
+		else
+			client_call(client, "mining.set_difficulty", "[%0.8f]", difficulty);
+	}
+	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
 	{
 		uint256 share_target;
 		diff_to_target(share_target, difficulty);

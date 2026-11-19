@@ -14,6 +14,10 @@ const int get_ethash_epoch_length()
 		return 7500;
 	if (is_phihash)
 		return 30000;
+	if (is_ethash)
+		return g_ethash_params.seed_epoch_length;
+	if (is_etchash)
+		return g_ethash_params.epoch_length;
 	return 0;
 }
 
@@ -27,6 +31,8 @@ const int get_ethash_period_length()
 		return 6;
 	if (is_phihash)
 		return 3;
+	if (is_ethash || is_etchash)
+		return 1;
 	return 0;
 }
 
@@ -40,10 +46,14 @@ const unsigned int get_full_dataset_init_size()
 		return (1U << 30);
 	if (is_phihash)
 		return (1 << 30);
+	if (is_ethash || is_etchash)
+		return g_ethash_params.dag_init_size ? g_ethash_params.dag_init_size : (1U << 30);
 	return 0;
 }
 
 const int get_epoch_number(int block_number)
 {
-    return block_number ? block_number / get_ethash_epoch_length() : 0;
+	if (is_ethash || is_etchash)
+		return ethash_epoch_for_height(block_number);
+	return block_number ? block_number / get_ethash_epoch_length() : 0;
 }
