@@ -364,7 +364,32 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
                 clientlog(client, "unable to find the wallet for coinid %d...", coinid);
                 return false;
             }
-            coind_pprpcsb(coind, templ->header_hash.ToString().c_str(), mixhash, nonce);
+
+            bool accepted = coind_pprpcsb(coind, templ->header_hash.ToString().c_str(), mixhash, nonce);
+            if (accepted) {
+                char blockhash[65] = { 0 };
+                if (coind_getblockhash(coind, templ->height, blockhash, sizeof(blockhash))) {
+                    job->block_found = true;
+
+                    double coin_diff = target_to_diff(decode_compact(templ->nbits, 25));
+                    block_add(client->userid, client->workerid, coind->id, templ->height,
+                        coin_diff, share_diff, blockhash, blockhash,
+                        templ->has_segwit_txs, client->solo);
+
+                    // Mark it confirmed so block_prune() writes it to the DB.
+                    block_confirm(coind->id, blockhash);
+
+                    debuglog("*** ACCEPTED %s %d by %s (id: %d) hash %s\n", coind->name,
+                        templ->height, client->sock->ip, client->userid, blockhash);
+                } else {
+                    job->block_found = true;
+                    debuglog("*** ACCEPTED %s %d but getblockhash failed\n",
+                        coind->name, templ->height);
+                }
+            } else {
+                debuglog("*** REJECTED :( %s block %d pprpcsb\n", coind->name, templ->height);
+                rejectlog("REJECTED %s block %d pprpcsb\n", coind->symbol, templ->height);
+            }
         }
         job_signal();
     }

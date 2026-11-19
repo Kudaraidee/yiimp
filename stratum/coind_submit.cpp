@@ -61,6 +61,41 @@ bool coind_pprpcsb(YAAMP_COIND *coind, const char* header_hash, const char* mix_
         return b;
 }
 
+// Resolve the canonical block hash after pprpcsb accepts a Progpow/Firo block.
+// Progpow powhash is not the block hash, so ask the daemon which hash landed at
+// the template height instead of inventing one locally.
+bool coind_getblockhash(YAAMP_COIND *coind, int height, char *hash, size_t hashlen)
+{
+        if(!coind || !hash || hashlen < 65) return false;
+
+        char params[64];
+        snprintf(params, sizeof(params), "[%d]", height);
+
+        for(int attempt = 0; attempt < 3; attempt++)
+        {
+                json_value *json = rpc_call(&coind->rpc, "getblockhash", params);
+                if(json)
+                {
+                        json_value *json_result = json_get_object(json, "result");
+                        if(json_result && json_result->type == json_string)
+                        {
+                                const char *s = json_result->u.string.ptr;
+                                if(s && strlen(s) >= 64 && strlen(s) < hashlen)
+                                {
+                                        snprintf(hash, hashlen, "%s", s);
+                                        json_value_free(json);
+                                        return true;
+                                }
+                        }
+                        json_value_free(json);
+                }
+                usleep(200*YAAMP_MS);
+        }
+
+        hash[0] = '\0';
+        return false;
+}
+
 bool coind_submitblock(YAAMP_COIND *coind, const char *block)
 {
 	int paramlen = strlen(block);

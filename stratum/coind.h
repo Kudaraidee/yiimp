@@ -110,6 +110,7 @@ void coind_sort();
 
 bool coind_submit(YAAMP_COIND *coind, const char *block);
 bool coind_pprpcsb(YAAMP_COIND *coind, const char* header_hash, const char* mix_hash, const char* nonce64);
+bool coind_getblockhash(YAAMP_COIND *coind, int height, char *hash, size_t hashlen);
 bool coind_submitgetauxblock(YAAMP_COIND *coind, const char *hash, const char *block);
 
 void coind_init(YAAMP_COIND *coind);
