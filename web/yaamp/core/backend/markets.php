@@ -96,9 +96,6 @@ function BackendPricesUpdateExchange($exchangename)
 		case 'btc-alpha':
 			updateBTCAlphaMarkets();
 		break; */
-		case 'tradeogre':
-			updateTradeOgreMarkets();
-		break;
 		case 'binance':
 			updateBinanceMarkets();
 		break;
@@ -620,57 +617,6 @@ function updateNonKYCMarkets()
 
 	}
     }
-}
-
-function updateTradeOgreMarkets($force = false)
-{
-	debuglog(__FUNCTION__);
-	$exchange = 'tradeogre';
-	if (exchange_get($exchange, 'disabled')) return;
-
-	$list = getdbolist('db_markets', "name LIKE '$exchange%'");
-	if (empty($list)) return;
-
-	$markets = tradeogre_api_query('markets');
-	if(!is_array($markets)) return;
-
-	foreach($list as $market)
-	{
-		$coin = getdbo('db_coins', $market->coinid);
-		if(!$coin) continue;
-
-		$symbol = $coin->getOfficialSymbol();
-		$dbpair = strtoupper($symbol).'-BTC';
-		if (!empty($market->base_coin))
-		{
-			$dbpair = strtoupper($symbol.'-'.$market->base_coin);
-		}
-	
-		if (market_get($exchange, $symbol, "disabled")) {
-			$market->disabled = 1;
-			$market->message = 'disabled from settings';
-			$market->save();
-			continue;
-		}
-
-		foreach ($markets as $ticker) {
-			$pair = key($ticker);
-			if ($pair === $dbpair) {
-				$price2 = ($ticker[$pair]['bid']+$ticker[$pair]['ask'])/2;
-				$market->price = AverageIncrement($market->price, $ticker[$pair]['bid']);
-				$market->price2 = AverageIncrement($market->price2, $price2);
-				$market->pricetime = time();
-				$market->save();
-
-				if ((empty($coin->price))||(empty($coin->price2))) {
-					$coin->price = $market->price;
-					$coin->price2 = $market->price2;
-					$coin->market = $exchange;
-					$coin->save();
-				}
-			}
-		}
-	}
 }
 
 function updateBiboxMarkets($force = false)

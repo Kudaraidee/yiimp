@@ -351,8 +351,8 @@ const char *header_value(const char *data, const char *search, char *value)
 		return value;
 	}
 
-	strncpy(value, p, MIN(1024, p2 - p));
-	value[MIN(1023, p2 - p)] = 0;
+	strncpy(value, p, std::min<size_t>(1024, p2 - p));
+	value[std::min<size_t>(1023, p2 - p)] = 0;
 
 	return value;
 }

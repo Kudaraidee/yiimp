@@ -141,6 +141,7 @@ function getAlgoPort($algo) {
     if(!$algo_ports) {
         $algoslist = yaamp_get_algo_list();
         if ($algoslist) {
+			$algo_ports = [];
             foreach ($algoslist AS $algorow) {
                 if (isset($algorow['name'])) $algo_ports[$algorow['name']] = $algorow['port'];
             }

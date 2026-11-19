@@ -2,13 +2,14 @@
 //#include "stratum.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 
 #ifndef uint8
 #define uint8  unsigned char
 #endif
 
 #ifndef uint32
-#define uint32 unsigned long int
+#define uint32 uint32_t
 #endif
 
 typedef struct

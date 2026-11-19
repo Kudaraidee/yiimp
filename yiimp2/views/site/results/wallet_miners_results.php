@@ -13,6 +13,7 @@ if(!$user) return;
 
 $userid = intval($user->id);
 $coinid = intval($user->coinid);
+$coin = null;
 if ($coinid) {
 	$coin = Coins::find()
 				->where([ 'id' => $coinid ])
@@ -35,7 +36,7 @@ echo "</thead>";
 
 foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
 {
-	if (!YAAMP_ALLOW_EXCHANGE && isset($coin) && $coin->algo != $algo) continue;
+	if (!YIIMP_ALLOW_EXCHANGE && isset($coin) && $coin->algo != $algo) continue;
 
 	$minercount = Workers::find()
 			->where(['userid' => $userid , 'algo' => $algo])
@@ -47,7 +48,7 @@ foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
 	$user_ttf = 0;
 
 	if ($pool_hash != 0) {
-		$user_ttf  = $user_pool_rate ? $coin->difficulty * 0x100000000 / $pool_hash : 0;
+		$user_ttf  = ($user_pool_rate && $coin) ? $coin->difficulty * 0x100000000 / $pool_hash : 0;
 	}
 	$user_ttf  = $user_ttf ? Yii::$app->ConversionUtils->sectoa2($user_ttf) : '-';
 
@@ -84,7 +85,7 @@ if(count($minercount))
 
 	foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
 	{
-		if (!YAAMP_ALLOW_EXCHANGE && isset($coin) && $coin->algo != $algo) continue;
+		if (!YIIMP_ALLOW_EXCHANGE && isset($coin) && $coin->algo != $algo) continue;
 
 		$user_shared_rate = Yii::$app->YiimpUtils->user_shared_rate($userid, $algo);
 		$user_solo_rate = Yii::$app->YiimpUtils->user_solo_rate($userid, $algo);
@@ -98,8 +99,8 @@ if(count($minercount))
 		$user_solo_ttf  = $user_solo_ttf ? Yii::$app->ConversionUtils->sectoa2($user_solo_ttf) : '';
 
 
-		$user_shared_rate = $user_shared_rate? Itoa2($user_shared_rate).'h/s': '-';
-		$user_solo_rate = $user_solo_rate? Itoa2($user_solo_rate).'h/s': '-';
+		$user_shared_rate = $user_shared_rate? Yii::$app->ConversionUtils->Itoa2($user_shared_rate).'h/s': '-';
+		$user_solo_rate = $user_solo_rate? Yii::$app->ConversionUtils->Itoa2($user_solo_rate).'h/s': '-';
 	
 		$shared_minercount = Workers::find()
 								->where(['userid'=>$userid,'algo'=>$algo])
@@ -112,7 +113,7 @@ if(count($minercount))
 
 		if ($shared_minercount)
 		{
-			if (YAAMP_ALLOW_EXCHANGE || !$user->coinid) 
+			if (YIIMP_ALLOW_EXCHANGE || !$user->coinid) 
 			{
 
 				$user_shared_shares = Yii::$app->cache->get("wallet_user_shared_shares-$userid-$algo");

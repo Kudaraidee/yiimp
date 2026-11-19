@@ -67,7 +67,7 @@ $stats = $stats = Market_history::find()
 				->all();
 foreach($stats as $histo) {
 	$d = date('Y-m-d H:i', $histo->time);
-	$series[YAAMP_SITE_NAME][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa($histo->price));
+	$series[YIIMP_SITE_NAME][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa($histo->price));
 	$max = max($max, $histo->price);
 }
 

@@ -9,7 +9,7 @@ echo '[';
 
 foreach($stats as $i=>$n)
 {
-	$e = bitcoinvaluetoa($n->earnings*24);
+	$e = Yii::$app->ConversionUtils->bitcoinvaluetoa($n->earnings*24);
 	if($i) echo ',';
 	$d = date('Y-m-d H:i:s', $n->time);
 	echo "[\"$d\",$e]";

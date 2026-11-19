@@ -1,0 +1,87 @@
+/* Tailwind CSS entry point — compiled by `npm run build` into web/css/tailwind.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Existing class compatibility ───────────────────────────────────────────
+   These @apply rules let view partials that emit Bootstrap/legacy class names
+   render correctly inside the Tailwind layout without any markup changes.
+*/
+
+@layer components {
+
+    /* dataGrid — the table class used across all admin view partials */
+    .dataGrid, .dataGrid2 {
+        @apply w-full text-sm text-left border-collapse;
+    }
+    .dataGrid thead, .dataGrid2 thead {
+        @apply bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-xs;
+    }
+    .dataGrid th, .dataGrid td,
+    .dataGrid2 th, .dataGrid2 td {
+        @apply px-3 py-2 border-b border-gray-200 dark:border-gray-600;
+    }
+    .ssrow:hover {
+        @apply bg-gray-50 dark:bg-gray-800;
+    }
+    .ssrow.filtered {
+        @apply hidden;
+    }
+
+    /* Bootstrap alert classes — used by Alert::widget() */
+    .alert {
+        @apply px-4 py-3 rounded-lg mb-4 flex items-start gap-3 text-sm;
+    }
+    .alert-success  { @apply bg-green-50  dark:bg-green-900/30  text-green-800  dark:text-green-300  border border-green-200  dark:border-green-800; }
+    .alert-danger   { @apply bg-red-50    dark:bg-red-900/30    text-red-800    dark:text-red-300    border border-red-200    dark:border-red-800; }
+    .alert-warning  { @apply bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800; }
+    .alert-info     { @apply bg-blue-50   dark:bg-blue-900/30   text-blue-800   dark:text-blue-300   border border-blue-200   dark:border-blue-800; }
+
+    /* Bootstrap button classes used in forms/views */
+    .btn {
+        @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
+               cursor-pointer transition-colors duration-150 border border-transparent;
+    }
+    .btn-primary   { @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500; }
+    .btn-secondary { @apply bg-gray-200   text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600; }
+    .btn-danger    { @apply bg-red-600    text-white hover:bg-red-700; }
+    .btn-success   { @apply bg-green-600  text-white hover:bg-green-700; }
+
+    /* Form controls */
+    .form-control {
+        @apply w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600
+               bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+               focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
+    }
+
+    /* Red utility class used across admin views */
+    .red { @apply text-red-600 dark:text-red-400; }
+
+    /* Bootstrap 5 pagination compat */
+    .pagination {
+        @apply flex flex-wrap list-none p-0 m-0;
+    }
+    .page-item {
+        @apply flex;
+    }
+    .page-link {
+        @apply block px-2.5 py-1 text-sm no-underline
+               text-indigo-500 dark:text-indigo-400
+               bg-white dark:bg-gray-800
+               border border-gray-300 dark:border-gray-600
+               hover:bg-indigo-50 dark:hover:bg-gray-700
+               transition-colors;
+    }
+    .page-item:not(:first-child) > .page-link { margin-left: -1px; }
+    .page-item:first-child  > .page-link { @apply rounded-l; }
+    .page-item:last-child   > .page-link { @apply rounded-r; }
+    .page-item.active   > .page-link {
+        @apply bg-indigo-600 dark:bg-indigo-700 border-indigo-600 dark:border-indigo-700
+               text-white z-10;
+    }
+    .page-item.disabled > .page-link {
+        @apply text-gray-400 dark:text-gray-500 pointer-events-none;
+    }
+    .pagination-sm .page-link { @apply px-2 py-0.5 text-xs; }
+}

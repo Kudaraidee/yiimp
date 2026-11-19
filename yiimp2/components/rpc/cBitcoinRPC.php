@@ -1,186 +1,208 @@
 <?php
 namespace app\components\rpc;
 
-use yii;
 use app\components\rpc\iRPCConnector;
 
+/**
+ * Bitcoin-compatible JSON-RPC 1.0 client (port of EasyBitcoin-PHP).
+ * Supports HTTP and TLS connections, including wallets served over HTTPS.
+ */
 class cBitcoinRPC implements iRPCConnector
 {
-		// Configuration options
-	private $username;
-	private $password;
-	private $proto;
-	private $host;
-	private $port;
-	private $url;
-	private $CACertificate;
+    private string $username;
+    private string $password;
+    private string $proto  = 'http';
+    private string $host;
+    private int $port;
+    private ?string $url;
+    private ?string $CACertificate = null;
 
-	// Information and debugging
-	public $status;
-	public $error;
-	public $raw_response;
-	public $response;
+    public ?int $status       = null;
+    public ?string $error     = null;
+    public ?string $raw_response = null;
+    public mixed $response    = null;
 
-	private $id = 0;
+    private int $id = 0;
 
-	/**
-	 * @param string $username
-	 * @param string $password
-	 * @param string $host
-	 * @param int $port
-	 * @param string $proto
-	 * @param string $url
-	 */
-	function __construct($username, $password, $host = 'localhost', $port = 8332, $url = null) {
-		$this->username      = $username;
-		$this->password      = $password;
-		$this->host          = $host;
-		$this->port          = $port;
-		$this->url           = $url;
+    public function __construct(
+        string $username,
+        string $password,
+        string $host = 'localhost',
+        int    $port = 8332,
+        ?string $url = null
+    ) {
+        $this->username = $username;
+        $this->password = $password;
+        $this->host     = $host;
+        $this->port     = $port;
+        $this->url      = $url;
 
-		// Set some defaults
-		$this->proto         = 'http';
-		$this->CACertificate = null;
+        // Handle TLS wallets specified as "https://certname@host"
+        if (str_contains($host, 'https://')) {
+            $host = substr($host, strlen('https://'));
+            if (str_contains($host, '@')) {
+                [$cert, $host] = explode('@', $host, 2);
+            } else {
+                $cert = 'yiimp';
+            }
+            $this->host = $host;
+            $this->setSSL("/usr/share/ca-certificates/{$cert}.crt");
+        }
+    }
 
-		// Hack to be able to connect to wallets over TLS
-		// sample coin HOST:  https://dcrd@127.0.0.1
-		// where dcrd is the certificate filename.
-		if (strstr($host, 'https://') !== false) {
-			$host = substr($host, strlen('https://'));
-			if (strstr($host, '@') !== false) {
-				$parts = explode('@', $host);
-				$cert = $parts[0];
-				$host = $parts[1];
-			} else {
-				$cert = 'yiimp';
-			}
-			$this->host = $host;
-			$this->setSSL("/usr/share/ca-certificates/$cert.crt");
-		}
-	}
+    public function setSSL(?string $certificate = null): void
+    {
+        $this->proto         = 'https';
+        $this->CACertificate = $certificate;
+    }
 
-	/**
-	 * @param string|null $certificate
-	 */
-	function setSSL($certificate = null) {
-		$this->proto         = 'https'; // force HTTPS
-		$this->CACertificate = $certificate;
-	}
+    // iRPCConnector -----------------------------------------------------------
 
-	function __call($method, $params)
-	{
-		$this->status       = null;
-		$this->error        = null;
-		$this->raw_response = null;
-		$this->response     = null;
+    public function call(string $method, array $params = []): mixed
+    {
+        return $this->__call($method, $params);
+    }
 
-		// The ID should be unique for each call
-		$this->id++;
+    public function getError(): ?string
+    {
+        return $this->error;
+    }
 
-		if (stripos($method, 'dump') !== false || stripos($method, 'backupwallet') !== false) {
-			$this->error = "$method method is not authorized!";
-			return FALSE;
-		}
+    // Magic dispatch ----------------------------------------------------------
 
-		// If no parameters are passed, this will be an empty array
-		if($method == 'getblocktemplate')
-		{
-			$param = isset($params[0]) ? $params[0] : '';
-			$request = "{\"method\":\"$method\",\"params\":[$param],\"id\":$this->id}";
-		//  debuglog($request);
-		}
+    public function __call(string $method, array $params): mixed
+    {
+        $this->status       = null;
+        $this->error        = null;
+        $this->raw_response = null;
+        $this->response     = null;
 
-		else
-		{
-			$params = array_values($params);
+        $this->id++;
 
-			// Build the request, it's ok that params might have any empty array
-			$request = json_encode(array(
-				'method' => $method,
-				'params' => $params,
-				'id'     => $this->id
-			));
-		}
+        if (stripos($method, 'dump') !== false || stripos($method, 'backupwallet') !== false) {
+            $this->error = "{$method} method is not authorized!";
+            return false;
+        }
 
-		// Build the cURL session
-		$curl    = curl_init("{$this->proto}://{$this->username}:{$this->password}@{$this->host}:{$this->port}/{$this->url}");
-		$options = array(
-			CURLOPT_CONNECTTIMEOUT => 20,
-			CURLOPT_TIMEOUT        => 30,
-			CURLOPT_RETURNTRANSFER => TRUE,
-			CURLOPT_FOLLOWLOCATION => TRUE,
-			CURLOPT_MAXREDIRS      => 10,
-			CURLOPT_HTTPHEADER     => array('Content-type: application/json'),
-			CURLOPT_POST           => TRUE,
-			CURLOPT_POSTFIELDS     => $request
-		);
+        if ($method === 'getblocktemplate') {
+            $param   = $params[0] ?? '';
+            $request = "{\"method\":\"$method\",\"params\":[$param],\"id\":{$this->id}}";
+        } else {
+            $params  = array_values($params);
+            $request = json_encode(['method' => $method, 'params' => $params, 'id' => $this->id]);
+        }
 
-		if ($this->proto == 'https') {
-			// If the CA Certificate was specified we change CURL to look for it
-			if ($this->CACertificate != null) {
-				$options[CURLOPT_CAINFO] = $this->CACertificate;
-				$options[CURLOPT_CAPATH] = DIRNAME($this->CACertificate);
-				$options[CURLOPT_SSLVERSION] = 1; // TLSv1
-			}
-			else {
-				// If not we need to assume the SSL cannot be verified so we set this flag to FALSE to allow the connection
-				$options[CURLOPT_SSL_VERIFYPEER] = FALSE;
-			}
-		}
+        $curl    = curl_init("{$this->proto}://{$this->username}:{$this->password}@{$this->host}:{$this->port}/{$this->url}");
+        $options = [
+            CURLOPT_CONNECTTIMEOUT => 20,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 10,
+            CURLOPT_HTTPHEADER     => ['Content-type: application/json'],
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $request,
+        ];
 
-		curl_setopt_array($curl, $options);
+        if ($this->proto === 'https') {
+            if ($this->CACertificate !== null) {
+                $options[CURLOPT_CAINFO]    = $this->CACertificate;
+                $options[CURLOPT_CAPATH]    = dirname($this->CACertificate);
+                $options[CURLOPT_SSLVERSION] = CURL_SSLVERSION_TLSv1;
+            } else {
+                $options[CURLOPT_SSL_VERIFYPEER] = false;
+            }
+        }
 
-		// Execute the request and decode to an array
-		$this->raw_response = curl_exec($curl);
-//      debuglog($this->raw_response);
-		$this->response     = json_decode($this->raw_response, TRUE);
+        curl_setopt_array($curl, $options);
 
-		// If the status is not 200, something is wrong
-		$this->status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $this->raw_response = curl_exec($curl);
+        $this->response     = json_decode($this->raw_response, true);
+        $this->status       = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $curl_error         = curl_error($curl);
+        curl_close($curl);
 
-		// If there was no error, this will be an empty string
-		$curl_error = curl_error($curl);
+        if (!empty($curl_error)) {
+            $this->error = $curl_error;
+        }
 
-		curl_close($curl);
-//      debuglog($this->response);
+        if (isset($this->response['error']) && $this->response['error']) {
+            $code          = $this->response['error']['code'] ?? '';
+            $message       = $this->response['error']['message'] ?? '';
+            $this->error   = "error {$code}: " . strtolower($message);
+        } elseif ($this->status !== 200) {
+            $this->error = match ($this->status) {
+                400 => 'HTTP_BAD_REQUEST',
+                401 => 'HTTP_UNAUTHORIZED',
+                403 => 'HTTP_FORBIDDEN',
+                404 => 'HTTP_NOT_FOUND',
+                default => null,
+            };
+        }
 
-		if (!empty($curl_error)) {
-			$this->error = $curl_error;
-		}
+        if ($this->error) {
+            return false;
+        }
 
-		if (isset($this->response['error']) && $this->response['error']) {
-			// store wallet error
-			$code = Yii::$app->ConversionUtils->arraySafeVal($this->response['error'], 'code', '');
-			$message = Yii::$app->ConversionUtils->arraySafeVal($this->response['error'], 'message', '');
-			$this->error = "error $code: ".strtolower($message);
-		}
-		elseif ($this->status != 200) {
-			// If bitcoind didn't return a nice error message, we need to make our own
-			switch ($this->status) {
-				case 400:
-					$this->error = 'HTTP_BAD_REQUEST';
-					break;
-				case 401:
-					$this->error = 'HTTP_UNAUTHORIZED';
-					break;
-				case 403:
-					$this->error = 'HTTP_FORBIDDEN';
-					break;
-				case 404:
-					$this->error = 'HTTP_NOT_FOUND';
-					break;
-			}
-		}
+        if (!is_array($this->response)) {
+            return false;
+        }
 
-		if ($this->error) {
-			return FALSE;
-		}
+        return $this->response['result'];
+    }
 
-		if (is_null($this->response) || (!is_array($this->response)))
-		{
-			return FALSE;
-		}
+    /**
+     * Send a pre-built JSON string directly to the daemon (used by the admin RPC console).
+     */
+    public function requestJson(string $json): mixed
+    {
+        $this->status       = null;
+        $this->error        = null;
+        $this->response     = null;
+        $this->raw_response = null;
 
-		return $this->response['result'];
-	}
+        $data     = json_decode($json);
+        $data->id = $this->id++;
+
+        $ch      = curl_init("{$this->proto}://{$this->username}:{$this->password}@{$this->host}:{$this->port}/{$this->url}");
+        $options = [
+            CURLOPT_CONNECTTIMEOUT => 20,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 10,
+            CURLOPT_HTTPHEADER     => ['Content-type: application/json'],
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($data),
+        ];
+        curl_setopt_array($ch, $options);
+
+        $this->raw_response = curl_exec($ch);
+        $this->response     = json_decode($this->raw_response, true);
+        $this->status       = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error         = curl_error($ch);
+        curl_close($ch);
+
+        if (!empty($curl_error)) {
+            $this->error = $curl_error;
+        }
+
+        if (isset($this->response['error']) && $this->response['error']) {
+            $this->error = strtolower($this->response['error']['message'] ?? '');
+        } elseif ($this->status !== 200) {
+            $this->error = match ($this->status) {
+                400 => 'HTTP_BAD_REQUEST',
+                401 => 'HTTP_UNAUTHORIZED',
+                403 => 'HTTP_FORBIDDEN',
+                404 => 'HTTP_NOT_FOUND',
+                default => null,
+            };
+        }
+
+        if ($this->error) {
+            return false;
+        }
+
+        return $this->response['result'];
+    }
 }

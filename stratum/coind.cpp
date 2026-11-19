@@ -36,7 +36,7 @@ double coind_profitability(YAAMP_COIND *coind)
 
 double coind_nethash(YAAMP_COIND *coind)
 {
-	int blocktime = (coind->blocktime)? coind->blocktime : MAX(MIN(coind->actual_ttf, 60), 30);
+	int blocktime = (coind->blocktime)? coind->blocktime : std::max(std::min(coind->actual_ttf, 60), 30);
 	int powlimit_bits = 32;
 
 	if (coind->powlimit_bits) powlimit_bits = coind->powlimit_bits;

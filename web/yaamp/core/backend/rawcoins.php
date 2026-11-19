@@ -202,22 +202,6 @@ function updateRawCoinExchange($marketname)
 			}
 			break;
 
-		case 'tradeogre':
-			if (!exchange_get('tradeogre', 'disabled')) {
-				$list = tradeogre_api_query('markets');
-				if(is_array($list) && !empty($list))
-				{
-					dborun("UPDATE markets SET deleted=true WHERE name='tradeogre'");
-					foreach($list as $ticker) {
-						$symbol_index = key($ticker);
-						$e = explode('-', $symbol_index);
-						$base = strtoupper($e[1]);
-						$symbol = strtoupper($e[0]);
-						updateRawCoin('tradeogre', $symbol, $symbol, ($base == 'BTC')?null:$base);
-					}
-				}
-			}
-		break;
 		case 'poloniex':
 			if (!exchange_get('poloniex', 'disabled')) {
 				$poloniex = new poloniex;

@@ -1,0 +1,15 @@
+{
+  "name": "yiimp2",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -i src/app.css -o web/css/tailwind.css --minify",
+    "watch": "tailwindcss -i src/app.css -o web/css/tailwind.css --watch"
+  },
+  "dependencies": {
+    "admin-lte": "^4.0.0",
+    "lucide": "latest"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

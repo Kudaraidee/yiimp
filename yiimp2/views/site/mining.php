@@ -2,229 +2,229 @@
 
 /** @var yii\web\View $this */
 
-$height = '240px';
+use yii\helpers\Html;
 
 $this->registerJsFile('@web/js/auto_refresh.js', ['depends' => [yii\web\JqueryAsset::className()]]);
 
-// fixes
-$algo = Yii::$app->session->get('yaamp-algo');
+$isTailwind = Yii::$app->LayoutManager->isTailwind();
+$isLegacy   = Yii::$app->LayoutManager->isLegacy();
+$height     = '240px';
+
+$algo       = Yii::$app->session->get('yaamp-algo');
+$homeUrl    = Yii::$app->homeUrl;
+$algoFactor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
+$algoUnit   = match (true) {
+    $algoFactor == 0.001       => 'Kh',
+    $algoFactor == 1000        => 'Gh',
+    $algoFactor == 1000000     => 'Th',
+    $algoFactor == 1000000000  => 'Ph',
+    default                    => 'Mh',
+};
+
+$hasGraphs = ($algo !== 'all');
 
 ?>
 
-<div id='resume_update_button' style='color: #444; background-color: #ffd; border: 1px solid #eea;
-	padding: 10px; margin-left: 20px; margin-right: 20px; margin-top: 15px; cursor: pointer; display: none;'
-	onclick='auto_page_resume();' align=center>
-<b>Auto refresh is paused - Click to resume</b></div>
-
-<table cellspacing=20 width=100%>
-<tr><td valign=top width=50%>
-
-<div id='mining_results'>
+<?php if ($isLegacy): ?>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     LEGACY
+     ══════════════════════════════════════════════════════════════════════════ -->
+<style>
+.mining-col { min-width:0; }
+.graph-wrap { overflow:hidden; width:100%; }
+.graph-wrap canvas { max-width:100%!important; }
+.main-left-box { margin-bottom:1rem; }
+</style>
+<div id="resume_update_button"
+     style="color:#444;background:#ffd;border:1px solid #eea;padding:10px;
+            margin:15px 20px;cursor:pointer;display:none;"
+     onclick="auto_page_resume()" align="center">
+    <b>Auto refresh is paused — click to resume</b>
+</div>
+<div class="row gx-4 mt-2">
+    <div class="col-12 col-md-6 mining-col">
+        <div id="mining_results"></div>
+        <?php if ($hasGraphs): ?>
+        <div class="main-left-box">
+            <div class="main-left-title">Last 24 Hours Estimate (<?= htmlspecialchars($algo) ?>)</div>
+            <div class="main-left-inner">
+                <div class="graph-wrap"><div id="graph_results_price" style="height:<?= $height ?>"></div></div>
+            </div>
+        </div>
+        <div class="main-left-box">
+            <div class="main-left-title">Last 24 Hours Hashrate (<?= htmlspecialchars($algo) ?>)</div>
+            <div class="main-left-inner">
+                <div class="graph-wrap"><div id="pool_hashrate_results" style="height:<?= $height ?>"></div></div>
+            </div>
+        </div>
+        <?php endif ?>
+    </div>
+    <div class="col-12 col-md-6 mining-col" style="overflow-x:auto;">
+        <div id="pool_current_results"></div>
+        <div id="found_results"></div>
+    </div>
 </div>
 
-<?php
-if($algo != 'all')
-echo <<<end
-<div class="main-left-box">
-<div class="main-left-title">Last 24 Hours Estimate ($algo)</div>
-<div class="main-left-inner"><br>
-<div id='graph_results_price' style='height: $height;'></div><br>
-</div></div><br>
 
-<div class="main-left-box">
-<div class="main-left-title">Last 24 Hours Hashrate ($algo)</div>
-<div class="main-left-inner"><br>
-<div id='pool_hashrate_results' style='height: $height;'></div><br>
-</div></div><br>
-end;
-
-$algo_unit = 'Mh';
-$algo_factor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
-if ($algo_factor == 0.001) $algo_unit = 'Kh';
-if ($algo_factor == 1000) $algo_unit = 'Gh';
-if ($algo_factor == 1000000) $algo_unit = 'Th';
-if ($algo_factor == 1000000000) $algo_unit = 'Ph';
-
-$homeUrl = Yii::$app->homeUrl;
-echo <<<end
-</td><td valign=top>
-
-<div id='pool_current_results'>
+<?php elseif (!$isTailwind): ?>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     ADMINLTE
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div id="resume_update_button"
+     class="alert alert-warning d-flex align-items-center gap-2 mb-3"
+     style="cursor:pointer;display:none!important;"
+     onclick="auto_page_resume()">
+    <i class="bi bi-pause-circle-fill"></i>
+    <strong>Auto refresh is paused</strong> — click to resume
+</div>
+<div class="row gx-3 mt-2">
+    <div class="col-12 col-md-6">
+        <div id="mining_results" class="mb-3"></div>
+        <?php if ($hasGraphs): ?>
+        <div class="card shadow-sm mb-3">
+            <div class="card-header py-2 small fw-semibold">
+                <i class="bi bi-graph-up me-1"></i>
+                Last 24h Estimate — <span class="font-monospace"><?= htmlspecialchars($algo) ?></span>
+            </div>
+            <div class="card-body">
+                <div id="graph_results_price" style="height:<?= $height ?>;"></div>
+            </div>
+        </div>
+        <div class="card shadow-sm mb-3">
+            <div class="card-header py-2 small fw-semibold">
+                <i class="bi bi-activity me-1"></i>
+                Last 24h Hashrate — <span class="font-monospace"><?= htmlspecialchars($algo) ?></span>
+            </div>
+            <div class="card-body">
+                <div id="pool_hashrate_results" style="height:<?= $height ?>;"></div>
+            </div>
+        </div>
+        <?php endif ?>
+    </div>
+    <div class="col-12 col-md-6" style="overflow-x:auto;">
+        <div id="pool_current_results" class="mb-3"></div>
+        <div id="found_results"></div>
+    </div>
 </div>
 
-<div id='found_results'>
+
+<?php else: ?>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     TAILWIND
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div id="resume_update_button"
+     class="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl
+            bg-amber-50 dark:bg-amber-900/20
+            border border-amber-200 dark:border-amber-800
+            text-amber-700 dark:text-amber-300 text-sm cursor-pointer"
+     style="display:none;"
+     onclick="auto_page_resume()">
+    <i data-lucide="pause-circle" class="w-5 h-5 shrink-0"></i>
+    <strong>Auto refresh is paused</strong> — click to resume
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+
+    <div class="flex flex-col gap-4 min-w-0">
+        <div id="mining_results"></div>
+
+        <?php if ($hasGraphs): ?>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700
+                    bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
+                        flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                <i data-lucide="trending-up" class="w-4 h-4 text-indigo-500 shrink-0"></i>
+                Last 24h Estimate
+                <span class="px-2 py-0.5 text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/30
+                             text-indigo-700 dark:text-indigo-300 font-mono ml-auto">
+                    <?= htmlspecialchars($algo) ?>
+                </span>
+            </div>
+            <div class="p-4">
+                <div id="graph_results_price" style="height:<?= $height ?>;"></div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700
+                    bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
+                        flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                <i data-lucide="activity" class="w-4 h-4 text-indigo-500 shrink-0"></i>
+                Last 24h Hashrate
+                <span class="px-2 py-0.5 text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/30
+                             text-indigo-700 dark:text-indigo-300 font-mono ml-auto">
+                    <?= htmlspecialchars($algo) ?>
+                </span>
+            </div>
+            <div class="p-4">
+                <div id="pool_hashrate_results" style="height:<?= $height ?>;"></div>
+            </div>
+        </div>
+        <?php endif ?>
+    </div>
+
+    <div class="flex flex-col gap-4 min-w-0 overflow-x-auto">
+        <div id="pool_current_results"></div>
+        <div id="found_results"></div>
+    </div>
+
 </div>
 
-</td></tr></table>
-
+<?php endif ?>
 
 <script>
+var global_algo = '<?= addslashes($algo) ?>';
+var querystring = global_algo ? '?algo=' + encodeURIComponent(global_algo) : '';
 
-var global_algo = '$algo';
-var querystring = '?algo=$algo';
-if (querystring=='?algo=') querystring = '';
-
-function select_algo(algo)
-{
-	window.location.href = '{$homeUrl}site/algo?algo='+algo+'&r={$homeUrl}site/mining';
+function select_algo(algo) {
+    window.location.href = '<?= $homeUrl ?>site/algo?algo=' + encodeURIComponent(algo) + '&r=<?= $homeUrl ?>site/mining';
 }
 
-function page_refresh()
-{
-	pool_current_refresh();
-	mining_refresh();
-	found_refresh();
-
-	if(global_algo != 'all')
-	{
-		pool_hashrate_refresh();
-		main_refresh_price();
-	}
+function page_refresh() {
+    pool_current_refresh();
+    mining_refresh();
+    found_refresh();
+    if (global_algo !== 'all') {
+        main_refresh_price();
+        pool_hashrate_refresh();
+    }
 }
 
-////////////////////////////////////////////////////
-
-function pool_current_ready(data)
-{
-	$('#pool_current_results').html(data);
+function pool_current_refresh() {
+    $.get('<?= $homeUrl ?>site/current_results' + querystring, '', function(d) {
+        $('#pool_current_results').html(d);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+}
+function mining_refresh() {
+    $.get('<?= $homeUrl ?>site/mining_results' + querystring, '', function(d) {
+        $('#mining_results').html(d);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    });
+}
+function found_refresh() {
+    $.get('<?= $homeUrl ?>site/found_results' + querystring, '', function(d) { $('#found_results').html(d); });
 }
 
-function pool_current_refresh()
-{
-	var url = "{$homeUrl}site/current_results"+querystring;
-	$.get(url, '', pool_current_ready);
+function main_refresh_price() {
+    $.get('<?= $homeUrl ?>site/graph_price_results' + querystring, '', function(data) {
+        try {
+            yiimpChart('graph_results_price', JSON.parse(data), {
+                title:   'Estimate (mBTC/<?= $algoUnit ?>/day)',
+                labels:  ['Raw', 'Smoothed'],
+                decimals: 5
+            });
+        } catch(e) {}
+    });
 }
 
-////////////////////////////////////////////////////
-
-function mining_ready(data)
-{
-	$('#mining_results').html(data);
+function pool_hashrate_refresh() {
+    $.get('<?= $homeUrl ?>site/graph_hashrate_results' + querystring, '', function(data) {
+        try {
+            yiimpChart('pool_hashrate_results', JSON.parse(data), {
+                title:  'Pool Hashrate (<?= $algoUnit ?>/s)',
+                labels: ['Raw', 'Smoothed']
+            });
+        } catch(e) {}
+    });
 }
-
-function mining_refresh()
-{
-	var url = "{$homeUrl}site/mining_results"+querystring;
-	$.get(url, '', mining_ready);
-}
-
-////////////////////////////////////////////////////
-
-function found_ready(data)
-{
-	$('#found_results').html(data);
-}
-
-function found_refresh()
-{
-	var url = "{$homeUrl}site/found_results"+querystring;
-	$.get(url, '', found_ready);
-}
-
-///////////////////////////////////////////////////////////////////////
-
-function main_ready_price(data)
-{
-	graph_init_price(data);
-}
-
-function main_refresh_price()
-{
-	var url = "{$homeUrl}site/graph_price_results"+querystring;
-	$.get(url, '', main_ready_price);
-}
-
-function graph_init_price(data)
-{
-	$('#graph_results_price').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_price', t,
-	{
-		title: '<b>Estimate (mBTC/{$algo_unit}/day)</b>',
-		axes: {
-			xaxis: {
-				tickInterval: 7200,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0,
-				tickOptions: {formatString: '<font size=1>%#.3f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults:
-		{
-			markerOptions: { style: 'none' }
-		},
-
-		grid:
-		{
-			borderWidth: 1,
-			shadowWidth: 0,
-			shadowDepth: 0,
-			background: '#ffffff'
-		},
-
-	});
-}
-
-///////////////////////////////////////////////////////////////////////
-
-function pool_hashrate_ready(data)
-{
-	pool_hashrate_graph_init(data);
-}
-
-function pool_hashrate_refresh()
-{
-	var url = "{$homeUrl}site/graph_hashrate_results"+querystring;
-	$.get(url, '', pool_hashrate_ready);
-}
-
-function pool_hashrate_graph_init(data)
-{
-	$('#pool_hashrate_results').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('pool_hashrate_results', t,
-	{
-		title: '<b>Pool Hashrate ($algo_unit/s)</b>',
-		axes: {
-			xaxis: {
-				tickInterval: 7200,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0,
-				tickOptions: {formatString: '<font size=1>%#.3f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults:
-		{
-			markerOptions: { style: 'none' }
-		},
-
-		grid:
-		{
-			borderWidth: 1,
-			shadowWidth: 0,
-			shadowDepth: 0,
-			background: '#ffffff'
-		},
-
-		highlighter:
-		{
-			show: true
-		},
-
-	});
-}
-
 </script>
-
-
-end;

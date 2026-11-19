@@ -6,7 +6,7 @@ $s = 4*60*60;
 $t = time() - 7*24*60*60;
 $stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
 
-$algo_unit_factor = yaamp_algo_mBTC_factor($algo);
+$algo_unit_factor = YIIMP_algo_mBTC_factor($algo);
 
 $res = array();
 $first = 0;
@@ -30,7 +30,7 @@ echo '[';
 
 foreach($res as $i=>$n)
 {
-	$m = $n['hashrate']? bitcoinvaluetoa($n['earnings'] * $algo_unit_factor * 1000000 / $n['hashrate']): 0;
+	$m = $n['hashrate']? Yii::$app->ConversionUtils->bitcoinvaluetoa($n['earnings'] * $algo_unit_factor * 1000000 / $n['hashrate']): 0;
 
 	if($i != $first) echo ',';
 	$d = date('Y-m-d H:i:s', $i);

@@ -86,3 +86,16 @@ a.desc:after {
 .form-group {
     margin-bottom: 1rem;
 }
+
+/* Legacy uni-form submit button (used in login, bookmark, coinwallet_form, market) */
+.submitButton {
+    padding: 4px 16px;
+    background: #e8e8e8;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .85em;
+}
+.submitButton:hover {
+    background: #d4d4d4;
+}

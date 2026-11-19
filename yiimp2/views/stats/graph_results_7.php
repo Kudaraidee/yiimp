@@ -6,7 +6,7 @@ $s = 24*60*60;
 $t = time() - 60*24*60*60;
 $stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
 
-$algo_unit_factor = yaamp_algo_mBTC_factor($algo);
+$algo_unit_factor = YIIMP_algo_mBTC_factor($algo);
 
 $res = array();
 $first = 0;

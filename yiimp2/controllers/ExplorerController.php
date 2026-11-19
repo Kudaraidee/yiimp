@@ -9,7 +9,7 @@ use app\components\rpc\WalletRPC;
 
 use app\models\Coins;
 
-class ExplorerController extends Controller
+class ExplorerController extends BaseController
 {
 	public $defaultAction='index';
 

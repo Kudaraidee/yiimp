@@ -1,6 +1,6 @@
 <?php
 
-require_once('/etc/yiimp/serverconfig.php');
+require_once(file_exists('/etc/yiimp/serverconfig.php') ? '/etc/yiimp/serverconfig.php' : 'serverconfig.php');
 require_once('yaamp/defaultconfig.php');
 
 class CronjobController extends CommonController
@@ -150,7 +150,6 @@ class CronjobController extends CommonController
 				doYobitTrading();
 				doNestexTrading();
 				doNonkycTrading();
-				doTradeogreTrading();
 				break;
 
 			case 3:
