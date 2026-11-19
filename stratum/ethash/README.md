@@ -165,14 +165,23 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 
 > pool ตรวจจับจาก parameter ที่ 2 ของ `mining.subscribe` (`EthereumStratum/1.0.0`) แล้วตอบกลับเป็น array ตาม spec ของ NiceHash ส่วน Rigel ที่ส่ง string เดียวกันจะยังได้ object response แบบเดิม (ตรวจจาก user agent `Rigel/`)
 
-ตัวอย่าง T-Rex 0.19/0.26:
+ตัวอย่าง T-Rex 0.19/0.26 แบบ ethproxy (scheme ธรรมดา):
 
 ```bash
 ./t-rex -a ethash -o stratum+tcp://pool.example.com:3639 \
   -u WALLET.WORKER -p c=LRS,mc=LRS --intensity 16 --kernel 0
 ```
 
-> **หมายเหตุสำคัญ:** T-Rex **ไม่ได้พูด EthereumStratum แบบ `mining.subscribe`/`mining.submit`** สำหรับ `-a ethash` ทั้งของ v0.19.14 และ v0.26.8 ถึงจะขึ้น `Using protocol: stratum1` หรือใช้ scheme `ethstratum+tcp://` ก็ตาม มันยังส่ง `eth_submitLogin` / `eth_getWork` / `eth_submitWork` (ethproxy) เหมือนกัน
+ตัวอย่าง T-Rex แบบ NiceHash `stratum2` (ใช้ protocol เดียวกับ NiceHash/MiningPoolHub):
+
+```bash
+./t-rex -a ethash -o stratum2+tcp://pool.example.com:3639 \
+  -u WALLET.WORKER -p c=LRS,mc=LRS --intensity 16 --kernel 0
+```
+
+> **หมายเหตุสำคัญ:** T-Rex **ไม่ได้พูด EthereumStratum แบบ `mining.subscribe`/`mining.submit`** เมื่อใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` สำหรับ `-a ethash` ทั้งของ v0.19.14 และ v0.26.8 ถึงจะขึ้น `Using protocol: stratum1` ก็ตาม มันยังส่ง `eth_submitLogin` / `eth_getWork` / `eth_submitWork` (ethproxy) เหมือนกัน
+>
+> เฉพาะ `stratum2+tcp://` / `stratum2+ssl://` ที่ใช้ NiceHash EthereumStratum/1.0.0 จริง ๆ (`mining.subscribe` / `mining.set_difficulty` / `mining.notify` / `mining.submit` + `mining.extranonce.subscribe`) ซึ่ง pool รองรับแล้วตามหัวข้อ NiceHash ด้านบน
 >
 > stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
 >
@@ -187,7 +196,7 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 >
 > กับ client แบบ ethproxy pool **จะไม่ส่ง** `mining.set_difficulty` / `mining.notify` (T-Rex จะฟ้อง `Unregistered stratum method`) แต่จะส่ง work ใหม่เป็น `{"jsonrpc":"2.0","result":[...]}` แทน
 >
-> ใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` กับ T-Rex ก็ได้ เพราะทั้งหมดตกลงมาเป็น ethproxy ฝั่ง pool รองรับหมดแล้ว
+> ใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` กับ T-Rex ก็ได้ เพราะทั้งหมดตกลงมาเป็น ethproxy ฝั่ง pool รองรับหมดแล้ว ส่วน `stratum2+tcp://` / `stratum2+ssl://` จะตกลงมาเป็น NiceHash ethstratum (รองรับแล้วเช่นกัน)
 
 > **การ์ด VRAM 4GB (เช่น GTX 1050 Ti):** DAG epoch ปัจจุบัน (~231) ใช้ ~2.8GB ถ้า T-Rex ฟ้อง `not enough free memory to mine ethash` ให้ลด workload ด้วย `--intensity 16 --kernel 0` หรือ `--dag-build-mode 1` และปิดโปรแกรมอื่นที่ใช้ VRAM ด้วย (Rigel มักพอแม้ intensity ต่ำกว่า)
 
