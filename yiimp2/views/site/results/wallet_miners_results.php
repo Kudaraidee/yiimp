@@ -76,8 +76,8 @@ foreach($utils->get_algos() as $algo)
 echo "</table>";
 ////////////////////////////////////////////////////////////////////////////////
 
-// Coins this user has actually mined recently. db_workers only knows the algo,
-// so coin attribution has to come from the shares themselves.
+// Coins this user has mined recently. db_workers only knows the algo, so coin
+// attribution for the hashrate/TTF comes from the shares themselves.
 $recent = (new \yii\db\Query())
 		->select(['coinid', 'solo', 'COUNT(DISTINCT workerid) AS workers'])
 		->from('shares')
@@ -94,7 +94,53 @@ foreach($recent as $row)
 	$recentByCoin[$rowCoinid][(int) $row['solo']] = (int) $row['workers'];
 }
 
-$coinIds = array_keys($recentByCoin);
+$workers = Workers::find()
+		->where(['userid' => $user->id])
+		->orderBy('password')
+		->all();
+
+// Worker rows are deleted on disconnect and recreated with a new id, so the
+// workerid values left in old shares cannot be used as a worker count. Count
+// the currently connected workers instead and map them to their coin through
+// the c=SYMBOL password token (falling back to the account's payout coin).
+$symbols = array();
+foreach($workers as $worker) {
+	if (preg_match('/(?:^|,)c=([A-Za-z0-9_.-]+)/i', $worker->password, $matches))
+		$symbols[] = strtoupper($matches[1]);
+}
+$symbols = array_unique($symbols);
+$coinsBySymbol = array();
+if (count($symbols)) {
+	foreach(Coins::find()->where(['symbol' => $symbols])->all() as $symbolCoin)
+		$coinsBySymbol[strtoupper($symbolCoin->symbol)] = (int) $symbolCoin->id;
+}
+
+$workerCount = array();
+foreach($workers as $worker)
+{
+	$solo = (stripos($worker->password, 'm=solo') !== false) ? 1 : 0;
+	$workerCoinid = 0;
+	if (preg_match('/(?:^|,)c=([A-Za-z0-9_.-]+)/i', $worker->password, $matches)) {
+		$symbol = strtoupper($matches[1]);
+		if (isset($coinsBySymbol[$symbol])) $workerCoinid = $coinsBySymbol[$symbol];
+	}
+	if (!$workerCoinid && $coinid) $workerCoinid = $coinid;
+	if (!$workerCoinid && count($recentByCoin) == 1) $workerCoinid = key($recentByCoin);
+	if (!$workerCoinid) continue;
+	if (!YIIMP_ALLOW_EXCHANGE && $coinid && $workerCoinid != $coinid) continue;
+
+	if (!isset($workerCount[$workerCoinid][$solo])) $workerCount[$workerCoinid][$solo] = 0;
+	$workerCount[$workerCoinid][$solo]++;
+}
+
+// Show rows for recent shares and for currently connected workers.
+$rowKeys = array();
+foreach($recentByCoin as $rowCoinid => $modes)
+	foreach($modes as $solo => $_) $rowKeys[$rowCoinid][$solo] = true;
+foreach($workerCount as $rowCoinid => $modes)
+	foreach($modes as $solo => $_) $rowKeys[$rowCoinid][$solo] = true;
+
+$coinIds = array_keys($rowKeys);
 $coins = array();
 if (count($coinIds))
 	$coins = Coins::find()->where(['id' => $coinIds])->indexBy('id')->all();
@@ -137,10 +183,6 @@ $totalShareMap = array();
 foreach($totalShares as $row)
 	$totalShareMap[(int) $row['coinid']][(int) $row['solo']] = (float) $row['diff'];
 
-$workers = Workers::find()
-			->where(['userid' => $user->id])
-			->orderBy('password')
-			->all();
 if(count($workers))
 {
 	echo "<br>";
@@ -161,7 +203,11 @@ if(count($workers))
 	{
 		foreach(array(0, 1) as $solo)
 		{
-			if (!isset($recentByCoin[$rowCoinid][$solo])) continue;
+			if (!isset($rowKeys[$rowCoinid][$solo])) continue;
+
+			$workerTotal = isset($workerCount[$rowCoinid][$solo]) ? $workerCount[$rowCoinid][$solo] : 0;
+			if (!$workerTotal && !isset($workerCount[$rowCoinid]) && isset($recentByCoin[$rowCoinid][$solo]))
+				$workerTotal = $recentByCoin[$rowCoinid][$solo]; // no c= token available, keep the old estimate
 
 			$userRate = $solo
 				? $utils->user_coin_solo_rate($userid, $rowCoinid)
@@ -199,7 +245,7 @@ if(count($workers))
 				. (($rowCoin->image) ? '<img src="'.htmlspecialchars($rowCoin->image, ENT_QUOTES, 'UTF-8').'" alt="">' : '')
 				. $symbol.'<span class="coin-algo">'.$rowCoin->algo.'</span></td>';
 			echo '<td><span class="mode '.($solo ? 'solo' : 'shared').'">'.($solo ? 'Solo' : 'Shared').'</span></td>';
-			echo '<td align="right">'.$recentByCoin[$rowCoinid][$solo].'</td>';
+			echo '<td align="right">'.$workerTotal.'</td>';
 			echo '<td align="right" width="100">'.$sharesText.'</td>';
 			echo '<td align="right" width="100"><b>'.$rateText.'</b></td>';
 			echo '<td align="right" width="100" class="ttf" title="'.$tip.'">'.$ttfText.'</td>';
@@ -209,11 +255,11 @@ if(count($workers))
 	}
 
 	if (!$shown) {
-		echo '<tr class="ssrow"><td colspan="6" align="center">No shares in the last hour</td></tr>';
+		echo '<tr class="ssrow"><td colspan="6" align="center">No shares in the last hour and no connected workers</td></tr>';
 	}
 	echo "</table>";
 	echo "<p style='font-size: .8em'>TTF is estimated per coin from that coin's difficulty and pool hashrate.<br>"
-		."Workers are counted from shares submitted in the last hour.</p>";
+		."Workers are the currently connected miners (c=SYMBOL in the password, or the account coin).</p>";
 }
 ////////////////////////////////////////////////////////////////////////////////
 
