@@ -92,32 +92,103 @@ bool ethash_parse_hex_target(const char *hex, uint8_t be[32])
 	return true;
 }
 
-// floor((2^256-1) / difficulty), exact using 128-bit long division.
+// floor((2^256-1) / difficulty), exact even for fractional difficulty.
 //
-// Miners do not all convert the target back to difficulty the same way:
-// Rigel uses 2^256 / target, while t-rex uses (2^256-1) / target. Using the
-// largest in-range target as the dividend makes both report the configured
-// difficulty. With 2^256 as the dividend, t-rex showed 7.00 for d=8.
+// Ethproxy miners such as t-rex convert the target back with
+// (2^256-1) / target, so using the same dividend here makes the pool and the
+// miner agree. The double is decomposed into mantissa * 2^exponent and divided
+// with 128-bit long division; rounding it to an integer first would make
+// d=8.5 produce a different target than the miner's.
+static void ethash_shift_max_target(uint8_t digits[40], int shift, int *length)
+{
+	memset(digits, 0, 40);
+
+	if (shift >= 0)
+	{
+		// (2^256-1) >> shift
+		if (shift >= 256)
+		{
+			*length = 0;
+			return;
+		}
+
+		const int byte_shift = shift / 8;
+		const int bit_shift = shift % 8;
+		for (int i = 0; i < 32; i++)
+		{
+			unsigned int word = 0;
+			if (i + byte_shift < 32)
+				word |= 0xffu;
+			if (i + byte_shift + 1 < 32)
+				word |= 0xffu << 8;
+			digits[i] = (uint8_t) (word >> bit_shift);
+		}
+		*length = 32;
+	}
+	else
+	{
+		// (2^256-1) << -shift
+		const int byte_shift = (-shift) / 8;
+		const int bit_shift = (-shift) % 8;
+		const unsigned int word = 0xffu << bit_shift;
+
+		for (int i = 31; i >= 0; i--)
+		{
+			digits[i + byte_shift] |= (uint8_t) word;
+			digits[i + byte_shift + 1] |= (uint8_t) (word >> 8);
+		}
+		*length = 32 + byte_shift + 1;
+	}
+}
+
 void ethash_diff_to_target(double diff, uint8_t be[32])
 {
 	memset(be, 0xff, 32);
 	if (!(diff > 0) || !isfinite(diff) || diff <= 1.0)
 		return;
 
-	unsigned long long divisor = (unsigned long long) llround(diff);
-	if (!divisor)
+	int exponent = 0;
+	const double fraction = frexp(diff, &exponent);
+	uint64_t mantissa = (uint64_t) ldexp(fraction, 53);
+	int shift = exponent - 53;
+
+	// Remove powers of two so the divisor is an odd 53-bit integer and any
+	// remaining power of two can be applied as a byte/bit shift to 2^256-1.
+	while (!(mantissa & 1))
 	{
-		memset(be, 0xff, 32);
+		mantissa >>= 1;
+		shift++;
+	}
+
+	uint8_t dividend[40];
+	int length = 0;
+	ethash_shift_max_target(dividend, shift, &length);
+	if (!length)
+	{
+		memset(be, 0, 32); // difficulty too large for a 256-bit target
 		return;
 	}
 
+	uint8_t quotient[40] = { 0 };
 	__uint128_t remainder = 0;
-	for (int i = 0; i < 32; i++)
+	for (int i = length - 1; i >= 0; i--)
 	{
-		remainder = (remainder << 8) | be[i];
-		be[i] = (uint8_t) (remainder / divisor);
-		remainder %= divisor;
+		remainder = (remainder << 8) | dividend[i];
+		quotient[i] = (uint8_t) (remainder / mantissa);
+		remainder %= mantissa;
 	}
+
+	for (int i = 32; i < 40; i++)
+	{
+		if (quotient[i])
+		{
+			memset(be, 0xff, 32); // should only happen for difficulty <= 1
+			return;
+		}
+	}
+
+	for (int i = 0; i < 32; i++)
+		be[i] = quotient[31 - i];
 }
 
 void ethash_target_to_diff(const uint8_t be[32], double *diff)
@@ -129,12 +200,13 @@ void ethash_target_to_diff(const uint8_t be[32], double *diff)
 		value += be[i];
 	}
 
-	long double two256 = 1;
+	// Same dividend as ethash_diff_to_target() and ethproxy miners.
+	long double max_target = 0;
 	for (int i = 0; i < 32; i++)
-		two256 *= 256;
+		max_target = max_target * 256 + 255;
 
 	if (value <= 0)
 		*diff = 0;
 	else
-		*diff = (double) (two256 / value);
+		*diff = (double) (max_target / value);
 }

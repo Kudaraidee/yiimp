@@ -3,6 +3,16 @@
 
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client)
 {
+	if (is_ethash || is_etchash)
+	{
+		// EthereumStratum/ethproxy miners accept fractional difficulty and
+		// derive their target from the exact value. Keep it instead of the
+		// even-integer rounding used by the Bitcoin-style algorithms.
+		if (difficulty < g_stratum_min_diff) difficulty = g_stratum_min_diff;
+		if (difficulty > g_stratum_max_diff) difficulty = g_stratum_max_diff;
+		return difficulty;
+	}
+
 	if (client->is_nicehash) {
 		if(difficulty < g_stratum_nicehash_min_diff) difficulty = g_stratum_nicehash_min_diff;
 		else if(difficulty < 1) difficulty = floor(difficulty*1000/2)/1000*2;
