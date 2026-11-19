@@ -124,16 +124,10 @@ void coinbase_aux(YAAMP_JOB_TEMPLATE *templ, char *aux_script)
 // as *additional* outputs. Its coinbasevalue is already the miner's 20% share,
 // so these amounts must NOT be subtracted from the pool output. Miningcore's
 // KiiroJob does the same and reads raw scriptPubKeys from the template.
-static void kiiro_pack_payee(YAAMP_COIND *coind, char *dest, json_value *json_result,
+static void kiiro_pack_obj(YAAMP_COIND *coind, char *dest, json_value *obj,
 	const char *name, unsigned int &outputs)
 {
-	json_value *obj = json_get_object(json_result, name);
-	if (!obj) {
-		json_value *arr = json_get_array(json_result, name);
-		if (arr && arr->u.array.length > 0 && arr->u.array.values[0]->type == json_object)
-			obj = arr->u.array.values[0];
-	}
-	if (!obj) return;
+	if (!obj || obj->type != json_object) return;
 
 	const char *script = json_get_string(obj, "script");
 	json_int_t amount = json_get_int(obj, "amount");
@@ -142,6 +136,19 @@ static void kiiro_pack_payee(YAAMP_COIND *coind, char *dest, json_value *json_re
 	outputs++;
 	script_pack_tx(coind, dest, amount, script);
 	debuglog("KIIRO coinbase output %s: %.8f\n", name, (double)amount / 100000000);
+}
+
+static void kiiro_pack_payee(YAAMP_COIND *coind, char *dest, json_value *json_result,
+	const char *name, unsigned int &outputs)
+{
+	json_value *arr = json_get_array(json_result, name);
+	if (arr) {
+		for (unsigned int i = 0; i < arr->u.array.length; i++)
+			kiiro_pack_obj(coind, dest, arr->u.array.values[i], name, outputs);
+		return;
+	}
+
+	kiiro_pack_obj(coind, dest, json_get_object(json_result, name), name, outputs);
 }
 
 void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *json_result)
