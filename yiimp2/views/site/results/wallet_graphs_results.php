@@ -36,12 +36,12 @@ if (!empty($algos)) {
     $workerRows = (new \yii\db\Query())
         ->select(['algo', 'COUNT(*) AS c'])
         ->from('workers')
-        ->where(['userid' => $user->id, 'algo' => array_keys($algos)])
+        ->where(['userid' => $user->id, 'algo' => $algos])
         ->groupBy('algo')
         ->all();
     $workerMap = array_column($workerRows, 'c', 'algo');
 
-    foreach ($algos as $algo => $_) {
+    foreach ($algos as $algo) {
         if ($huMap[$algo] || ($workerMap[$algo] ?? 0)) {
             $activeAlgos[] = $algo;
         }
