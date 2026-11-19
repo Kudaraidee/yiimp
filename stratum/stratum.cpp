@@ -34,6 +34,8 @@ char g_stratum_algo[256];
 double g_stratum_difficulty;
 double g_stratum_min_diff;
 double g_stratum_max_diff;
+int g_stratum_eth_vardiff_window = 180;
+double g_stratum_eth_vardiff_target = 1.0;
 
 double g_stratum_nicehash_difficulty;
 double g_stratum_nicehash_min_diff;
@@ -355,7 +357,14 @@ int main(int argc, char **argv)
 	g_stratum_difficulty = iniparser_getdouble(ini, "STRATUM:difficulty", 16);
 	g_stratum_min_diff = iniparser_getdouble(ini, "STRATUM:diff_min", g_stratum_difficulty/2);
 	g_stratum_max_diff = iniparser_getdouble(ini, "STRATUM:diff_max", g_stratum_difficulty*8192);
-	
+
+	// Ethash vardiff uses a fixed window and a much lower target share rate
+	// than the Bitcoin-style algorithm. Both are tunable per pool.
+	g_stratum_eth_vardiff_window = iniparser_getint(ini, "STRATUM:eth_vardiff_window", 180);
+	if (g_stratum_eth_vardiff_window < 30) g_stratum_eth_vardiff_window = 30;
+	g_stratum_eth_vardiff_target = iniparser_getdouble(ini, "STRATUM:eth_vardiff_target", 1.0);
+	if (g_stratum_eth_vardiff_target < 0.1) g_stratum_eth_vardiff_target = 0.1;
+
 	char *new_log_directory = iniparser_getstring(ini, "STRATUM:logdir", NULL);
 	if (new_log_directory) { strcpy(g_log_directory, new_log_directory); }
 

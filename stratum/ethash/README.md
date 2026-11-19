@@ -198,6 +198,22 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 >
 > ใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` กับ T-Rex ก็ได้ เพราะทั้งหมดตกลงมาเป็น ethproxy ฝั่ง pool รองรับหมดแล้ว ส่วน `stratum2+tcp://` / `stratum2+ssl://` จะตกลงมาเป็น NiceHash ethstratum (รองรับแล้วเช่นกัน)
 
+### Vardiff สำหรับ Ethash/Etchash
+
+ต่างจากระบบ Bitcoin-style เดิม: ETH vardiff ตั้งเป้า **ประมาณ 1 share/นาที** แทน 10 share/นาที เพราะ share ขนาดเล็กเกินไปทำให้ DB และ network รับภาระโดยไม่เพิ่มความแม่นยำของ hashrate
+
+- วัดจาก **fixed window 3 นาที** และคำนวณตอนส่ง job ใหม่ (ประมาณทุก 20 วินาที) ไม่ใช้ EMA ที่อัปเดตเฉพาะตอนมี share เข้ามา
+- ปรับได้ใน `[STRATUM]` ด้วย `eth_vardiff_window` (วินาที ค่าเริ่มต้น 180) และ `eth_vardiff_target` (share/นาที ค่าเริ่มต้น 1)
+- อัตรา share ต่อนาที (เทียบกับ `eth_vardiff_target`):
+  - `>= 4x` → เพิ่ม difficulty `2x`
+  - `>= 2x` → เพิ่ม `1.5x`
+  - `0.5x–2x` → คงเดิม
+  - `<= 0.5x` → ลด `0.75x`
+  - `<= 0.25x` → ลด `2x`
+- ทุกครั้งที่เปลี่ยน difficulty window จะเริ่มใหม่ทันที
+- ควรตั้ง `diff_min` / `diff_max` ใน config ให้กว้าง (ตัวอย่าง `0.01`–`100`) เพราะค่า default แบบ Bitcoin คือ `difficulty/2` ซึ่งสูงเกินไปสำหรับ ETH ที่ใช้สเกล `2^32`
+- `d=X` ยังล็อก difficulty ตลอด session (ยกเว้น flood protection >100 share/นาที); `sd=X` เป็นแค่ค่าเริ่มต้น แล้ว vardiff จะปรับตามอัตรา share หลัง 3 นาที
+
 > **การ์ด VRAM 4GB (เช่น GTX 1050 Ti):** DAG epoch ปัจจุบัน (~231) ใช้ ~2.8GB ถ้า T-Rex ฟ้อง `not enough free memory to mine ethash` ให้ลด workload ด้วย `--intensity 16 --kernel 0` หรือ `--dag-build-mode 1` และปิดโปรแกรมอื่นที่ใช้ VRAM ด้วย (Rigel มักพอแม้ intensity ต่ำกว่า)
 
 **สำคัญ:** ถ้าเปิดหลาย coin ใน `algo='ethash'` เดียวกัน ให้ระบุ `mc=SYMBOL` เสมอ (หรือตั้ง `autoexchange = 0` ใน `[STRATUM]`) มิฉะนั้น stratum จะส่ง job จากทุก chain ให้ miner → seed hash เปลี่ยน → Rigel ต้องสร้าง DAG ใหม่หลาย GB ทุกครั้งที่ job เปลี่ยน และอาจหลุดการเชื่อมต่อ

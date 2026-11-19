@@ -1,6 +1,15 @@
 
 #include "stratum.h"
 
+// Ethash/Etchash vardiff targets about one share per minute per small GPU.
+// The generic Bitcoin-style vardiff aims for 10 shares/min, which floods the
+// pool with tiny shares on Ethash and makes share accounting noisy. Both the
+// window and the target rate are configurable per pool.
+static long long eth_vardiff_window_ms()
+{
+	return (long long) g_stratum_eth_vardiff_window * 1000LL;
+}
+
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client)
 {
 	if (is_ethash || is_etchash)
@@ -42,6 +51,7 @@ void client_record_difficulty(YAAMP_CLIENT *client)
 
 	client->shares_per_minute = (client->shares_per_minute * (100 - p) + 60*1000*p/e) / 100;
 	client->last_submit_time = current_timestamp();
+	client->vardiff_shares++;
 
 //	debuglog("client->shares_per_minute %f\n", client->shares_per_minute);
 }
@@ -64,6 +74,48 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 {
 	if(client->difficulty_remote) {
 		client_change_difficulty(client, client->difficulty_remote);
+		return;
+	}
+
+	if (is_ethash || is_etchash)
+	{
+		// Fixed-window rate is much more stable than the generic EMA here:
+		// the EMA is only refreshed when a share arrives, so a slow Ethash
+		// GPU either never triggered a change or took ~30 minutes to settle.
+		long long now = current_timestamp();
+		if (!client->vardiff_window_start) client->vardiff_window_start = now;
+		long long elapsed = now - client->vardiff_window_start;
+		if (elapsed < eth_vardiff_window_ms()) return;
+
+		double target_rate = g_stratum_eth_vardiff_target;
+		double rate = client->vardiff_shares * 60000.0 / (double) elapsed;
+		double new_diff = client->difficulty_actual;
+
+		if (client->difficulty_fixed)
+		{
+			// Keep flood protection for pinned difficulty, but do not
+			// otherwise vardiff a miner that explicitly asked for d=X.
+			if (rate > 100) new_diff *= 4.0;
+			else {
+				client->vardiff_shares = 0;
+				client->vardiff_window_start = now;
+				return;
+			}
+		}
+		else if (rate >= target_rate * 4.0)
+			new_diff *= 2.0;
+		else if (rate >= target_rate * 2.0)
+			new_diff *= 1.5;
+		else if (rate <= target_rate * 0.25)
+			new_diff *= 0.5;
+		else if (rate <= target_rate * 0.5)
+			new_diff *= 0.75;
+
+		client->vardiff_shares = 0;
+		client->vardiff_window_start = now;
+
+		if (new_diff != client->difficulty_actual)
+			client_change_difficulty(client, new_diff);
 		return;
 	}
 
@@ -92,7 +144,14 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 {
 //	debuglog("%s diff %f\n", client->sock->ip, difficulty);
-	client->shares_per_minute = YAAMP_SHAREPERSEC;
+	if (is_ethash || is_etchash)
+	{
+		client->shares_per_minute = g_stratum_eth_vardiff_target;
+		client->vardiff_shares = 0;
+		client->vardiff_window_start = current_timestamp();
+	}
+	else
+		client->shares_per_minute = YAAMP_SHAREPERSEC;
 
 	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 	if (is_ethash || is_etchash)

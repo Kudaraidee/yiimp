@@ -89,6 +89,11 @@ public:
 	long long last_submit_time;
 	double shares_per_minute;
 
+	// ETH vardiff counts shares in a fixed window instead of the generic
+	// 10 shares/min EMA, which is far too aggressive for Ethash GPUs.
+	long long vardiff_window_start;
+	int vardiff_shares;
+
 	char extranonce1[32];
 	int extranonce2size;
 
