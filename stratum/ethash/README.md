@@ -156,6 +156,15 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 ./rigel -a ethash -o ethstratum+tcp://pool.example.com:3639 -u WALLET -p c=LRS,mc=LRS
 ```
 
+ตัวอย่าง T-Rex 0.19 (รองรับ `ethstratum+tcp` → ใช้ protocol `stratum1` ภายใน):
+
+```bash
+./t-rex -a ethash -o ethstratum+tcp://pool.example.com:3639 \
+  -u WALLET.WORKER -p c=LRS,mc=LRS --intensity 16 --kernel 0
+```
+
+> **การ์ด VRAM 4GB (เช่น GTX 1050 Ti):** DAG epoch ปัจจุบัน (~231) ใช้ ~2.8GB ถ้า T-Rex ฟ้อง `not enough free memory to mine ethash` ให้ลด workload ด้วย `--intensity 16 --kernel 0` หรือ `--dag-build-mode 1` และปิดโปรแกรมอื่นที่ใช้ VRAM ด้วย (Rigel มักพอแม้ intensity ต่ำกว่า)
+
 **สำคัญ:** ถ้าเปิดหลาย coin ใน `algo='ethash'` เดียวกัน ให้ระบุ `mc=SYMBOL` เสมอ (หรือตั้ง `autoexchange = 0` ใน `[STRATUM]`) มิฉะนั้น stratum จะส่ง job จากทุก chain ให้ miner → seed hash เปลี่ยน → Rigel ต้องสร้าง DAG ใหม่หลาย GB ทุกครั้งที่ job เปลี่ยน และอาจหลุดการเชื่อมต่อ
 
 สิ่งที่ stratum ส่งให้ miner:
