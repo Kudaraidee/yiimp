@@ -6,7 +6,6 @@
 /** @var Exception $exception */
 
 use app\models\Coins;
-use app\models\Shares;
 use app\models\Workers;
 
 $user = Yii::$app->YiimpUtils->getuserbyaddress(Yii::$app->getRequest()->getQueryParam('address'));
@@ -99,12 +98,39 @@ $workers = Workers::find()
 		->orderBy('password')
 		->all();
 
+// One rig can open several stratum connections, creating duplicate worker rows
+// with the same name. Collapse them to one row per name and add up their rates.
+$sharesPerMinute = (new \yii\db\Query())
+		->select(['workerid', 'COUNT(*) AS c'])
+		->from('shares')
+		->where(['userid' => $userid])
+		->andWhere(['>', 'time', $now - 60])
+		->groupBy(['workerid'])
+		->all();
+$sharesByWorker = array();
+foreach($sharesPerMinute as $row)
+	$sharesByWorker[(int) $row['workerid']] = (int) $row['c'];
+
+$workerStats = array();
+foreach($workers as $worker)
+{
+	$name = trim((string) $worker->worker);
+	if ($name === '') continue; // unnamed duplicate connections
+	if (!isset($workerStats[$name]))
+		$workerStats[$name] = array('worker' => $worker, 'hashrate' => 0.0, 'shares' => 0);
+	$workerStats[$name]['hashrate'] += (float) $utils->worker_rate($worker->id, $worker->algo);
+	$workerStats[$name]['shares'] += isset($sharesByWorker[(int) $worker->id]) ? $sharesByWorker[(int) $worker->id] : 0;
+}
+$uniqueWorkers = array();
+foreach($workerStats as $stat)
+	$uniqueWorkers[] = $stat['worker'];
+
 // Worker rows are deleted on disconnect and recreated with a new id, so the
 // workerid values left in old shares cannot be used as a worker count. Count
 // the currently connected workers instead and map them to their coin through
 // the c=SYMBOL password token (falling back to the account's payout coin).
 $symbols = array();
-foreach($workers as $worker) {
+foreach($uniqueWorkers as $worker) {
 	if (preg_match('/(?:^|,)c=([A-Za-z0-9_.-]+)/i', $worker->password, $matches))
 		$symbols[] = strtoupper($matches[1]);
 }
@@ -116,7 +142,7 @@ if (count($symbols)) {
 }
 
 $workerCount = array();
-foreach($workers as $worker)
+foreach($uniqueWorkers as $worker)
 {
 	$solo = (stripos($worker->password, 'm=solo') !== false) ? 1 : 0;
 	$workerCoinid = 0;
@@ -183,7 +209,7 @@ $totalShareMap = array();
 foreach($totalShares as $row)
 	$totalShareMap[(int) $row['coinid']][(int) $row['solo']] = (float) $row['diff'];
 
-if(count($workers))
+if(count($uniqueWorkers))
 {
 	echo "<br>";
 	echo '<table class="dataGrid2 wallet-miners-table">';
@@ -259,11 +285,12 @@ if(count($workers))
 	}
 	echo "</table>";
 	echo "<p style='font-size: .8em'>TTF is estimated per coin from that coin's difficulty and pool hashrate.<br>"
-		."Workers are the currently connected miners (c=SYMBOL in the password, or the account coin).</p>";
+		."Workers are connected miners with the same name merged; unnamed connections are hidden."
+		." Coin from c=SYMBOL in the password (or the account coin).</p>";
 }
 ////////////////////////////////////////////////////////////////////////////////
 
-if(count($workers))
+if(count($uniqueWorkers))
 {
 	echo "<br>";
 	echo "<table  class='dataGrid2'>";
@@ -280,24 +307,18 @@ if(count($workers))
 	echo "</tr>";
 	echo "</thead>";
 
-	foreach($workers as $worker)
+	foreach($workerStats as $name => $stat)
 	{
-		$user_rate1 = $utils->worker_rate($worker->id, $worker->algo);
+		$worker = $stat['worker'];
 
-		$user_rate1 = $user_rate1? $conv->Itoa2($user_rate1).'h/s': '';
+		$user_rate1 = $stat['hashrate'] ? $conv->Itoa2($stat['hashrate']).'h/s' : '';
 
 		$version = substr($worker->version, 0, 20);
 		$password = substr($worker->password, 0, 32);
 
-		$name = $worker->worker;
-
 		$subscribe = $conv->Booltoa($worker->subscribe);
 
-		$t = $now - 60;
-		$shares_per_minute = Shares::find()
-						->where(['algo'=>$worker->algo,'userid'=> $user->id, 'workerid' => $worker->id])
-						->andWhere(['>','time',$t])
-						->count();
+		$shares_per_minute = $stat['shares'];
 
 		echo '<tr class="ssrow">';
 		echo '<td title="'.$worker->version.'"><b>Version:</b> '.$version.' <br> <b>Worker Name:</b> '.$name.' </td>';
