@@ -182,8 +182,8 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 
 สิ่งที่ stratum ส่งให้ miner แบบ EthereumStratum (Rigel / ethminer):
 
-- `mining.subscribe` → `{"mining_notify":[["mining.set_difficulty","..."],["mining.notify","..."]],"extranonce":"..."}`
-  (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce`; ถ้าตอบเป็น array แบบดั้งเดิม Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage`)
+- `mining.subscribe` → `{"mining_notify":[{"method":"mining.set_difficulty","params":{"difficulty":16}},{"method":"mining.notify","params":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":true}}],"extranonce":"..."}`
+  (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce` โดย `mining_notify` แต่ละตัวเป็น object ที่มี `method` กับ `params` ไม่ใช่ array; ถ้าตอบเป็น array แบบดั้งเดิมหรือใช้ `params` เป็น array Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage`)
 - `mining.set_difficulty` → difficulty แบบ 2^256 / target เป็น **JSON number** (เช่น `[0.5]`); การส่งเป็น string `["0.5"]` ทำให้ Rigel reject notification แล้ว reconnect
 - `mining.notify` → `[jobId, seedHash, headerHash, true]`
 - `mining.submit` → `[worker, jobId, nonce]`
