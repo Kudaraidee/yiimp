@@ -142,7 +142,7 @@ static void kiiro_pack_payee(YAAMP_COIND *coind, char *dest, json_value *json_re
 	const char *name, unsigned int &outputs)
 {
 	json_value *arr = json_get_array(json_result, name);
-	if (arr) {
+	if (arr && arr->type == json_array) {
 		for (unsigned int i = 0; i < arr->u.array.length; i++)
 			kiiro_pack_obj(coind, dest, arr->u.array.values[i], name, outputs);
 		return;
