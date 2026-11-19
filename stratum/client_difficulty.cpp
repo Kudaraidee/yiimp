@@ -94,10 +94,12 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 		client->share_target = ethash_be_to_uint256(target_be);
 		client->next_target = client->share_target;
 
-		if(difficulty >= 1)
-			client_call(client, "mining.set_difficulty", "[%.0f]", difficulty);
-		else
-			client_call(client, "mining.set_difficulty", "[%0.8f]", difficulty);
+		// EthereumStratum/1.0.0 expects the difficulty as a decimal string,
+		// e.g. "0.1", not a JSON number. Miners such as t-rex ignore numeric
+		// values and fall back to diff 0.
+		char diffstr[64];
+		snprintf(diffstr, sizeof(diffstr), "%.8g", difficulty);
+		client_call(client, "mining.set_difficulty", "[\"%s\"]", diffstr);
 	}
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
 	{
