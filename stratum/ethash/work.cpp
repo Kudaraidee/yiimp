@@ -186,7 +186,8 @@ bool ethash_submit_work(YAAMP_COIND *coind, const char *nonce,
 
 bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 {
-	// EthereumStratum/1.0.0: [worker, jobId, nonce] (nonce without our prefix)
+	// EthereumStratum/1.0.0: [worker, jobId, nonce] (usually the full nonce,
+	// including the extranonce from mining.subscribe).
 	// Some miners also send a fourth parameter with the mix digest.
 	if (!json_params || json_params->type != json_array ||
 		json_params->u.array.length < 3 || json_params->u.array.length > 4 ||
@@ -201,17 +202,18 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 		json_params->u.array.values[2]->u.string.ptr);
 	const int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
 	const int prefix_len = strlen(client->extranonce1);
+	const size_t part_len = strlen(nonce_part);
 
-	if (prefix_len <= 0 || strlen(nonce_part) + prefix_len != 16 ||
-		!ishexa((char *) nonce_part, strlen(nonce_part)))
-	{
-		client_send_error(client, 20, "Invalid nonce");
-		client->submit_bad++;
-		return true;
-	}
-
+	// EthereumStratum miners normally send the complete 8-byte nonce: the
+	// extranonce1 from mining.subscribe is already included. Accept the older
+	// form where only the miner-controlled part is submitted as well.
 	char nonce[20] = { 0 };
-	const int written = snprintf(nonce, sizeof(nonce), "%s%s", client->extranonce1, nonce_part);
+	int written = -1;
+	if (part_len == 16)
+		written = snprintf(nonce, sizeof(nonce), "%s", nonce_part);
+	else if (prefix_len > 0 && part_len + (size_t) prefix_len == 16)
+		written = snprintf(nonce, sizeof(nonce), "%s%s", client->extranonce1, nonce_part);
+
 	if (written < 0 || written >= (int) sizeof(nonce) || !ishexa(nonce, 16))
 	{
 		client_send_error(client, 20, "Invalid nonce");

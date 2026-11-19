@@ -143,12 +143,20 @@ ethminer -U -S pool.example.com:3639 -O WALLET.WORKER:x
 ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 ```
 
+ตัวอย่าง Rigel:
+
+```bash
+./rigel -a ethash -o ethstratum+tcp://pool.example.com:3639 -u WALLET -p c=LRS
+```
+
 สิ่งที่ stratum ส่งให้ miner:
 
-- `mining.subscribe` → protocol `EthereumStratum/1.0.0`
+- `mining.subscribe` → `[[["mining.set_difficulty","..." ],["mining.notify","..."]],extranonce1,4]`
+  (ไม่ใส่สตริง `"EthereumStratum/1.0.0"` เพิ่มใน subscription list เพราะ miner บางตัว เช่น Rigel จะ reject)
 - `mining.set_difficulty` → difficulty แบบ 2^256 / target
 - `mining.notify` → `[jobId, seedHash, headerHash, true]`
-- `mining.submit` → `[worker, jobId, nonceWithoutExtranonce]`
+- `mining.submit` → `[worker, jobId, nonce]`
+  pool รองรับทั้ง nonce แบบเต็ม 16 hex (Rigel/ethminer รวม extranonce ไว้แล้ว) และแบบ 8 hex ต่อท้าย extranonce1
 
 pool เป็นคนคำนวณ mix digest เองจาก `ethash_hash()` แล้วส่ง `eth_submitWork(nonce, header, mix)` ให้ node
 

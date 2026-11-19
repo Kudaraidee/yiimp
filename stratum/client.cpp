@@ -129,10 +129,11 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 
 	if (is_ethash || is_etchash)
 	{
-		// EthereumStratum/1.0.0 (NiceHash): the third element of the first
-		// array is the protocol identifier ethminer uses for autodetection.
+		// EthereumStratum/1.0.0: subscriptions, extranonce1 and extranonce2
+		// size. Keep the subscription list to two [method, value] pairs;
+		// miners such as Rigel reject an extra protocol-identifier element.
 		client_send_result(client,
-			"[[[\"mining.set_difficulty\",\"%.3g\"],[\"mining.notify\",\"%s\"],\"EthereumStratum/1.0.0\"],\"%s\",4]",
+			"[[[\"mining.set_difficulty\",\"%.3g\"],[\"mining.notify\",\"%s\"]],\"%s\",4]",
 			client->difficulty_actual, client->notify_id, client->extranonce1);
 	}
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
