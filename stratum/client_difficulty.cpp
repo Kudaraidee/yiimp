@@ -148,11 +148,46 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 	return 0;
 }
 
+// Match a comma-separated password token such as "d=2" or "sd=0.1".
+// A plain strstr("d=") also matches "sd=", "xd=", "decred=", etc.; keeping
+// the tokens explicit lets d= and sd= have different meanings.
+static const char *client_password_param(const char *password, const char *key, size_t keylen)
+{
+	if (!password) return NULL;
+
+	const char *p = password;
+	while (*p)
+	{
+		while (*p == ' ' || *p == ',') p++;
+		if (!*p) break;
+
+		if (!strncmp(p, key, keylen) && p[keylen] == '=')
+			return p + keylen + 1;
+
+		p = strchr(p, ',');
+	}
+	return NULL;
+}
+
 void client_initialize_difficulty(YAAMP_CLIENT *client)
 {
-	char *p = strstr(client->password, "d=");
-	char *p2 = strstr(client->password, "decred=");
-	if(!p || p2) return;
+	// Keep the old Decred behavior: an explicit decred= token disables the
+	// generic difficulty overrides. The exact token parser no longer needs
+	// this to stop "sd=" from being mistaken for "d=", but other password
+	// formats can still contain both.
+	if (client_password_param(client->password, "decred", 6)) return;
+
+	// d= pins the difficulty for the whole session. sd= only seeds the initial
+	// difficulty; vardiff is still free to adjust it later. d= wins if both
+	// are present.
+	const char *value = client_password_param(client->password, "d", 1);
+	bool difficulty_fixed = true;
+	if (!value)
+	{
+		value = client_password_param(client->password, "sd", 2);
+		difficulty_fixed = false;
+	}
+	if (!value) return;
 
 	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
 	{
@@ -162,28 +197,28 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 	else if (is_ethash || is_etchash)
 	{
 		// Ethash/ethproxy miners use the full 256-bit target. An explicit d=
-		// must be used as-is: client_normalize_difficulty() clamps to the
-		// Bitcoin-style g_stratum_min_diff (difficulty/2), which silently
+		// or sd= must be used as-is: client_normalize_difficulty() clamps to
+		// the Bitcoin-style g_stratum_min_diff (difficulty/2), which silently
 		// turned d=2 into 8 on a pool configured with difficulty = 16.
-		double diff = atof(p+2);
+		double diff = atof(value);
 		if (diff > 0 && isfinite(diff))
 		{
 			uint8_t be[32];
 			ethash_diff_to_target(diff, be);
 			client->difficulty_actual = diff;
 			client->share_target = ethash_be_to_uint256(be);
-			client->difficulty_fixed = true;
+			client->difficulty_fixed = difficulty_fixed;
 		}
 	}
 	else {
-		double diff = client_normalize_difficulty(atof(p+2), client);
+		double diff = client_normalize_difficulty(atof(value), client);
 		uint64_t user_target = diff_to_target(diff);
 
 	//	debuglog("%016llx target\n", user_target);
 		if(user_target >= YAAMP_MINDIFF && user_target <= YAAMP_MAXDIFF)
 		{
 			client->difficulty_actual = diff;
-			client->difficulty_fixed = true;
+			client->difficulty_fixed = difficulty_fixed;
 		}
 	}
 

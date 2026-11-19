@@ -168,7 +168,11 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 > stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
 >
 > - `eth_submitLogin` → ใช้ username/password แบบเดียวกับ `mining.authorize`
-> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` โดย target คือ `floor(2^224 / difficulty)` ตามสเกล ethash มาตรฐาน (raw difficulty = `difficulty × 2^32`) Rigel รับ difficulty เป็นตัวเลขแล้วโชว์ `34.36G (8.00)` สำหรับ `d=8`, T-Rex อ่าน target แล้วโชว์ raw difficulty `34.36G` — สองตัวจริง ๆ แล้วขุดที่ difficulty เดียวกัน รองรับ difficulty ทศนิยม เช่น `d=0.1` หรือ `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม และ `-p d=...` มีผลจริงทั้ง Rigel และ T-Rex (ไม่ถูก range check แบบ Bitcoin-style) ค่า `difficulty` ใน config คือค่าหลังหาร 2^32 เช่น `0.1` → raw 429.5M เหมาะกับการ์ดระดับ 1050 Ti (~1 share/นาที)
+> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` โดย target คือ `floor(2^224 / difficulty)` ตามสเกล ethash มาตรฐาน (raw difficulty = `difficulty × 2^32`) Rigel รับ difficulty เป็นตัวเลขแล้วโชว์ `34.36G (8.00)` สำหรับ `d=8`, T-Rex อ่าน target แล้วโชว์ raw difficulty `34.36G` — สองตัวจริง ๆ แล้วขุดที่ difficulty เดียวกัน รองรับ difficulty ทศนิยม เช่น `d=0.1` หรือ `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม ค่า `difficulty` ใน config คือค่าหลังหาร 2^32 เช่น `0.1` → raw 429.5M เหมาะกับการ์ดระดับ 1050 Ti (~1 share/นาที)
+> - `-p d=...` → ตั้ง difficulty เริ่มต้นแล้ว **ล็อกไว้ตลอด session** (vardiff ไม่เปลี่ยน) ใช้ได้ทั้ง Rigel และ T-Rex
+> - `-p sd=...` → ตั้ง difficulty เริ่มต้นแบบเดียวกัน แต่ **ไม่ล็อก** ให้ vardiff ปรับขึ้น/ลงตามอัตรา share ได้เหมือน miner ทั่วไป ถ้าใส่ทั้ง `d=` และ `sd=` ฝั่ง `d=` จะชนะ
+>
+> ทั้ง `d=` และ `sd=` ต้องเป็น token ที่คั่นด้วย comma เช่น `c=LRS,mc=LRS,sd=0.1` (ไม่ใช่ substring ของ `sd=`, `xd=` ฯลฯ); `decred=` ที่มีอยู่จะยังปิดการใช้งาน override นี้เหมือนเดิม
 > - `eth_submitHashrate` → ตอบ `true`
 > - `eth_submitWork` → pool ตรวจ mix digest ด้วย `ethash_hash()` เอง บันทึก share และส่งบล็อกให้ node ด้วย `eth_submitWork` ถ้าเจอ block
 >
