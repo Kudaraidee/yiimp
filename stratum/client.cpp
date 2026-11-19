@@ -670,6 +670,15 @@ void *client_thread(void *p)
 			// T-Rex uses ethproxy-style calls even for stratum+tcp:// on the
 			// ethash algorithm. Treat it as a first-class protocol here.
 			client->is_ethproxy = true;
+
+			// ethproxy clients never send mining.subscribe, so the difficulty
+			// normally assigned in client_subscribe() is still zero here.
+			// Set it before authorize() sends the initial work and records the
+			// share target; otherwise eth_getWork advertises an all-ff target
+			// and every share is accounted at difficulty zero.
+			if (!(client->difficulty_actual > 0) && g_stratum_difficulty > 0)
+				client->difficulty_actual = g_stratum_difficulty;
+
 			b = client_authorize(client, json_params);
 		}
 

@@ -51,6 +51,16 @@ const unsigned int get_full_dataset_init_size()
 	return 0;
 }
 
+// Ethash/Etchash use 256 FNV rounds per DAG item. Kawpow and its derivatives
+// increased this to 512; sharing that value with ETH mode makes the light
+// verifier generate a different mix digest than real miners.
+const int get_full_dataset_item_parents()
+{
+	if (is_ethash || is_etchash)
+		return 256;
+	return 512;
+}
+
 const int get_epoch_number(int block_number)
 {
 	if (is_ethash || is_etchash)

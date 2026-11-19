@@ -27,7 +27,12 @@ constexpr static int light_cache_init_size = 1 << 24;
 constexpr static int light_cache_growth = 1 << 17;
 constexpr static int light_cache_rounds = 3;
 constexpr static int full_dataset_growth = 1 << 23;
-constexpr static int full_dataset_item_parents = 512;
+// Ethash/Etchash use the specification's 256 FNV rounds per DAG item; the other
+// algorithms built on this vendored library keep the 512-round variant.
+inline int dataset_item_parents() noexcept
+{
+    return get_full_dataset_item_parents();
+}
 
 //MeowPow Dag Change
 constexpr static int meowpow_dagchange_epoch = 110;
@@ -221,7 +226,7 @@ struct item_state
 hash512 calculate_dataset_item_512(const epoch_context& context, int64_t index) noexcept
 {
     item_state item0{context, index};
-    for (uint32_t j = 0; j < full_dataset_item_parents; ++j)
+    for (uint32_t j = 0; j < (uint32_t) dataset_item_parents(); ++j)
         item0.update(j);
     return item0.final();
 }
@@ -235,7 +240,7 @@ hash1024 calculate_dataset_item_1024(const epoch_context& context, uint32_t inde
     item_state item0{context, int64_t(index) * 2};
     item_state item1{context, int64_t(index) * 2 + 1};
 
-    for (uint32_t j = 0; j < full_dataset_item_parents; ++j)
+    for (uint32_t j = 0; j < (uint32_t) dataset_item_parents(); ++j)
     {
         item0.update(j);
         item1.update(j);
@@ -251,7 +256,7 @@ hash2048 calculate_dataset_item_2048(const epoch_context& context, uint32_t inde
     item_state item2{context, int64_t(index) * 4 + 2};
     item_state item3{context, int64_t(index) * 4 + 3};
 
-    for (uint32_t j = 0; j < full_dataset_item_parents; ++j)
+    for (uint32_t j = 0; j < (uint32_t) dataset_item_parents(); ++j)
     {
         item0.update(j);
         item1.update(j);
