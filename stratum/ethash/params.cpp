@@ -92,7 +92,12 @@ bool ethash_parse_hex_target(const char *hex, uint8_t be[32])
 	return true;
 }
 
-// floor(2^256 / difficulty), exact using 128-bit long division.
+// floor((2^256-1) / difficulty), exact using 128-bit long division.
+//
+// Miners do not all convert the target back to difficulty the same way:
+// Rigel uses 2^256 / target, while t-rex uses (2^256-1) / target. Using the
+// largest in-range target as the dividend makes both report the configured
+// difficulty. With 2^256 as the dividend, t-rex showed 7.00 for d=8.
 void ethash_diff_to_target(double diff, uint8_t be[32])
 {
 	memset(be, 0xff, 32);
@@ -106,21 +111,11 @@ void ethash_diff_to_target(double diff, uint8_t be[32])
 		return;
 	}
 
-	// The dividend is 0x01 followed by 32 zero bytes (2^256).
-	unsigned char digits[33];
-	memset(digits, 0, sizeof(digits));
-	digits[0] = 1;
-
 	__uint128_t remainder = 0;
-	memset(be, 0, 32);
-	for (int i = 0; i < 33; i++)
+	for (int i = 0; i < 32; i++)
 	{
-		remainder = (remainder << 8) | digits[i];
-		if (i == 0)
-			continue; // quotient still fits in 32 bytes
-
-		const __uint128_t q = remainder / divisor;
-		be[i - 1] = (uint8_t) q;
+		remainder = (remainder << 8) | be[i];
+		be[i] = (uint8_t) (remainder / divisor);
 		remainder %= divisor;
 	}
 }
