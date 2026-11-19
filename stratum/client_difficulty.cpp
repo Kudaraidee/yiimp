@@ -103,12 +103,10 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 			return 0;
 		}
 
-		// EthereumStratum/1.0.0 expects the difficulty as a decimal string,
-		// e.g. "0.1", not a JSON number. Miners such as t-rex ignore numeric
-		// values and fall back to diff 0.
-		char diffstr[64];
-		snprintf(diffstr, sizeof(diffstr), "%.8g", difficulty);
-		client_call(client, "mining.set_difficulty", "[\"%s\"]", diffstr);
+		// Rigel's SetDifficultyParams deserializes difficulty as a JSON
+		// number. A quoted string does not match ServerMessage and leaves
+		// the miner waiting for a job until it reconnects.
+		client_call(client, "mining.set_difficulty", "[%.8g]", difficulty);
 	}
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
 	{

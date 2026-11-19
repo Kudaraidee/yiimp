@@ -182,9 +182,9 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 
 สิ่งที่ stratum ส่งให้ miner แบบ EthereumStratum (Rigel / ethminer):
 
-- `mining.subscribe` → `[[["mining.set_difficulty","..." ],["mining.notify","..."]],extranonce1,4]`
-  (ไม่ใส่สตริง `"EthereumStratum/1.0.0"` เพิ่มใน subscription list เพราะ miner บางตัว เช่น Rigel จะ reject)
-- `mining.set_difficulty` → difficulty แบบ 2^256 / target
+- `mining.subscribe` → `{"mining_notify":[["mining.set_difficulty","..."],["mining.notify","..."]],"extranonce":"..."}`
+  (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce`; ถ้าตอบเป็น array แบบดั้งเดิม Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage`)
+- `mining.set_difficulty` → difficulty แบบ 2^256 / target เป็น **JSON number** (เช่น `[0.5]`); การส่งเป็น string `["0.5"]` ทำให้ Rigel reject notification แล้ว reconnect
 - `mining.notify` → `[jobId, seedHash, headerHash, true]`
 - `mining.submit` → `[worker, jobId, nonce]`
   pool รองรับทั้ง nonce แบบเต็ม 16 hex (Rigel/ethminer รวม extranonce ไว้แล้ว) และแบบ 8 hex ต่อท้าย extranonce1
