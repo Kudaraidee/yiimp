@@ -168,7 +168,7 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 > stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
 >
 > - `eth_submitLogin` → ใช้ username/password แบบเดียวกับ `mining.authorize`
-> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` (target มาจาก difficulty ที่ตั้งค่าไว้ → T-Rex แสดง `diff` เป็นตัวเลข แทน `0.00`)
+> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` (target มาจาก difficulty ที่ตั้งค่าไว้) ถ้าตั้ง `difficulty = 1` target จะเป็น `0xffff...ff` และ T-Rex อาจแสดง `diff: 0.00` ได้ ให้ตั้งค่า `difficulty = 16` ขึ้นไปเพื่อให้เห็น diff ที่แท้จริงและลดจำนวน share ที่ไหลเข้าพูล
 > - `eth_submitHashrate` → ตอบ `true`
 > - `eth_submitWork` → pool ตรวจ mix digest ด้วย `ethash_hash()` เอง บันทึก share และส่งบล็อกให้ node ด้วย `eth_submitWork` ถ้าเจอ block
 >
