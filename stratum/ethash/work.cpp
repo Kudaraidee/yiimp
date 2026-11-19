@@ -34,7 +34,7 @@ static void ethash_bin_to_hex(const uint8_t be[32], char *hex66)
 	hex66[66] = 0;
 }
 
-static const char *ethash_strip_prefix(const char *src)
+const char *ethash_strip_prefix(const char *src)
 {
 	if (src && (!strncmp(src, "0x", 2) || !strncmp(src, "0X", 2)))
 		return src + 2;
@@ -168,10 +168,20 @@ void ethash_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char 
 	// EthereumStratum/1.0.0: [jobId, seedHash, headerHash, cleanJobs]
 	// Extra fields (height/target) are intentionally omitted; difficulty is
 	// delivered through mining.set_difficulty.
+	// NiceHash's spec omits the 0x prefix; Rigel accepts the prefixed form
+	// used by its object-shaped subscribe response.
+	const char *seed = templ->eth_seed;
+	const char *header = templ->eth_header;
+	if (client && client->is_nicehash_ethstratum)
+	{
+		seed = ethash_strip_prefix(seed);
+		header = ethash_strip_prefix(header);
+	}
+
 	sprintf(buffer,
 		"{\"id\":null,\"method\":\"mining.notify\",\"params\":"
 		"[\"%x\",\"%s\",\"%s\",true]}\n",
-		job->id, templ->eth_seed, templ->eth_header);
+		job->id, seed, header);
 }
 
 // ---------------------------------------------------------------------------

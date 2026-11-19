@@ -47,6 +47,7 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 
 	get_random_key(client->notify_id);
 
+	char ethstratum_version[64] = { 0 };
 	if(json_params->u.array.length>0)
 	{
 		if (json_params->u.array.values[0]->u.string.ptr)
@@ -57,6 +58,21 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 			client->difficulty_actual = g_stratum_nicehash_difficulty;
 		}
 
+		// NiceHash EthereumStratum/1.0.0 advertises the protocol as the second
+		// subscribe parameter. Rigel advertises the same string but uses its
+		// own object-shaped subscribe reply, so exclude it explicitly.
+		if ((is_ethash || is_etchash) && json_params->u.array.length > 1 &&
+			json_params->u.array.values[1]->u.string.ptr)
+		{
+			const char *v = json_params->u.array.values[1]->u.string.ptr;
+			if (!strncmp(v, "EthereumStratum/", 16))
+			{
+				strncpy(ethstratum_version, v, sizeof(ethstratum_version)-1);
+				if (!strstr(client->version, "Rigel"))
+					client->is_nicehash_ethstratum = true;
+			}
+		}
+
 		if(strstr(client->version, "proxy") || strstr(client->version, "/3."))
       client->reconnectable = false;
 
@@ -65,7 +81,7 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		if(strstr(client->version, "cpuminer-opt")) client->stats = true;
 	}
 
-	if(json_params->u.array.length>1)
+	if(json_params->u.array.length>1 && !client->is_nicehash_ethstratum)
 	{
 		char notify_id[1024] = { 0 };
 		if (json_params->u.array.values[1]->u.string.ptr)
@@ -129,34 +145,47 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 
 	if (is_ethash || is_etchash)
 	{
-		// Rigel's EthereumStratum decoder maps the subscribe result into a
-		// struct with named fields: mining_notify and extranonce. Each
-		// mining_notify entry is an adjacently tagged command object with
-		// "method" and "params"; the usual [method, value] pairs and the
-		// classic three-element subscribe array do not deserialize there.
-		//
-		// Seed the miner with the current job so it can start hashing before
-		// the first standalone mining.notify. Difficulty is a JSON number.
-		YAAMP_JOB *job = job_get_last_for_ethash(client);
-		const char *seed = "0x0000000000000000000000000000000000000000000000000000000000000000";
-		const char *header = seed;
-		int jobid = 0;
-
-		if (job && job->templ && job->templ->eth_seed[0] && job->templ->eth_header[0])
+		if (client->is_nicehash_ethstratum)
 		{
-			seed = job->templ->eth_seed;
-			header = job->templ->eth_header;
-			jobid = job->id;
-			client->jobid_sent = job->id;
+			// EthereumStratum/1.0.0 (NiceHash spec): [[subscription], extranonce1].
+			// There is no extranonce2 and the first job arrives after authorize.
+			client_send_result(client,
+				"[[\"mining.notify\",\"%s\",\"%s\"],\"%s\"]",
+				client->notify_id,
+				ethstratum_version[0] ? ethstratum_version : "EthereumStratum/1.0.0",
+				client->extranonce1);
 		}
+		else
+		{
+			// Rigel's EthereumStratum decoder maps the subscribe result into a
+			// struct with named fields: mining_notify and extranonce. Each
+			// mining_notify entry is an adjacently tagged command object with
+			// "method" and "params"; the usual [method, value] pairs and the
+			// classic three-element subscribe array do not deserialize there.
+			//
+			// Seed the miner with the current job so it can start hashing before
+			// the first standalone mining.notify. Difficulty is a JSON number.
+			YAAMP_JOB *job = job_get_last_for_ethash(client);
+			const char *seed = "0x0000000000000000000000000000000000000000000000000000000000000000";
+			const char *header = seed;
+			int jobid = 0;
 
-		client_send_result(client,
-			"{\"mining_notify\":["
-			"{\"method\":\"mining.set_difficulty\",\"params\":{\"difficulty\":%.3g}},"
-			"{\"method\":\"mining.notify\",\"params\":{\"job_id\":\"%x\","
-			"\"seed_hash\":\"%s\",\"header_hash\":\"%s\",\"_clean_jobs\":true}}"
-			"],\"extranonce\":\"%s\"}",
-			client->difficulty_actual, jobid, seed, header, client->extranonce1);
+			if (job && job->templ && job->templ->eth_seed[0] && job->templ->eth_header[0])
+			{
+				seed = job->templ->eth_seed;
+				header = job->templ->eth_header;
+				jobid = job->id;
+				client->jobid_sent = job->id;
+			}
+
+			client_send_result(client,
+				"{\"mining_notify\":["
+				"{\"method\":\"mining.set_difficulty\",\"params\":{\"difficulty\":%.3g}},"
+				"{\"method\":\"mining.notify\",\"params\":{\"job_id\":\"%x\","
+				"\"seed_hash\":\"%s\",\"header_hash\":\"%s\",\"_clean_jobs\":true}}"
+				"],\"extranonce\":\"%s\"}",
+				client->difficulty_actual, jobid, seed, header, client->extranonce1);
+		}
 	}
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
 	{

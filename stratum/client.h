@@ -60,6 +60,11 @@ public:
 	// receive mining.set_difficulty / mining.notify.
 	bool is_ethproxy;
 
+	// NiceHash EthereumStratum/1.0.0 subscribers expect the classic array
+	// subscribe result and 0x-less notify fields. Rigel advertises the same
+	// version but uses its own object-shaped response, so keep them separate.
+	bool is_nicehash_ethstratum;
+
 	int userid;
 	int workerid;
 	int coinid;

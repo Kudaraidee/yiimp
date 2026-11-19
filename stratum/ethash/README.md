@@ -156,6 +156,15 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 ./rigel -a ethash -o ethstratum+tcp://pool.example.com:3639 -u WALLET -p c=LRS,mc=LRS
 ```
 
+ตัวอย่าง miner ที่ใช้ NiceHash EthereumStratum/1.0.0 (PhoenixMiner, lolMiner, GMiner, NBMiner, ethminer):
+
+```bash
+./PhoenixMiner -pool ethstratum+tcp://pool.example.com:3639 -wal WALLET -worker WORKER -pass c=LRS,mc=LRS
+./lolMiner --pool ethstratum+tcp://pool.example.com:3639 --wallet WALLET --worker WORKER --pass c=LRS,mc=LRS
+```
+
+> pool ตรวจจับจาก parameter ที่ 2 ของ `mining.subscribe` (`EthereumStratum/1.0.0`) แล้วตอบกลับเป็น array ตาม spec ของ NiceHash ส่วน Rigel ที่ส่ง string เดียวกันจะยังได้ object response แบบเดิม (ตรวจจาก user agent `Rigel/`)
+
 ตัวอย่าง T-Rex 0.19/0.26:
 
 ```bash
@@ -184,14 +193,17 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 
 **สำคัญ:** ถ้าเปิดหลาย coin ใน `algo='ethash'` เดียวกัน ให้ระบุ `mc=SYMBOL` เสมอ (หรือตั้ง `autoexchange = 0` ใน `[STRATUM]`) มิฉะนั้น stratum จะส่ง job จากทุก chain ให้ miner → seed hash เปลี่ยน → Rigel ต้องสร้าง DAG ใหม่หลาย GB ทุกครั้งที่ job เปลี่ยน และอาจหลุดการเชื่อมต่อ
 
-สิ่งที่ stratum ส่งให้ miner แบบ EthereumStratum (Rigel / ethminer):
+สิ่งที่ stratum ส่งให้ miner แบบ EthereumStratum:
 
-- `mining.subscribe` → `{"mining_notify":[{"method":"mining.set_difficulty","params":{"difficulty":16}},{"method":"mining.notify","params":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":true}}],"extranonce":"..."}`
-  (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce` โดย `mining_notify` แต่ละตัวเป็น object ที่มี `method` กับ `params` ไม่ใช่ array; ถ้าตอบเป็น array แบบดั้งเดิมหรือใช้ `params` เป็น array Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage`)
+- `mining.subscribe` มี 2 รูปแบบตาม miner:
+  - **NiceHash / ethminer / PhoenixMiner / lolMiner ฯลฯ** → `[["mining.notify","<sessionId>","EthereumStratum/1.0.0"],"<extranonce1>"]` ตาม spec NiceHash (ไม่มี extranonce2; job แรกจะส่งหลัง `mining.authorize`)
+  - **Rigel** → `{"mining_notify":[{"method":"mining.set_difficulty","params":{"difficulty":16}},{"method":"mining.notify","params":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":true}}],"extranonce":"..."}`
+    (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce` โดย `mining_notify` แต่ละตัวเป็น object ที่มี `method` กับ `params` ไม่ใช่ array; ถ้าตอบเป็น array แบบดั้งเดิมหรือใช้ `params` เป็น array Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage`)
+- `mining.extranonce.subscribe` → ตอบ `true` (รองรับตาม extension ของ NiceHash; pool ไม่เปลี่ยน extranonce กลาง session)
 - `mining.set_difficulty` → difficulty แบบ `2^224 / target` (raw = difficulty × 2^32) เป็น **JSON number** (เช่น `[0.1]`); การส่งเป็น string `["0.1"]` ทำให้ Rigel reject notification แล้ว reconnect
-- `mining.notify` → `[jobId, seedHash, headerHash, true]`
+- `mining.notify` → `[jobId, seedHash, headerHash, true]`; ตาม spec NiceHash pool จะตัด `0x` ออกจาก seed/header ส่วน Rigel ได้รูปแบบเดิมที่มี `0x`
 - `mining.submit` → `[worker, jobId, nonce]`
-  pool รองรับทั้ง nonce แบบเต็ม 16 hex (Rigel/ethminer รวม extranonce ไว้แล้ว) และแบบ 8 hex ต่อท้าย extranonce1
+  pool รองรับทั้ง nonce แบบเต็ม 16 hex (miner รวม extranonce ไว้แล้ว) และแบบ 12 hex (NiceHash ใช้ extranonce 2 bytes → minernonce 6 bytes) ที่ต้องต่อท้าย `extranonce1`
 
 pool เป็นคนคำนวณ mix digest เองจาก `ethash_hash()` แล้วส่ง `eth_submitWork(nonce, header, mix)` ให้ node
 
