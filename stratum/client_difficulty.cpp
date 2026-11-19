@@ -158,6 +158,21 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 		client->difficulty_actual = g_stratum_difficulty;
 		diff_to_target(client->share_target, client->difficulty_actual);
 	}
+	else if (is_ethash || is_etchash)
+	{
+		// Ethash/ethproxy miners use the full 256-bit target. The generic
+		// 64-bit diff_to_target() range check below rejects normal values such
+		// as d=2, which silently falls back to g_stratum_difficulty.
+		double diff = client_normalize_difficulty(atof(p+2), client);
+		if (diff > 0 && isfinite(diff))
+		{
+			uint8_t be[32];
+			ethash_diff_to_target(diff, be);
+			client->difficulty_actual = diff;
+			client->share_target = ethash_be_to_uint256(be);
+			client->difficulty_fixed = true;
+		}
+	}
 	else {
 		double diff = client_normalize_difficulty(atof(p+2), client);
 		uint64_t user_target = diff_to_target(diff);

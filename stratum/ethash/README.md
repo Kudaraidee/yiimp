@@ -168,7 +168,7 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 > stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
 >
 > - `eth_submitLogin` → ใช้ username/password แบบเดียวกับ `mining.authorize`
-> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` โดย target คือ `floor((2^256-1) / difficulty)` Rigel รับ difficulty เป็นตัวเลขและ T-Rex คำนวณ `(2^256-1) / target` ทั้งคู่จึงแสดงค่าที่ตั้งไว้ (เช่น `d=8` → ทั้งคู่โชว์ `8.00`) รองรับ difficulty ทศนิยม เช่น `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม แนะนำ `difficulty = 8` ขึ้นไปเพื่อลดจำนวน share ที่ไหลเข้าพูล
+> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` โดย target คือ `floor((2^256-1) / difficulty)` Rigel รับ difficulty เป็นตัวเลขและ T-Rex คำนวณ `(2^256-1) / target` ทั้งคู่จึงแสดงค่าที่ตั้งไว้ (เช่น `d=8` → ทั้งคู่โชว์ `8.00`) รองรับ difficulty ทศนิยม เช่น `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม และ `-p d=...` มีผลจริงทั้ง Rigel และ T-Rex (ไม่ถูก range check แบบ Bitcoin-style) แนะนำ `difficulty = 8` ขึ้นไปเพื่อลดจำนวน share ที่ไหลเข้าพูล
 > - `eth_submitHashrate` → ตอบ `true`
 > - `eth_submitWork` → pool ตรวจ mix digest ด้วย `ethash_hash()` เอง บันทึก share และส่งบล็อกให้ node ด้วย `eth_submitWork` ถ้าเจอ block
 >
