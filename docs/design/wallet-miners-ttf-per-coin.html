@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Design preview — แยก TTF ตามเหรียญในหน้า Miners</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         margin: 0; padding: 24px; background: #f5f6f8; color: #333; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .note { background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px;
+          padding: 12px 16px; margin-bottom: 20px; font-size: 14px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px;
+           font-weight: 700; color: #fff; vertical-align: middle; }
+  .badge.before { background: #95a5a6; }
+  .badge.after  { background: #2f9e44; }
+  .panel { background: #fff; border: 1px solid #ddd; border-radius: 6px;
+           padding: 16px; margin-bottom: 22px; }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; }
+  .main-left-box { border: 1px solid #e3e3e3; border-radius: 4px; margin-bottom: 12px; }
+  .main-left-title { background: #f0f0f0; padding: 8px 10px; font-weight: 700; font-size: 14px;
+                     border-bottom: 1px solid #e3e3e3; }
+  .main-left-inner { padding: 8px 10px 12px; }
+  table.dataGrid2 { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .dataGrid2 th { background: #fafafa; border-bottom: 1px solid #ddd; padding: 7px 8px;
+                  text-align: left; white-space: nowrap; }
+  .dataGrid2 td { border-bottom: 1px solid #f0f0f0; padding: 7px 8px; }
+  .ssrow:nth-child(even) { background: #fcfcfc; }
+  .coin { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; }
+  .coin img { width: 16px; height: 16px; border-radius: 50%; background: #ddd; }
+  .algo { color: #777; font-size: 11px; }
+  .mode { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; }
+  .mode.shared { background: #87d547; color: #fff; }
+  .mode.solo   { background: #48d8d8; color: #fff; }
+  .ttf { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .ttf.unknown { color: #999; font-weight: 400; }
+  .hint { color: #888; font-size: 11px; margin-top: 8px; }
+  .legend { font-size: 12px; color: #666; margin: 8px 0 0; }
+  code { background: #f4f4f4; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  .good { color: #2f9e44; }
+  .warn { color: #e8590c; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="note">
+    <b>Design preview (ยังไม่แก้โค้ดจริง)</b> — หน้า <code>/?address=…</code> → ส่วน <b>Miners</b> → ตาราง <b>Shares</b><br>
+    เปลี่ยนจาก “1 แถวต่อ algo (TTF รวม)” เป็น “1 แถวต่อ เหรียญ × โหมด” เพื่อให้ TTF ของแต่ละเหรียญแยกกันชัดเจน<br>
+    <b class="good">Implemented:</b> <code>yiimp2/views/site/results/wallet_miners_results.php</code> และ <code>yiimp2/components/YiimpUtils.php</code>
+  </div>
+
+  <!-- BEFORE -->
+  <div class="panel">
+    <h2><span class="badge before">ก่อน</span> &nbsp;ตาราง Shares แบบเดิม (aggregated ตาม algo)</h2>
+    <div class="main-left-box">
+      <div class="main-left-title">Miners: 0xD6e7305602…0300</div>
+      <div class="main-left-inner">
+        <table class="dataGrid2">
+          <thead><tr>
+            <th>Mode</th><th style="text-align:right">Workers</th><th style="text-align:right">Shares</th>
+            <th style="text-align:right">Hashrate*</th><th style="text-align:right">TTF</th>
+          </tr></thead>
+          <tbody>
+            <tr class="ssrow"><td><b>Shared</b></td><td style="text-align:right">2</td>
+              <td style="text-align:right">100%</td><td style="text-align:right"><b>123.1 Mh/s</b></td>
+              <td style="text-align:right" class="ttf warn">671416 years</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">TTF ค่าเดียวสำหรับทุกเหรียญ → ใช้ difficulty ของ <code>$user-&gt;coinid</code> แต่ hashrate รวมทุก coin ใน algo นั้น</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- AFTER -->
+  <div class="panel">
+    <h2><span class="badge after">หลัง</span> &nbsp;ตาราง Shares แยกตามเหรียญ (เสนอ)</h2>
+    <div class="main-left-box">
+      <div class="main-left-title">Miners: 0xD6e7305602…0300</div>
+      <div class="main-left-inner">
+
+        <table class="dataGrid2">
+          <thead><tr>
+            <th>Summary</th><th style="text-align:right">Workers</th><th style="text-align:right">Hashrate*</th><th style="text-align:right">TTF</th>
+          </tr></thead>
+          <tbody>
+            <tr class="ssrow"><td><b>ethash</b></td><td style="text-align:right">2</td>
+              <td style="text-align:right"><b>123.1 Mh/s</b></td>
+              <td style="text-align:right" class="ttf unknown" title="ดู TTF แยกตามเหรียญในตารางด้านล่าง">–</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">Summary ยังเป็นภาพรวมตาม algo (TTF ไม่บังคับแสดง หรือแสดงเป็น “–” แล้วให้ตารางด้านล่างเป็นตัวจริง)</p>
+        <br>
+
+        <table class="dataGrid2">
+          <thead><tr>
+            <th>Coin</th><th>Mode</th><th style="text-align:right">Workers</th><th style="text-align:right">Shares</th>
+            <th style="text-align:right">Hashrate*</th><th style="text-align:right" title="Estimated time to find a block">TTF</th>
+          </tr></thead>
+          <tbody>
+            <tr class="ssrow">
+              <td><span class="coin"><img src="" alt="">LRS <span class="algo">ethash</span></span></td>
+              <td><span class="mode shared">Shared</span></td>
+              <td style="text-align:right">2</td>
+              <td style="text-align:right">100%</td>
+              <td style="text-align:right"><b>123.1 Mh/s</b></td>
+              <td style="text-align:right" class="ttf" title="diff 12.4T · pool 1.83 Gh/s · you 123.1 Mh/s">18 days</td>
+            </tr>
+            <tr class="ssrow">
+              <td><span class="coin"><img src="" alt="">ETC <span class="algo">ethash</span></span></td>
+              <td><span class="mode shared">Shared</span></td>
+              <td style="text-align:right">1</td>
+              <td style="text-align:right">0.42%</td>
+              <td style="text-align:right"><b>41.6 Mh/s</b></td>
+              <td style="text-align:right" class="ttf" title="diff 3.71T · pool 3.12 Gh/s · you 41.6 Mh/s">6 days</td>
+            </tr>
+            <tr class="ssrow">
+              <td><span class="coin"><img src="" alt="">EXP <span class="algo">ethash</span></span></td>
+              <td><span class="mode solo">Solo</span></td>
+              <td style="text-align:right">1</td>
+              <td style="text-align:right">–</td>
+              <td style="text-align:right"><b>81.5 Mh/s</b></td>
+              <td style="text-align:right" class="ttf" title="diff 2.08T · pool 244 Mh/s · you 81.5 Mh/s">8 hours</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="legend">
+          <span class="mode shared">Shared</span> shares ปกติ &nbsp;
+          <span class="mode solo">Solo</span> password <code>m=solo</code> &nbsp;·&nbsp;
+          แถวจะปรากฏเฉพาะเหรียญที่มี shares/worker ใช้งานอยู่
+        </p>
+        <p class="hint">
+          TTF ต่อแถว = <code>coin.difficulty × 2^32 / pool_coin_rate(coinid, mode)</code>
+          (หรือคูณ block time ตามสูตรหน้า Pool ถ้าต้องการให้ตรงกับ TTF***)
+        </p>
+
+        <br>
+        <table class="dataGrid2">
+          <thead><tr><th>Details</th><th>Password</th><th>Algo</th><th style="text-align:right">Diff</th>
+            <th style="text-align:right">Hashrate*</th><th style="text-align:right">Shares/Min*</th></tr></thead>
+          <tbody>
+            <tr class="ssrow"><td><b>Version:</b> Rigel/1.23.2<br><b>Worker Name:</b> Miner01</td>
+              <td>c=LRS,mc=LRS</td><td>ethash</td><td style="text-align:right">0.4</td>
+              <td style="text-align:right">76.2 Mh/s</td><td style="text-align:right">0</td></tr>
+            <tr class="ssrow"><td><b>Version:</b> Rigel/1.23.2<br><b>Worker Name:</b> 1050Ti</td>
+              <td>c=LRS,mc=LRS,d=2</td><td>ethash</td><td style="text-align:right">2</td>
+              <td style="text-align:right"></td><td style="text-align:right">0</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">ตาราง Details ไม่เปลี่ยน (ยังแสดงตาม worker)</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>สิ่งที่ต้องเปลี่ยนเมื่ออนุมัติแบบนี้</h2>
+    <ol style="font-size:13px; line-height:1.7">
+      <li><code>yiimp2/views/site/results/wallet_miners_results.php</code> — เปลี่ยน loop จาก algo เป็น “coins ที่มี shares ของ user” แล้วแยก Shared/Solo</li>
+      <li><code>yiimp2/components/YiimpUtils.php</code> — เพิ่ม <code>user_coin_shared_rate()</code> / <code>user_coin_solo_rate()</code> (แบบเดิมมีเฉพาะตาม algo)</li>
+      <li>ใช้ <code>coin_shared_rate($coinid)</code> / <code>coin_solo_rate($coinid)</code> ที่มีอยู่แล้วเป็นตัวหาร TTF</li>
+      <li> Workers ต่อเหรียญนับจาก <code>workerid</code> ใน shares (worker ใน db_workers ผูกกับ algo ไม่ได้บอกว่า mining coin ไหน)</li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>

@@ -21,9 +21,26 @@ if ($coinid) {
 				->one();
 }
 
+$utils = Yii::$app->YiimpUtils;
+$conv = Yii::$app->ConversionUtils;
+$now = time();
+
 echo "<div class='main-left-box'>";
 echo "<div class='main-left-title'>Miners: {$user->username}</div>";
 echo "<div class='main-left-inner'>";
+
+echo <<<'CSS'
+<style>
+.wallet-miners-table .coin-cell { white-space: nowrap; }
+.wallet-miners-table .coin-cell img { width:16px; height:16px; margin-right:6px; vertical-align:middle; }
+.wallet-miners-table .coin-algo { color:#888; font-size:.85em; margin-left:4px; }
+.wallet-miners-table .mode { display:inline-block; padding:2px 7px; border-radius:3px;
+	color:#fff; font-size:.85em; font-weight:bold; }
+.wallet-miners-table .mode.shared { background:#87d547; }
+.wallet-miners-table .mode.solo { background:#48d8d8; }
+.wallet-miners-table .ttf { font-variant-numeric:tabular-nums; }
+</style>
+CSS;
 
 echo '<table class="dataGrid2">';
 echo "<thead>";
@@ -35,7 +52,7 @@ echo "<th align=right width=60>TTF</th>";
 echo "</tr>";
 echo "</thead>";
 
-foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
+foreach($utils->get_algos() as $algo)
 {
 	if (!YIIMP_ALLOW_EXCHANGE && isset($coin) && $coin->algo != $algo) continue;
 
@@ -44,38 +61,93 @@ foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
 			->count();
 	if (!$minercount) continue;
 
-	$user_pool_rate = Yii::$app->YiimpUtils->user_rate($userid, $algo);
-	$pool_hash = Yii::$app->YiimpUtils->pool_rate_pow($algo);
-	$user_ttf = 0;
+	$user_pool_rate = $utils->user_rate($userid, $algo);
+	$user_pool_rate = $user_pool_rate? $conv->Itoa2($user_pool_rate).'h/s': '-';
 
-	if ($pool_hash != 0) {
-		$user_ttf  = ($user_pool_rate && $coin) ? $coin->difficulty * 0x100000000 / $pool_hash : 0;
-	}
-	$user_ttf  = $user_ttf ? Yii::$app->ConversionUtils->sectoa2($user_ttf) : '-';
-
-	$user_pool_rate = $user_pool_rate? Yii::$app->ConversionUtils->Itoa2($user_pool_rate).'h/s': '-';
-	
 	echo '<tr class="ssrow">';
 	echo '<td><b>'.$algo.'</b></td>';
 	echo '<td align="right" >'.$minercount.'</td>';
 	echo '<td align="right" width="100"><b>'.$user_pool_rate.'</b></td>';
-	echo '<td align="right" width="100">'.$user_ttf.'</td>';
+	// algo-level TTF combines different coin difficulties, so point to the per-coin table
+	echo '<td align="right" width="100" title="See TTF per coin below">-</td>';
 	echo '</tr>';
 }
 
 echo "</table>";
 ////////////////////////////////////////////////////////////////////////////////
 
-$minercount = Workers::find()
+// Coins this user has actually mined recently. db_workers only knows the algo,
+// so coin attribution has to come from the shares themselves.
+$recent = (new \yii\db\Query())
+		->select(['coinid', 'solo', 'COUNT(DISTINCT workerid) AS workers'])
+		->from('shares')
+		->where(['valid' => 1, 'userid' => $userid])
+		->andWhere(['>', 'time', $now - 3600])
+		->groupBy(['coinid', 'solo'])
+		->all();
+
+$recentByCoin = array();
+foreach($recent as $row)
+{
+	$rowCoinid = (int) $row['coinid'];
+	if (!YIIMP_ALLOW_EXCHANGE && $coinid && $rowCoinid != $coinid) continue;
+	$recentByCoin[$rowCoinid][(int) $row['solo']] = (int) $row['workers'];
+}
+
+$coinIds = array_keys($recentByCoin);
+$coins = array();
+if (count($coinIds))
+	$coins = Coins::find()->where(['id' => $coinIds])->indexBy('id')->all();
+uasort($coins, function($a, $b) { return strcasecmp($a->symbol, $b->symbol); });
+
+// All-time share difficulty per coin/mode, used for the contribution percentage.
+$shareKey = md5($userid.'-'.implode('-', $coinIds));
+$userShareKey = "wallet_user_coin_shares-$shareKey";
+$totalShareKey = "wallet_total_coin_shares-$shareKey";
+
+$userShares = Yii::$app->cache->get($userShareKey);
+if ($userShares === false) {
+	$userShares = count($coinIds) ? (new \yii\db\Query())
+			->select(['coinid', 'solo', 'SUM(difficulty) AS diff'])
+			->from('shares')
+			->where(['valid' => 1, 'userid' => $userid])
+			->andWhere(['in', 'coinid', $coinIds])
+			->groupBy(['coinid', 'solo'])
+			->all() : array();
+	Yii::$app->cache->set($userShareKey, $userShares, 60);
+}
+
+$totalShares = Yii::$app->cache->get($totalShareKey);
+if ($totalShares === false) {
+	$totalShares = count($coinIds) ? (new \yii\db\Query())
+			->select(['coinid', 'solo', 'SUM(difficulty) AS diff'])
+			->from('shares')
+			->where(['valid' => 1])
+			->andWhere(['in', 'coinid', $coinIds])
+			->groupBy(['coinid', 'solo'])
+			->all() : array();
+	Yii::$app->cache->set($totalShareKey, $totalShares, 60);
+}
+
+$userShareMap = array();
+foreach($userShares as $row)
+	$userShareMap[(int) $row['coinid']][(int) $row['solo']] = (float) $row['diff'];
+
+$totalShareMap = array();
+foreach($totalShares as $row)
+	$totalShareMap[(int) $row['coinid']][(int) $row['solo']] = (float) $row['diff'];
+
+$workers = Workers::find()
 			->where(['userid' => $user->id])
 			->orderBy('password')
 			->all();
-if(count($minercount))
+if(count($workers))
 {
 	echo "<br>";
-	echo '<table class="dataGrid2">';
+	echo '<table class="dataGrid2 wallet-miners-table">';
 	echo "<thead>";
 	echo "<tr>";
+	echo "<th align=left>Coin</th>";
 	echo "<th align=left>Mode</th>";
 	echo "<th align=right width=80>Workers</th>";
 	echo "<th align=right>Shares</th>";
@@ -84,120 +156,61 @@ if(count($minercount))
 	echo "</tr>";
 	echo "</thead>";
 
-	foreach(Yii::$app->YiimpUtils->get_algos() as $algo)
+	$shown = false;
+	foreach($coins as $rowCoinid => $rowCoin)
 	{
-		if (!YIIMP_ALLOW_EXCHANGE && isset($coin) && $coin->algo != $algo) continue;
-
-		$user_shared_rate = Yii::$app->YiimpUtils->user_shared_rate($userid, $algo);
-		$user_solo_rate = Yii::$app->YiimpUtils->user_solo_rate($userid, $algo);
-		
-		$pool_shared_hash = Yii::$app->YiimpUtils->pool_shared_rate($algo);
-		$user_shared_ttf  = $user_shared_rate ? $coin->difficulty * 0x100000000 / $pool_shared_hash : 0;
-		$user_shared_ttf  = $user_shared_ttf ? Yii::$app->ConversionUtils->sectoa2($user_shared_ttf) : '';
-
-		$pool_solo_hash = Yii::$app->YiimpUtils->pool_solo_rate($algo);
-		$user_solo_ttf  = $user_solo_rate ? $coin->difficulty * 0x100000000 / $pool_solo_hash : 0;
-		$user_solo_ttf  = $user_solo_ttf ? Yii::$app->ConversionUtils->sectoa2($user_solo_ttf) : '';
-
-
-		$user_shared_rate = $user_shared_rate? Yii::$app->ConversionUtils->Itoa2($user_shared_rate).'h/s': '-';
-		$user_solo_rate = $user_solo_rate? Yii::$app->ConversionUtils->Itoa2($user_solo_rate).'h/s': '-';
-	
-		$shared_minercount = Workers::find()
-								->where(['userid'=>$userid,'algo'=>$algo])
-								->andWhere(['not like','password','m=solo'])
-								->count();
-		$solo_minercount = Workers::find()
-								->where(['userid'=>$userid,'algo'=>$algo])
-								->andWhere(['like','password','m=solo'])
-								->count();
-
-		if ($shared_minercount)
+		foreach(array(0, 1) as $solo)
 		{
-			if (YIIMP_ALLOW_EXCHANGE || !$user->coinid) 
-			{
+			if (!isset($recentByCoin[$rowCoinid][$solo])) continue;
 
-				$user_shared_shares = Yii::$app->cache->get("wallet_user_shared_shares-$userid-$algo");
-				if (!$user_shared_shares) {
-					$user_shared_shares = (new \yii\db\Query())
-							->select(['SUM(difficulty)'])
-							->from('shares')
-							->where([ 'valid' => 1 , 'userid' => $userid , 'algo'=> $algo , 'solo' => 0])
-							->scalar();
-					Yii::$app->cache->set("wallet_user_shared_shares-$userid-$algo", $user_shared_shares);
-				}
+			$userRate = $solo
+				? $utils->user_coin_solo_rate($userid, $rowCoinid)
+				: $utils->user_coin_shared_rate($userid, $rowCoinid);
+			$poolRate = $solo
+				? $utils->coin_solo_rate($rowCoinid)
+				: $utils->coin_shared_rate($rowCoinid);
 
-				if(!$user_shared_shares && !$shared_minercount) continue;
+			// same scale as the old wallet TTF: network difficulty / pool hashrate
+			$ttf = ($userRate && $poolRate && $rowCoin->difficulty > 0)
+				? $rowCoin->difficulty * 0x100000000 / $poolRate : 0;
+			$ttfText = $ttf ? $conv->sectoa2($ttf) : '-';
 
-				$total_shared_shares = Yii::$app->cache->get("wallet_total_shared_shares-$algo");
-				if (!$total_shared_shares) {
-					$total_shared_shares = (new \yii\db\Query())
-							->select(['SUM(difficulty)'])
-							->from('shares')
-							->where([ 'valid' => 1 , 'algo'=> $algo , 'solo' => 0])
-							->scalar();
-					Yii::$app->cache->set("wallet_total_shared_shares-$algo", $total_shared_shares);
-				}
+			$userDiff = isset($userShareMap[$rowCoinid][$solo]) ? $userShareMap[$rowCoinid][$solo] : 0;
+			$totalDiff = isset($totalShareMap[$rowCoinid][$solo]) ? $totalShareMap[$rowCoinid][$solo] : 0;
+			$percent = ($userDiff && $totalDiff) ? round($userDiff * 100 / $totalDiff, 2) : 0;
+			$sharesText = (!$solo && $percent) ? $conv->Itoa2($percent).'%' : '-';
 
-			} 
-			else 
-			{
-				$user_shared_shares = Yii::$app->cache->get("wallet_user_shared_shares-$algo-$coinid-$userid");
-				if (!$user_shared_shares) {
-					$user_shared_shares = (new \yii\db\Query())
-							->select(['SUM(difficulty)'])
-							->from('shares')
-							->where([ 'valid' => 1 , 'userid' => $userid , 'coinid' => $coinid , 'algo'=> $algo , 'solo' => 0])
-							->scalar();
-					Yii::$app->cache->set("wallet_user_shared_shares-$algo-$coinid-$userid", $user_shared_shares);
-				}
-				if(!$user_shared_shares) continue;
+			$rateText = $userRate ? $conv->Itoa2($userRate).'h/s' : '-';
+			$tip = 'diff '.number_format((float) $rowCoin->difficulty, 2)
+				.' · pool '.($poolRate ? $conv->Itoa2($poolRate).'h/s' : '-')
+				.' · you '.($userRate ? $conv->Itoa2($userRate).'h/s' : '-');
 
-				$total_shared_shares = Yii::$app->cache->get("wallet_coin_shared_shares-$coinid");
-				if (!$total_shared_shares) {
-					$total_shared_shares = (new \yii\db\Query())
-							->select(['SUM(difficulty)'])
-							->from('shares')
-							->where([ 'valid' => 1 , 'coinid' => $coinid , 'algo'=> $algo , 'solo' => 0])
-							->scalar();
-					Yii::$app->cache->set("wallet_coin_shared_shares-$coinid", $total_shared_shares);
-				}
-			}
-	
-			if(!$total_shared_shares) continue;
-			$percent_shared_shares = round($user_shared_shares * 100 / $total_shared_shares, 4);
-			$percent_shared_shares = $percent_shared_shares? Yii::$app->ConversionUtils->Itoa2($percent_shared_shares).'%': '-';
-		}
+			$symbol = htmlspecialchars($rowCoin->symbol, ENT_QUOTES, 'UTF-8');
+			$name = htmlspecialchars($rowCoin->name, ENT_QUOTES, 'UTF-8');
 
-		if ($shared_minercount)
-		{
 			echo '<tr class="ssrow">';
-			echo '<td><b>Shared</b></td>';
-			echo '<td align="right" >'.$shared_minercount.'</td>';
-			echo '<td align="right" width="100">'.$percent_shared_shares.'</td>';
-			echo '<td align="right" width="100"><b>'.$user_shared_rate.'</b></td>';
-			echo '<td align="right" width="100">'.$user_shared_ttf.'</td>';
+			echo '<td class="coin-cell" title="'.$name.'">'
+				. (($rowCoin->image) ? '<img src="'.htmlspecialchars($rowCoin->image, ENT_QUOTES, 'UTF-8').'" alt="">' : '')
+				. $symbol.'<span class="coin-algo">'.$rowCoin->algo.'</span></td>';
+			echo '<td><span class="mode '.($solo ? 'solo' : 'shared').'">'.($solo ? 'Solo' : 'Shared').'</span></td>';
+			echo '<td align="right">'.$recentByCoin[$rowCoinid][$solo].'</td>';
+			echo '<td align="right" width="100">'.$sharesText.'</td>';
+			echo '<td align="right" width="100"><b>'.$rateText.'</b></td>';
+			echo '<td align="right" width="100" class="ttf" title="'.$tip.'">'.$ttfText.'</td>';
 			echo '</tr>';
-		}
-		
-		if ($solo_minercount)
-		{
-			echo '<tr class="ssrow">';
-			echo '<td><b>Solo</b></td>';
-			echo '<td align="right" >'.$solo_minercount.'</td>';
-		 	echo '<td align="right" width="100">-</td>';
-			echo '<td align="right" width="100"><b>'.$user_solo_rate.'</b></td>';
-			echo '<td align="right" width="100">'.$user_solo_ttf.'</td>';
-			echo '</tr>';
+			$shown = true;
 		}
 	}
-	echo "</table>"; 
+
+	if (!$shown) {
+		echo '<tr class="ssrow"><td colspan="6" align="center">No shares in the last hour</td></tr>';
+	}
+	echo "</table>";
+	echo "<p style='font-size: .8em'>TTF is estimated per coin from that coin's difficulty and pool hashrate.<br>"
+		."Workers are counted from shares submitted in the last hour.</p>";
 }
-
-
 ////////////////////////////////////////////////////////////////////////////////
 
-$workers = Workers::find()->where(['userid'=>$user->id])->orderBy('password')->all();
 if(count($workers))
 {
 	echo "<br>";
@@ -217,20 +230,20 @@ if(count($workers))
 
 	foreach($workers as $worker)
 	{
-		$user_rate1 = Yii::$app->YiimpUtils->worker_rate($worker->id, $worker->algo);
-		
-		$user_rate1 = $user_rate1? Yii::$app->ConversionUtils->Itoa2($user_rate1).'h/s': '';
+		$user_rate1 = $utils->worker_rate($worker->id, $worker->algo);
+
+		$user_rate1 = $user_rate1? $conv->Itoa2($user_rate1).'h/s': '';
 
 		$version = substr($worker->version, 0, 20);
 		$password = substr($worker->password, 0, 32);
-		
+
 		$name = $worker->worker;
 
-		$subscribe = Yii::$app->ConversionUtils->Booltoa($worker->subscribe);
+		$subscribe = $conv->Booltoa($worker->subscribe);
 
-		$t = time() - 60;
+		$t = $now - 60;
 		$shares_per_minute = Shares::find()
-						->where(['algo'=>$algo,'userid'=> $user->id, 'workerid' => $worker->id])
+						->where(['algo'=>$worker->algo,'userid'=> $user->id, 'workerid' => $worker->id])
 						->andWhere(['>','time',$t])
 						->count();
 
@@ -257,11 +270,3 @@ echo "<p style='font-size: .8em'>
 		</p>";
 
 echo "</div><br>";
-
-
-
-
-
-
-
-
