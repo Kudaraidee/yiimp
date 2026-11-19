@@ -131,6 +131,20 @@ static YAAMP_JOB *job_get_last_for_client(YAAMP_CLIENT *client)
 	return result;
 }
 
+YAAMP_JOB *job_get_last_for_ethash(YAAMP_CLIENT *client)
+{
+	if (!g_autoexchange)
+	{
+		YAAMP_JOB *job = job_get_last(client->coinid);
+		if (job) return job;
+	}
+
+	YAAMP_JOB *job = job_get_last_for_client(client);
+	if (job) return job;
+
+	return job_get_last(0);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void job_send_last(YAAMP_CLIENT *client)
@@ -152,7 +166,11 @@ void job_send_last(YAAMP_CLIENT *client)
 	client->jobid_sent = job->id;
 
 	char buffer[YAAMP_SMALLBUFSIZE];
-	if (is_ethash || is_etchash)
+	if (client->is_ethproxy && (is_ethash || is_etchash))
+	{
+		ethash_ethproxy_work_buffer(job, client, buffer);
+	}
+	else if (is_ethash || is_etchash)
 	{
 		ethash_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -177,7 +195,11 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 	}
 
 	char buffer[YAAMP_SMALLBUFSIZE];
-	if (is_ethash || is_etchash)
+	if (client->is_ethproxy && (is_ethash || is_etchash))
+	{
+		ethash_ethproxy_work_buffer(job, client, buffer);
+	}
+	else if (is_ethash || is_etchash)
 	{
 		ethash_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -223,7 +245,11 @@ void job_broadcast(YAAMP_JOB *job)
 
 		char buffer[YAAMP_SMALLBUFSIZE];
 		memset(buffer, 0, sizeof(buffer));
-		if (is_ethash || is_etchash)
+		if (client->is_ethproxy && (is_ethash || is_etchash))
+		{
+			ethash_ethproxy_work_buffer(job, client, buffer);
+		}
+		else if (is_ethash || is_etchash)
 		{
 			ethash_job_mining_notify_buffer(job, client, buffer);
 		}

@@ -156,22 +156,31 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 ./rigel -a ethash -o ethstratum+tcp://pool.example.com:3639 -u WALLET -p c=LRS,mc=LRS
 ```
 
-ตัวอย่าง T-Rex 0.19/0.26 (**ต้องใช้ `stratum+tcp`** ซึ่งเป็น EthereumStratum):
+ตัวอย่าง T-Rex 0.19/0.26:
 
 ```bash
 ./t-rex -a ethash -o stratum+tcp://pool.example.com:3639 \
   -u WALLET.WORKER -p c=LRS,mc=LRS --intensity 16 --kernel 0
 ```
 
-> **ระวัง:** อย่าใช้ `ethstratum+tcp://` กับ T-Rex — scheme นี้ทำให้ T-Rex สลับไปพูด **ethproxy** (`eth_submitLogin` / `eth_getWork` / `eth_submitWork`) แทน EthereumStratum ผลคือ `Unregistered stratum method mining.set_difficulty`, `diff: 0.00` และ share ถูก reject ทั้งหมด ตาม README ของ T-Rex ethproxy คือ `stratum+http://` ส่วน `stratum+tcp://` คือ EthereumStratum
+> **หมายเหตุสำคัญ:** T-Rex **ไม่ได้พูด EthereumStratum แบบ `mining.subscribe`/`mining.submit`** สำหรับ `-a ethash` ทั้งของ v0.19.14 และ v0.26.8 ถึงจะขึ้น `Using protocol: stratum1` หรือใช้ scheme `ethstratum+tcp://` ก็ตาม มันยังส่ง `eth_submitLogin` / `eth_getWork` / `eth_submitWork` (ethproxy) เหมือนกัน
 >
-> (Rigel ใช้ `ethstratum+tcp://` และพูด EthereumStratum ได้ตามปกติ — scheme นี้ไม่ได้มีพฤติกรรมเหมือนกันทุก miner)
+> stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
+>
+> - `eth_submitLogin` → ใช้ username/password แบบเดียวกับ `mining.authorize`
+> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` (target มาจาก difficulty ที่ตั้งค่าไว้ → T-Rex แสดง `diff` เป็นตัวเลข แทน `0.00`)
+> - `eth_submitHashrate` → ตอบ `true`
+> - `eth_submitWork` → pool ตรวจ mix digest ด้วย `ethash_hash()` เอง บันทึก share และส่งบล็อกให้ node ด้วย `eth_submitWork` ถ้าเจอ block
+>
+> กับ client แบบ ethproxy pool **จะไม่ส่ง** `mining.set_difficulty` / `mining.notify` (T-Rex จะฟ้อง `Unregistered stratum method`) แต่จะส่ง work ใหม่เป็น `{"jsonrpc":"2.0","result":[...]}` แทน
+>
+> ใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` กับ T-Rex ก็ได้ เพราะทั้งหมดตกลงมาเป็น ethproxy ฝั่ง pool รองรับหมดแล้ว
 
 > **การ์ด VRAM 4GB (เช่น GTX 1050 Ti):** DAG epoch ปัจจุบัน (~231) ใช้ ~2.8GB ถ้า T-Rex ฟ้อง `not enough free memory to mine ethash` ให้ลด workload ด้วย `--intensity 16 --kernel 0` หรือ `--dag-build-mode 1` และปิดโปรแกรมอื่นที่ใช้ VRAM ด้วย (Rigel มักพอแม้ intensity ต่ำกว่า)
 
 **สำคัญ:** ถ้าเปิดหลาย coin ใน `algo='ethash'` เดียวกัน ให้ระบุ `mc=SYMBOL` เสมอ (หรือตั้ง `autoexchange = 0` ใน `[STRATUM]`) มิฉะนั้น stratum จะส่ง job จากทุก chain ให้ miner → seed hash เปลี่ยน → Rigel ต้องสร้าง DAG ใหม่หลาย GB ทุกครั้งที่ job เปลี่ยน และอาจหลุดการเชื่อมต่อ
 
-สิ่งที่ stratum ส่งให้ miner:
+สิ่งที่ stratum ส่งให้ miner แบบ EthereumStratum (Rigel / ethminer):
 
 - `mining.subscribe` → `[[["mining.set_difficulty","..." ],["mining.notify","..."]],extranonce1,4]`
   (ไม่ใส่สตริง `"EthereumStratum/1.0.0"` เพิ่มใน subscription list เพราะ miner บางตัว เช่น Rigel จะ reject)

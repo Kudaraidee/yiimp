@@ -11,6 +11,10 @@
 
 #include <math.h>
 #include <string.h>
+#include <strings.h>
+
+bool ethash_submit_work(YAAMP_COIND *coind, const char *nonce,
+	const char *header, const char *mix);
 
 static bool ethash_parse_hex(const char *src, uint8_t be[32])
 {
@@ -168,6 +172,244 @@ void ethash_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char 
 		"{\"id\":null,\"method\":\"mining.notify\",\"params\":"
 		"[\"%x\",\"%s\",\"%s\",true]}\n",
 		job->id, templ->eth_seed, templ->eth_header);
+}
+
+// ---------------------------------------------------------------------------
+// ethproxy compatibility
+//
+// T-Rex identifies its EthereumStratum connections with "stratum1" but still
+// speaks ethproxy on the wire: eth_submitLogin / eth_getWork / eth_submitWork.
+// Rigel uses mining.subscribe/mining.submit and keeps the existing path above.
+// ---------------------------------------------------------------------------
+
+static void ethash_ethproxy_target_hex(YAAMP_CLIENT *client, char *hex66)
+{
+	uint8_t be[32];
+	if (client && !client->share_target.IsNull())
+		ethash_uint256_to_be(client->share_target, be);
+	else
+		ethash_diff_to_target(client ? client->difficulty_actual : 0, be);
+
+	ethash_bin_to_hex(be, hex66);
+}
+
+static void ethash_ethproxy_work_result(YAAMP_JOB *job, YAAMP_CLIENT *client, char *result)
+{
+	char target[80] = { 0 };
+	ethash_ethproxy_target_hex(client, target);
+
+	snprintf(result, 512, "[\"%s\",\"%s\",\"%s\"]",
+		job->templ->eth_header, job->templ->eth_seed, target);
+}
+
+void ethash_ethproxy_work_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer)
+{
+	char result[512] = { 0 };
+	ethash_ethproxy_work_result(job, client, result);
+
+	// Unsolicited work push, matching the shape geth's ethproxy uses.
+	sprintf(buffer, "{\"jsonrpc\":\"2.0\",\"result\":%s}\n", result);
+}
+
+bool ethash_ethproxy_send_work(YAAMP_CLIENT *client)
+{
+	YAAMP_JOB *job = job_get_last_for_ethash(client);
+	if (!job) return false;
+
+	char buffer[1024] = { 0 };
+	ethash_ethproxy_work_buffer(job, client, buffer);
+	socket_send_raw(client->sock, buffer, strlen(buffer));
+
+	client->jobid_sent = job->id;
+	return true;
+}
+
+bool ethash_ethproxy_get_work(YAAMP_CLIENT *client)
+{
+	if (!g_list_client.Find(client))
+	{
+		client_send_error(client, 20, "Not authorized");
+		return true;
+	}
+
+	YAAMP_JOB *job = job_get_last_for_ethash(client);
+	if (!job || !job->templ || !job->templ->eth_header[0])
+	{
+		client_send_error(client, 20, "No work available");
+		return true;
+	}
+
+	char result[512] = { 0 };
+	ethash_ethproxy_work_result(job, client, result);
+	client_send_result(client, "%s", result);
+
+	client->jobid_sent = job->id;
+	return true;
+}
+
+bool ethash_ethproxy_submit_work(YAAMP_CLIENT *client, json_value *json_params)
+{
+	// eth_submitWork(nonce, powHash, mixDigest), all 0x-prefixed hex strings.
+	if (!json_params || json_params->type != json_array ||
+		json_params->u.array.length < 3 || !valid_string_params(json_params))
+	{
+		debuglog("%s - %s ethproxy: bad submit\n", client->username, client->sock->ip);
+		client->submit_bad++;
+		client_send_result(client, "false");
+		return true;
+	}
+
+	const char *nonce_part = ethash_strip_prefix(
+		json_params->u.array.values[0]->u.string.ptr);
+	const char *header = json_params->u.array.values[1]->u.string.ptr;
+	const char *mix_part = ethash_strip_prefix(
+		json_params->u.array.values[2]->u.string.ptr);
+
+	char nonce[20] = { 0 };
+	int written = -1;
+	const size_t part_len = strlen(nonce_part);
+	const int prefix_len = strlen(client->extranonce1);
+
+	if (part_len == 16)
+		written = snprintf(nonce, sizeof(nonce), "%s", nonce_part);
+	else if (prefix_len > 0 && part_len + (size_t) prefix_len == 16)
+		written = snprintf(nonce, sizeof(nonce), "%s%s", client->extranonce1, nonce_part);
+
+	uint8_t submitted_mix_be[32];
+	if (written < 0 || written >= (int) sizeof(nonce) || !ishexa(nonce, 16) ||
+		!ethash_parse_hex(mix_part, submitted_mix_be))
+	{
+		debuglog("%s - %s ethproxy: invalid submit params\n", client->username, client->sock->ip);
+		client->submit_bad++;
+		client_send_result(client, "false");
+		return true;
+	}
+
+	// ethproxy has no job id: match the submitted PoW hash to a live template.
+	const char *header_cmp = ethash_strip_prefix(header);
+	YAAMP_JOB *job = NULL;
+	g_list_job.Enter();
+	for (CLI li = g_list_job.first; li; li = li->next)
+	{
+		YAAMP_JOB *candidate = (YAAMP_JOB *) li->data;
+		if (!candidate->templ || !candidate->templ->eth_header[0]) continue;
+		if (strcasecmp(ethash_strip_prefix(candidate->templ->eth_header), header_cmp)) continue;
+
+		object_lock(candidate);
+		job = candidate;
+		break;
+	}
+	g_list_job.Leave();
+
+	if (!job)
+	{
+		debuglog("%s - %s ethproxy: unknown job header %s\n",
+			client->username, client->sock->ip, header);
+		client->submit_bad++;
+		client_send_result(client, "false");
+		return true;
+	}
+
+	YAAMP_JOB_TEMPLATE *templ = job->templ;
+
+	auto reject_share = [&](const char *message, int error_number)
+	{
+		debuglog("%s - %s ethproxy: %s\n", client->username, client->sock->ip, message);
+		client_send_result(client, "false");
+		share_add(client, job, false, templ->eth_header, templ->ntime,
+			nonce, 0, error_number, templ->height);
+		client->submit_bad++;
+		object_unlock(job);
+	};
+
+	ethash_context_ptr context = ethash_get_context(templ->eth_epoch);
+	if (!context)
+	{
+		reject_share("no epoch context", 20);
+		return true;
+	}
+
+	const ethash::hash256 header_hash = ethash_to_hash256(templ->eth_header);
+	const uint64_t nonce64 = strtoull(nonce, NULL, 16);
+	const ethash::result result = ethash::hash(*context, header_hash, nonce64);
+
+	uint8_t final_be[32], mix_be[32];
+	memcpy(final_be, result.final_hash.bytes, 32);
+	memcpy(mix_be, result.mix_hash.bytes, 32);
+
+	if (memcmp(submitted_mix_be, mix_be, 32) != 0)
+	{
+		reject_share("invalid mix digest", 27);
+		return true;
+	}
+
+	uint256 final_hash = ethash_be_to_uint256(final_be);
+	uint8_t share_be[32];
+	ethash_diff_to_target(client->difficulty_actual, share_be);
+	const uint256 share_target = ethash_be_to_uint256(share_be);
+
+	if (final_hash > share_target)
+	{
+		reject_share("low difficulty share", 26);
+		return true;
+	}
+
+	char mixhex[80] = { 0 };
+	ethash_bin_to_hex(mix_be, mixhex);
+
+	if (share_find(job->id, templ->eth_header, mixhex, nonce, client->username))
+	{
+		reject_share("duplicate share", 22);
+		return true;
+	}
+
+	uint8_t network_be[32];
+	if (!ethash_parse_hex(templ->eth_target, network_be))
+		memset(network_be, 0xff, 32);
+	const uint256 network_target = ethash_be_to_uint256(network_be);
+
+	if (final_hash <= network_target && !job->block_found)
+	{
+		YAAMP_COIND *coind = job->coind;
+		if (coind && ethash_submit_work(coind, nonce, templ->eth_header, mixhex))
+		{
+			job->block_found = true;
+			double network_diff = 0;
+			ethash_target_to_diff(network_be, &network_diff);
+			double block_share_diff = 0;
+			ethash_target_to_diff(final_be, &block_share_diff);
+
+			stratumlog("*** ACCEPTED %s %d by %s (id: %d)\n",
+				coind->name, templ->height, client->sock->ip, client->userid);
+
+			block_add(client->userid, client->workerid, coind->id, templ->height,
+				network_diff, block_share_diff, final_hash.ToString().c_str(),
+				final_hash.ToString().c_str(), 0, client->solo);
+		}
+		else
+		{
+			debuglog("*** REJECTED %s block %d\n",
+				coind ? coind->symbol : "?", templ->height);
+			rejectlog("REJECTED %s block %d\n", coind ? coind->symbol : "?", templ->height);
+		}
+		job_signal();
+	}
+
+	double share_diff = 0;
+	ethash_target_to_diff(final_be, &share_diff);
+	stratumlog("client %d on job %d sent diff %0.3f powhash %s\n",
+		client->userid, job->id, share_diff, final_hash.ToString().c_str());
+
+	client_send_result(client, "true");
+	client_record_difficulty(client);
+	client->submit_bad = 0;
+	client->shares++;
+
+	share_add(client, job, true, templ->eth_header, templ->ntime, nonce,
+		share_diff, 0, templ->height);
+
+	object_unlock(job);
+	return true;
 }
 
 bool ethash_submit_work(YAAMP_COIND *coind, const char *nonce,

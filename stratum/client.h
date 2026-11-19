@@ -55,6 +55,11 @@ public:
 
 	bool is_nicehash;
 
+	// T-Rex and other ethproxy miners never send mining.subscribe; they log
+	// in with eth_submitLogin and poll eth_getWork. Such clients must not
+	// receive mining.set_difficulty / mining.notify.
+	bool is_ethproxy;
+
 	int userid;
 	int workerid;
 	int coinid;

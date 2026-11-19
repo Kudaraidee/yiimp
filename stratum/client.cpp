@@ -665,6 +665,20 @@ void *client_thread(void *p)
 		{
 			clientlog(client, "using getwork"); // client using http:// url
 		}
+		else if((is_ethash || is_etchash) && !strcmp(method, "eth_submitLogin"))
+		{
+			// T-Rex uses ethproxy-style calls even for stratum+tcp:// on the
+			// ethash algorithm. Treat it as a first-class protocol here.
+			client->is_ethproxy = true;
+			b = client_authorize(client, json_params);
+		}
+
+		else if((is_ethash || is_etchash) && !strcmp(method, "eth_getWork"))
+			b = ethash_ethproxy_get_work(client);
+
+		else if((is_ethash || is_etchash) && !strcmp(method, "eth_submitWork"))
+			b = ethash_ethproxy_submit_work(client, json_params);
+
 		else if(!strcmp(method, "eth_submitHashrate"))
 		{
 			b = client_send_result(client, "true"); // skip eth_submitHashrate method
