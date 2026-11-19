@@ -279,6 +279,20 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
 
     int coinid = job->coind->id;
 
+    // KIIRO/Miningcore requires the worker to echo the exact header hash from
+    // mining.notify. Reject a mismatched header before crediting a share that
+    // could never be submitted as a valid block via pprpcsb.
+    if (is_firopow && job->templ) {
+        char expected_header[65] = { 0 };
+        snprintf(expected_header, sizeof(expected_header), "%s",
+            job->templ->header_hash.ToString().c_str());
+        string_lower(expected_header);
+        if (strcmp(header, expected_header)) {
+            client_submit_error(client, job, 20, "Invalid header hash", header, mixhash, nonce);
+            return true;
+        }
+    }
+
     //! sanity check nonce
     if (strlen(nonce) != YAAMP_KAWPOW_NONCE_SIZE * 2 || !ishexa(nonce, YAAMP_KAWPOW_NONCE_SIZE * 2)) {
         client_submit_error(client, job, 20, "Invalid nonce size", header, mixhash, nonce);
