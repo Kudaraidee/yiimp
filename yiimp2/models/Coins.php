@@ -14,6 +14,27 @@ class Coins extends ActiveRecord
         ];
     }
 
+    public function attributeLabels(): array
+    {
+        return [
+            // specifications column repurposed as a JSON wallet_info cache;
+            // written by CoinService::updateCoinStats(), read by the explorer overview.
+            'specifications' => 'Wallet Info',
+        ];
+    }
+
+    /**
+     * Return the decoded wallet_info JSON stored in specifications, or [].
+     * Keys: networkhashps (float), updated_at (int unix timestamp).
+     */
+    public function getWalletInfo(): array
+    {
+        if (empty($this->specifications)) {
+            return [];
+        }
+        return json_decode($this->specifications, true) ?: [];
+    }
+
     public function getOfficialSymbol()
 	{
 		if(!empty($this->symbol2))

@@ -5,7 +5,7 @@ $algo = user()->getState('yaamp-algo');
 $t = time() - 48*60*60;
 $stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
 
-$algo_unit_factor = yaamp_algo_mBTC_factor($algo);
+$algo_unit_factor = YIIMP_algo_mBTC_factor($algo);
 
 $data = array();
 

@@ -5,7 +5,7 @@ CC=gcc -g -ggdb
 #LDFLAGS=-g
 
 CXXFLAGS = -O2 -I.. -march=native -DNO_AES_NI -DBLAKE3_NO_SSE2 -DBLAKE3_NO_SSE41 -DXKCP_has_KeccakP1600
-CFLAGS= $(CXXFLAGS) -std=gnu99
+CFLAGS= $(CXXFLAGS) -std=gnu99 -fno-strict-aliasing -fwrapv
 LDFLAGS=-O2 -lgmp
 
 SOURCES=lyra2re.c lyra2v2.c Lyra2.c lyra2z.c lyra2z330.c Lyra2-z.c Sponge.c allium.c SWIFFTX/SWIFFTX.c lyra2vc0ban.c lyra2v3.c \

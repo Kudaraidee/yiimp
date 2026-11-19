@@ -26,7 +26,6 @@ require_once("binance.php");
 require_once("hitbtc.php");
 require_once("kucoin.php");
 require_once("nonkyc.php");
-require_once("tradeogre.php");
 require_once("safetrade.php");
 require_once("bibox.php");
 
@@ -74,8 +73,6 @@ function getMarketUrl($coin, $marketName)
 		$url = "https://www.kucoin.com/#/trade.pro/{$symbol}-{$base}";
 	else if ($market == 'nonkyc')
 		$url = "https://nonkyc.io/market/{$symbol}_{$base}";
-	else if($market == 'tradeogre')
-		$url = "https://tradeogre.com/exchange/{$symbol}-{$base}";
 	else if($market == 'yobit')
 		$url = "https://yobit.net/en/trade/{$symbol}/{$base}";
 	else if($market == 'safetrade')

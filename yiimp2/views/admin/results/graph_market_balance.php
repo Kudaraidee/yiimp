@@ -58,7 +58,7 @@ $stats = Market_history::find()
 $max = 0;
 foreach($stats as $histo) {
 	$d = date('Y-m-d H:i', $histo->time);
-	$series[YAAMP_SITE_NAME][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa($histo->balance));
+	$series[YIIMP_SITE_NAME][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa($histo->balance));
 	$max = max($max, $histo->balance);
 }
 $stackedMax += $max;

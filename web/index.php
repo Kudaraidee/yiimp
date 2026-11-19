@@ -2,7 +2,7 @@
 
 //define('YII_DEBUG', true);
 
-require_once('/etc/yiimp/serverconfig.php');
+require_once(file_exists('/etc/yiimp/serverconfig.php') ? '/etc/yiimp/serverconfig.php' : 'serverconfig.php');
 require_once('yaamp/defaultconfig.php');
 require_once('yaamp/ui/app.php');
 

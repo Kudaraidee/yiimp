@@ -304,10 +304,10 @@ void db_update_coinds(YAAMP_DB *db)
 
 		if(row[21]) coind->isaux = atoi(row[21]);
 
-		if(row[22] && row[23]) coind->actual_ttf = min(atoi(row[22]), atoi(row[23]));
+		if(row[22] && row[23]) coind->actual_ttf = std::min(atoi(row[22]), atoi(row[23]));
 		else if(row[22]) coind->actual_ttf = atoi(row[22]);
-		coind->actual_ttf = min(coind->actual_ttf, 120);
-		coind->actual_ttf = max(coind->actual_ttf, 20);
+		coind->actual_ttf = std::min(coind->actual_ttf, 120);
+		coind->actual_ttf = std::max(coind->actual_ttf, 20);
 
 		if(row[24]) coind->usememorypool = atoi(row[24]);
 		if(row[25]) coind->hasmasternodes = atoi(row[25]);
@@ -478,9 +478,9 @@ void db_update_remotes(YAAMP_DB *db)
 		if(remote->renter)
 		{
 			if(!strcmp(g_current_algo->name, "sha256"))
-				remote->speed = MIN(remote->speed, MAX(remote->renter->balance/g_current_algo->rent*100000000, 1));
+				remote->speed = std::min(remote->speed, std::max(remote->renter->balance/g_current_algo->rent*100000000, 1.0));
 			else
-				remote->speed = MIN(remote->speed, MAX(remote->renter->balance/g_current_algo->rent*100000, 1));
+				remote->speed = std::min(remote->speed, std::max(remote->renter->balance/g_current_algo->rent*100000, 1.0));
 		}
 	}
 

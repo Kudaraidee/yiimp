@@ -1,602 +1,221 @@
 <?php
 
-use yii\bootstrap5\ActiveForm;
-use yii\bootstrap5\Html;
+/** @var yii\web\View  $this     */
+/** @var string        $algo     */
+/** @var string        $algoUnit */
+/** @var array         $algos    */  // ['algoname' => coinCount, ...]
+/** @var array         $stats1   */  // ['hashrate', 'total', 'btcPerMhd']
+/** @var array         $stats2   */
+/** @var array         $stats3   */
 
-/** @var yii\web\View $this */
+use yii\helpers\Html;
 
-$algo = Yii::$app->session->get('yaamp-algo');
-$algo_unit = 'Mh';
-$algo_factor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
-if ($algo_factor == 0.001) $algo_unit = 'Kh';
-if ($algo_factor == 1000) $algo_unit = 'Gh';
-if ($algo_factor == 1000000) $algo_unit = 'Th';
-if ($algo_factor == 1000000000) $algo_unit = 'Ph';
+$isTailwind = Yii::$app->LayoutManager->isTailwind();
+$isLegacy   = Yii::$app->LayoutManager->isLegacy();
+$height     = '240px';
+$au         = Html::encode($algoUnit);
 
-$hour = 60 * 60;
-$days = 24 * $hour;
-
-$dbMax = Yii::$app->cache->get("stats_maxt-$algo");
-if (!$dbMax) {
-	$dbMax = (new \yii\db\Query())
-			->select(['(MAX(time)-30*60)'])
-			->from('hashstats')
-			->where(['algo' => $algo])
-			->andWhere(['>','time',(time()-2*$hour)])
-			->scalar();
-	Yii::$app->cache->set("stats_maxt-$algo", $dbMax);
+$options = '';
+foreach ($algos as $a => $count) {
+    $sel      = ($a === $algo) ? ' selected' : '';
+    $options .= '<option value="' . Html::encode($a) . '"' . $sel . '>' . Html::encode($a) . '</option>';
 }
 
-$dtMax = max(time()-$hour, $dbMax);
+// Three period columns — same structure, different graph IDs
+$periods = [
+    ['label' => 'Last 48 Hours', 'stats' => $stats1, 'graphs' => [1, 2, 3]],
+    ['label' => 'Last 7 Days',   'stats' => $stats2, 'graphs' => [4, 5, 6]],
+    ['label' => 'Last 30 Days',  'stats' => $stats3, 'graphs' => [7, 8, 9]],
+];
 
-$t1 = $dtMax - 2*$days;
-$t2 = $dtMax - 7*$days;
-$t3 = $dtMax - 30*$days;
+$graphInits = [
+    1 => "yiimpChart('graph_results_1', JSON.parse(data), { title: 'Hashrate ({$au}/s)', fill: true, colors: ['rgba(78,180,180,0.8)'], decimals: 3 });",
+    2 => "yiimpChart('graph_results_2', JSON.parse(data), { type: 'bar', title: 'BTC/Day', btcDecimals: true });",
+    3 => "yiimpChart('graph_results_3', JSON.parse(data), { type: 'bar', title: 'BTC/{$au}/d', btcDecimals: true });",
+    4 => "yiimpChart('graph_results_4', JSON.parse(data), { title: 'Hashrate ({$au}/s)', fill: true, colors: ['rgba(78,180,180,0.8)'], decimals: 3 });",
+    5 => "yiimpChart('graph_results_5', JSON.parse(data), { type: 'bar', title: 'BTC/Day', btcDecimals: true });",
+    6 => "yiimpChart('graph_results_6', JSON.parse(data), { type: 'bar', title: 'BTC/{$au}/d', btcDecimals: true });",
+    7 => "yiimpChart('graph_results_7', JSON.parse(data), { title: 'Hashrate ({$au}/s)', fill: true, colors: ['rgba(78,180,180,0.8)'], decimals: 3 });",
+    8 => "yiimpChart('graph_results_8', JSON.parse(data), { title: 'BTC/Day', btcDecimals: true });",
+    9 => "yiimpChart('graph_results_9', JSON.parse(data), { title: 'BTC/{$au}/d', btcDecimals: true });",
+];
 
-$row1 = Yii::$app->cache->get("stats_col1-$algo");
-if (!$row1) {
-	$row1 = (new \yii\db\Query())
-			->select(['AVG(hashrate) as a','SUM(earnings) as b'])
-			->from('hashstats')
-			->where(['algo' => $algo])
-			->andWhere(['>','time',$t1])
-			->one();
-	Yii::$app->cache->set("stats_col1-$algo", $row1);
-}
-$row2 = Yii::$app->cache->get("stats_col2-$algo");
-if (!$row2) {
-	$row2 = (new \yii\db\Query())
-			->select(['AVG(hashrate) as a','SUM(earnings) as b'])
-			->from('hashstats')
-			->where(['algo' => $algo])
-			->andWhere(['>','time',$t2])
-			->one();
-	Yii::$app->cache->set("stats_col2-$algo", $row2);
-}
-$row3 = Yii::$app->cache->get("stats_col3-$algo");
-if (!$row3) {
-	$row3 = (new \yii\db\Query())
-			->select(['AVG(hashrate) as a','SUM(earnings) as b'])
-			->from('hashstats')
-			->where(['algo' => $algo])
-			->andWhere(['>','time',$t3])
-			->one();
-	Yii::$app->cache->set("stats_col3-$algo", $row3);
-}
+?>
 
-if($row1['a']>0 && $row2['a']>0 && $row3['a']>0)
-{
-	$a1 = max(1., (double) $row1['a']);
-	$a2 = max(1., (double) $row2['a']);
-	$a3 = max(1., (double) $row3['a']);
-
-	$btcmhday1 = Yii::$app->ConversionUtils->bitcoinvaluetoa(($row1['b'] / 2)  * $algo_factor * (1000000 / $a1));
-	$btcmhday2 = Yii::$app->ConversionUtils->bitcoinvaluetoa(($row2['b'] / 7)  * $algo_factor * (1000000 / $a2));
-	$btcmhday3 = Yii::$app->ConversionUtils->bitcoinvaluetoa(($row3['b'] / 30) * $algo_factor * (1000000 / $a3));
-}
-else
-{
-	$btcmhday1 = 0;
-	$btcmhday2 = 0;
-	$btcmhday3 = 0;
-}
-
-$hashrate1 = Yii::$app->ConversionUtils->Itoa2($row1['a']);
-$hashrate2 = Yii::$app->ConversionUtils->Itoa2($row2['a']);
-$hashrate3 = Yii::$app->ConversionUtils->Itoa2($row3['a']);
-
-$total1 = Yii::$app->ConversionUtils->bitcoinvaluetoa($row1['b']);
-$total2 = Yii::$app->ConversionUtils->bitcoinvaluetoa($row2['b']);
-$total3 = Yii::$app->ConversionUtils->bitcoinvaluetoa($row3['b']);
-
-$height = '240px';
-
-//$algos = yaamp_get_algos();
-$algos = array();
-$enabled = (new \yii\db\Query())
-			->select(['algo','count(id) as count'])
-			->from('coins')
-			->where(['enable' => 1,'visible' => 1])
-			->groupBy('algo')
-			->orderBy('algo')
-			->all();
-foreach ($enabled as $row) {
-	$algos[$row['algo']] = $row['count'];
-}
-
-$string = '';
-foreach($algos as $a => $count)
-{
-	if($a == $algo)
-		$string .= "<option value='$a' selected>$a</option>";
-	else
-		$string .= "<option value='$a'>$a</option>";
-}
-
-// to fill the graphs on right edges (big tick interval of 4 days)
-$dtMin1 = $t1 + $hour;
-$dtMax1 = $dtMax;
-
-$dtMin2 = $t2 - 2*$hour;
-$dtMax2 = $dtMin2 + 7 * $days;
-
-$dtMin3 = $dtMax1 - (8*4+1)*$days;
-$dtMax3 = $dtMin3 + (8*4) * $days;
-
-echo <<<end
-
-<div id='resume_update_button' style='color: #444; background-color: #ffd; border: 1px solid #eea;
-	padding: 10px; margin-left: 20px; margin-right: 20px; margin-top: 15px; cursor: pointer; display: none;'
-	onclick='auto_page_resume();' align=center>
-	<b>Auto refresh is paused - Click to resume</b></div>
-
-<div align=right>
-Select Algo: <select id='algo_select'>$string</select>&nbsp;
+<?php if ($isLegacy): ?>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     LEGACY
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div id="resume_update_button"
+     style="color:#444;background:#ffd;border:1px solid #eea;padding:10px;
+            margin:15px 20px;cursor:pointer;display:none;"
+     onclick="auto_page_resume()" align="center">
+    <b>Auto refresh is paused — click to resume</b>
 </div>
 
-<script>
+<div align="right" style="margin-bottom:6px;">
+    Select Algo: <select id="algo_select"><?= $options ?></select>&nbsp;
+</div>
 
-$('#algo_select').change(function(event)
-{
-	var algo = $('#algo_select').val();
-	window.location.href = '/site/algo?algo='+algo+'&r=/stats';
+<div class="row gx-4">
+<?php foreach ($periods as $p): ?>
+    <div class="col-12 col-md-4">
+        <div class="main-left-box">
+            <div class="main-left-title"><?= Html::encode($p['label']) ?></div>
+            <div class="main-left-inner">
+                <ul>
+                    <li>Average Hashrate: <b><?= Html::encode($p['stats']['hashrate']) ?>h/s</b></li>
+                    <li>BTC Value: <b><?= Html::encode($p['stats']['total']) ?></b></li>
+                    <li>BTC/<?= $au ?>/d: <b><?= Html::encode($p['stats']['btcPerMhd']) ?></b></li>
+                </ul>
+                <?php foreach ($p['graphs'] as $gid): ?>
+                <div id="graph_results_<?= $gid ?>"
+                     style="height:<?= $height ?>;<?= $gid !== $p['graphs'][0] ? 'margin-top:1rem;' : '' ?>"></div>
+                <?php endforeach ?>
+            </div>
+        </div>
+    </div>
+<?php endforeach ?>
+</div>
+
+
+<?php elseif (!$isTailwind): ?>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     ADMINLTE
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div id="resume_update_button"
+     class="alert alert-warning d-flex align-items-center gap-2 mb-3"
+     style="cursor:pointer;display:none!important;"
+     onclick="auto_page_resume()">
+    <i class="bi bi-pause-circle-fill"></i>
+    <strong>Auto refresh is paused</strong> — click to resume
+</div>
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <label class="text-muted small mb-0">Algo:</label>
+    <select id="algo_select" class="form-select form-select-sm" style="width:140px;">
+        <?= $options ?>
+    </select>
+</div>
+
+<div class="row gx-3">
+<?php foreach ($periods as $p): ?>
+    <div class="col-12 col-md-4 mb-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header py-2 d-flex align-items-center gap-2">
+                <strong class="small"><?= Html::encode($p['label']) ?></strong>
+                <span class="badge bg-light text-dark border font-monospace ms-1"><?= $au ?></span>
+            </div>
+            <div class="card-body pb-0">
+                <ul class="list-unstyled small mb-3">
+                    <li class="text-muted mb-1">
+                        Hashrate
+                        <strong class="text-dark ms-1"><?= Html::encode($p['stats']['hashrate']) ?>h/s</strong>
+                    </li>
+                    <li class="text-muted mb-1">
+                        BTC Value
+                        <strong class="text-dark ms-1 font-monospace"><?= Html::encode($p['stats']['total']) ?></strong>
+                    </li>
+                    <li class="text-muted">
+                        BTC/<?= $au ?>/d
+                        <strong class="text-dark ms-1 font-monospace"><?= Html::encode($p['stats']['btcPerMhd']) ?></strong>
+                    </li>
+                </ul>
+                <?php foreach ($p['graphs'] as $gid): ?>
+                <div id="graph_results_<?= $gid ?>"
+                     style="height:<?= $height ?>;<?= $gid !== $p['graphs'][0] ? 'margin-top:1rem;' : '' ?>"></div>
+                <?php endforeach ?>
+            </div>
+        </div>
+    </div>
+<?php endforeach ?>
+</div>
+
+
+<?php else: ?>
+<!-- ══════════════════════════════════════════════════════════════════════════
+     TAILWIND
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div id="resume_update_button"
+     class="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl
+            bg-amber-50 dark:bg-amber-900/20
+            border border-amber-200 dark:border-amber-800
+            text-amber-700 dark:text-amber-300 text-sm cursor-pointer"
+     style="display:none;"
+     onclick="auto_page_resume()">
+    <i data-lucide="pause-circle" class="w-5 h-5 shrink-0"></i>
+    <strong>Auto refresh is paused</strong> — click to resume
+</div>
+
+<div class="flex items-center gap-2 mb-4">
+    <label class="text-xs text-gray-400 dark:text-gray-500">Algo:</label>
+    <select id="algo_select"
+            class="px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600
+                   bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100
+                   focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <?= $options ?>
+    </select>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<?php foreach ($periods as $p): ?>
+    <div class="rounded-xl border border-gray-200 dark:border-gray-700
+                bg-white dark:bg-gray-800 shadow-sm overflow-hidden flex flex-col">
+
+        <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
+                    flex items-center gap-2">
+            <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                <?= Html::encode($p['label']) ?>
+            </span>
+            <span class="px-1.5 py-0.5 text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/30
+                         text-indigo-700 dark:text-indigo-300 font-mono ml-auto">
+                <?= $au ?>
+            </span>
+        </div>
+
+        <div class="px-4 py-3">
+            <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mb-4">
+                <dt class="text-gray-400 dark:text-gray-500">Hashrate</dt>
+                <dd class="text-right font-mono font-semibold text-gray-800 dark:text-gray-200">
+                    <?= Html::encode($p['stats']['hashrate']) ?>h/s
+                </dd>
+                <dt class="text-gray-400 dark:text-gray-500">BTC Value</dt>
+                <dd class="text-right font-mono text-gray-700 dark:text-gray-300">
+                    <?= Html::encode($p['stats']['total']) ?>
+                </dd>
+                <dt class="text-gray-400 dark:text-gray-500">BTC/<?= $au ?>/d</dt>
+                <dd class="text-right font-mono text-gray-700 dark:text-gray-300">
+                    <?= Html::encode($p['stats']['btcPerMhd']) ?>
+                </dd>
+            </dl>
+
+            <?php foreach ($p['graphs'] as $gid): ?>
+            <div id="graph_results_<?= $gid ?>"
+                 style="height:<?= $height ?>;<?= $gid !== $p['graphs'][0] ? 'margin-top:1rem;' : '' ?>"></div>
+            <?php endforeach ?>
+        </div>
+    </div>
+<?php endforeach ?>
+</div>
+
+<?php endif ?>
+
+<script>
+$('#algo_select').change(function () {
+    window.location.href = '/site/algo?algo=' + encodeURIComponent($('#algo_select').val()) + '&r=/stats';
 });
 
+function page_refresh() {
+    for (var i = 1; i <= 9; i++) {
+        (function (n) {
+            $.get('/stats/graph_results_' + n, '', function (data) {
+                window['graph_init_' + n](data);
+            });
+        })(i);
+    }
+}
+
+<?php foreach ($graphInits as $n => $body): ?>
+function graph_init_<?= $n ?>(data) { <?= $body ?> }
+<?php endforeach ?>
 </script>
-
-<table width=100%><tr><td valign=top width=33%>
-
-<div class="main-left-box">
-<div class="main-left-title">Last 48 Hours</div>
-<div class="main-left-inner">
-
-<ul>
-<li>Average Hashrate: <b>{$hashrate1}h/s</b></li>
-<li>BTC Value: <b>$total1</b></li>
-<li>BTC/{$algo_unit}/d: <b>$btcmhday1</b></li>
-</ul>
-
-<br>
-<div id='graph_results_1' style='height: $height;'></div><br><br>
-<div id='graph_results_2' style='height: $height;'></div><br><br>
-<div id='graph_results_3' style='height: $height;'></div><br><br>
-
-</div></div><br>
-
-</td>
-<td></td>
-<td valign=top width=33%>
-
-<div class="main-left-box">
-<div class="main-left-title">Last 7 Days</div>
-<div class="main-left-inner">
-
-<ul>
-<li>Average Hashrate: <b>{$hashrate2}h/s</b></li>
-<li>BTC Value: <b>$total2</b></li>
-<li>BTC/{$algo_unit}/d: <b>$btcmhday2</b></li>
-</ul>
-
-<br>
-<div id='graph_results_4' style='height: $height;'></div><br><br>
-<div id='graph_results_5' style='height: $height;'></div><br><br>
-<div id='graph_results_6' style='height: $height;'></div><br><br>
-
-</div></div><br>
-
-</td>
-<td></td>
-<td valign=top width=33%>
-
-<div class="main-left-box">
-<div class="main-left-title">Last 30 Days</div>
-<div class="main-left-inner">
-
-<ul>
-<li>Average Hashrate: <b>{$hashrate3}h/s</b></li>
-<li>BTC Value: <b>$total3</b></li>
-<li>BTC/{$algo_unit}/d: <b>$btcmhday3</b></li>
-</ul>
-
-<br>
-<div id='graph_results_7' style='height: $height;'></div><br><br>
-<div id='graph_results_8' style='height: $height;'></div><br><br>
-<div id='graph_results_9' style='height: $height;'></div><br><br>
-
-</div></div><br>
-
-</td></tr></table>
-
-<br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br><br><br><br>
-<br><br><br><br><br><br><br><br><br><br>
-
-<script type="text/javascript">
-
-var dtMin1 = new Date(1000*{$dtMin1});
-var dtMax1 = new Date(1000*{$dtMax1});
-
-var dtMin2 = new Date(1000*{$dtMin2});
-var dtMax2 = new Date(1000*{$dtMax2});
-
-var dtMin3 = new Date(1000*{$dtMin3});
-var dtMax3 = new Date(1000*{$dtMax3});
-
-function page_refresh()
-{
-	main_refresh_1();
-	main_refresh_2();
-	main_refresh_3();
-	main_refresh_4();
-	main_refresh_5();
-	main_refresh_6();
-	main_refresh_7();
-	main_refresh_8();
-	main_refresh_9();
-}
-
-end;
-
-for($i = 1; $i < 10; $i++)
-{
-	echo <<<end
-	///////////////////////////////////////////////////////////////////////
-
-	function main_ready_$i(data)
-	{
-		graph_init_$i(data);
-	}
-
-	function main_refresh_$i()
-	{
-		var url = "/stats/graph_results_$i";
-		$.get(url, '', main_ready_$i);
-	}
-end;
-}
-
-echo <<<end
-
-function graph_init_1(data)
-{
-	$('#graph_results_1').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_1', [t],
-	{
-		title: '<b>Hashrate ({$algo_unit}/s)</b>',
-		axes: {
-			xaxis: {
-				min: dtMin1,
-				max: dtMax1,
-				tickInterval: 14400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.3f</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		seriesColors: [ "rgba(78, 180, 180, 0.8)" ],
-		series: [ { fill: true } ],
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-function graph_init_2(data)
-{
-	$('#graph_results_2').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_2', [t],
-	{
-		title: '<b>BTC/Day</b>',
-		axes: {
-			xaxis: {
-				min: dtMin1,
-				max: dtMax1,
-				tickInterval: 14400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: {barWidth: 3}
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-function graph_init_3(data)
-{
-	$('#graph_results_3').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_3', [t],
-	{
-		title: '<b>BTC/{$algo_unit}/d</b>',
-		axes: {
-			xaxis: {
-				min: dtMin1,
-				max: dtMax1,
-				tickInterval: 14400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%#Hh</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: { barWidth: 3 }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-function graph_init_4(data)
-{
-	$('#graph_results_4').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_4', [t],
-	{
-		title: '<b>Hashrate ({$algo_unit}/s)</b>',
-		axes: {
-			xaxis: {
-				min: dtMin2,
-				max: dtMax2,
-				tickInterval: 86400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.3f</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		seriesColors: [ "rgba(78, 180, 180, 0.8)" ],
-		series: [ { fill: true } ],
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-function graph_init_5(data)
-{
-	$('#graph_results_5').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_5', [t],
-	{
-		title: '<b>BTC/Day</b>',
-		axes: {
-			xaxis: {
-				min: dtMin2,
-				max: dtMax2,
-				tickInterval: 86400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: { barWidth: 3 }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-function graph_init_6(data)
-{
-	$('#graph_results_6').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_6', [t],
-	{
-		title: '<b>BTC/{$algo_unit}/d</b>',
-		axes: {
-			xaxis: {
-				min: dtMin2,
-				max: dtMax2,
-				tickInterval: 86400,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			renderer: $.jqplot.BarRenderer,
-			rendererOptions: { barWidth: 3 }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-
-function graph_init_7(data)
-{
-	$('#graph_results_7').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_7', [t],
-	{
-		title: '<b>Hashrate ({$algo_unit}/s)</b>',
-		axes: {
-			xaxis: {
-				min: dtMin3,
-				max: dtMax3,
-				tickInterval: 4 * 24*60*60,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%m/%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.3f</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		seriesColors: [ "rgba(78, 180, 180, 0.8)" ],
-		series: [ { fill: true } ],
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-function graph_init_8(data)
-{
-	$('#graph_results_8').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_8', [t],
-	{
-		title: '<b>BTC/Day</b>',
-		axes: {
-			xaxis: {
-				min: dtMin3,
-				max: dtMax3,
-				tickInterval: 4 * 24*60*60,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%m/%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-function graph_init_9(data)
-{
-	$('#graph_results_9').empty();
-
-	var t = $.parseJSON(data);
-	var plot1 = $.jqplot('graph_results_9', [t],
-	{
-		title: '<b>BTC/{$algo_unit}/d</b>',
-		axes: {
-			xaxis: {
-				min: dtMin3,
-				max: dtMax3,
-				tickInterval: 4 * 24*60*60,
-				renderer: $.jqplot.DateAxisRenderer,
-				tickOptions: {formatString: '<font size=1>%m/%d</font>'}
-			},
-			yaxis: {
-				min: 0.0,
-				tickOptions: {formatString: '<font size=1>%#.8f &nbsp;</font>'}
-			}
-		},
-
-		seriesDefaults: {
-			markerOptions: { style: 'none' },
-			rendererOptions: { smooth: true }
-		},
-
-		grid: {
-			borderWidth: 1,
-			shadowWidth: 2,
-			shadowDepth: 2
-		},
-
-	});
-}
-
-
-</script>
-end;
-
-

@@ -212,6 +212,11 @@ json_value * json_parse_ex (json_settings * settings,
                             char * error_buf)
 {
    json_char error [json_error_max];
+
+   if (!json) {
+      if (error_buf) strcpy(error_buf, "json is null");
+      return NULL;
+   }
    unsigned int cur_line;
    const json_char * cur_line_begin, * i, * end;
    json_value * top, * root, * alloc = 0;
@@ -233,7 +238,8 @@ json_value * json_parse_ex (json_settings * settings,
    error[0] = '\0';
    end = (json + length);
 
-   memcpy (&state.settings, settings, sizeof (json_settings));
+   if (settings)
+      memcpy (&state.settings, settings, sizeof (json_settings));
 
    if (!state.settings.mem_alloc)
       state.settings.mem_alloc = default_alloc;
@@ -924,9 +930,16 @@ json_value * json_parse (const json_char * json, size_t length)
 void json_value_free_ex (json_settings * settings, json_value * value)
 {
    json_value * cur_value;
+   json_settings default_settings = { 0 };
 
    if (!value)
       return;
+
+   if (!settings)
+      settings = &default_settings;
+
+   if (!settings->mem_free)
+      settings->mem_free = default_free;
 
    value->parent = 0;
 
@@ -1015,11 +1028,11 @@ double json_double_value(const json_value *json)
 
 json_value* json_get_val(json_value *obj, const char *key)
 {
-   if (obj->type != json_object)
+   if (!obj || obj->type != json_object || !key)
       return NULL;
 
    for (unsigned int i = 0; i < obj->u.object.length; i++)
-      if (!strcmp(obj->u.object.values[i].name, key))
+      if (obj->u.object.values[i].name && !strcmp(obj->u.object.values[i].name, key))
          return obj->u.object.values[i].value;
 
    return NULL;

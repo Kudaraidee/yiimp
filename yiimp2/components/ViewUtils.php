@@ -8,133 +8,302 @@ use yii\helpers\Html;
 
 class ViewUtils extends Component
 {
-	public function showButtonHeader()
-	{
-		echo "<div class='buttonwrapper'>";
-	}
+    // ── Icon map ──────────────────────────────────────────────────────────────
+    //
+    // Canonical name → per-library identifiers.
+    // Bootstrap Icons (AdminLTE) and Lucide (Tailwind) use different naming
+    // conventions; this table is the single source of truth.
+    //
+    // Usage:  Yii::$app->ViewUtils->icon('home')
+    //         Yii::$app->ViewUtils->icon('logout', 'me-2')   // with extra CSS class
+    private const ICON_MAP = [
+        // ── Public navigation ─────────────────────────────────────────────
+        'home'          => ['bi' => 'bi-house',                 'lucide' => 'home'],
+        'pool'          => ['bi' => 'bi-cpu',                   'lucide' => 'cpu'],
+        'wallet'        => ['bi' => 'bi-wallet2',               'lucide' => 'wallet'],
+        'graphs'        => ['bi' => 'bi-graph-up',              'lucide' => 'trending-up'],
+        'miners'        => ['bi' => 'bi-people',                'lucide' => 'users'],
+        'api'           => ['bi' => 'bi-code-slash',            'lucide' => 'code-2'],
+        'explorer'      => ['bi' => 'bi-search',                'lucide' => 'telescope'],
+        'benchmark'     => ['bi' => 'bi-speedometer2',          'lucide' => 'gauge'],
+        'rental'        => ['bi' => 'bi-lightning-charge',      'lucide' => 'zap'],
+        // ── Admin navigation ──────────────────────────────────────────────
+        'dashboard'     => ['bi' => 'bi-speedometer',           'lucide' => 'layout-dashboard'],
+        'wallets'       => ['bi' => 'bi-wallet',                'lucide' => 'wallet-cards'],
+        'coins'         => ['bi' => 'bi-coin',                  'lucide' => 'coins'],
+        'exchange'      => ['bi' => 'bi-arrow-left-right',      'lucide' => 'arrow-left-right'],
+        'balances'      => ['bi' => 'bi-bar-chart',             'lucide' => 'bar-chart-2'],
+        'users'         => ['bi' => 'bi-people-fill',           'lucide' => 'users-2'],
+        'workers'       => ['bi' => 'bi-pc-display',            'lucide' => 'monitor'],
+        'version'       => ['bi' => 'bi-tag',                   'lucide' => 'tag'],
+        'earnings'      => ['bi' => 'bi-cash-stack',            'lucide' => 'receipt'],
+        'payments'      => ['bi' => 'bi-credit-card',           'lucide' => 'credit-card'],
+        'botnets'       => ['bi' => 'bi-bug',                   'lucide' => 'shield-alert'],
+        'monsters'      => ['bi' => 'bi-person-dash',           'lucide' => 'user-x'],
+        'jobs'          => ['bi' => 'bi-briefcase',             'lucide' => 'briefcase'],
+        'renting-admin' => ['bi' => 'bi-lightning-charge-fill', 'lucide' => 'zap-off'],
+        'nicehash'      => ['bi' => 'bi-hdd-network',           'lucide' => 'server'],
+        // ── Chrome / UI ───────────────────────────────────────────────────
+        'menu'          => ['bi' => 'bi-list',                  'lucide' => 'menu'],
+        'site-logo'     => ['bi' => 'bi-grid-3x3-gap-fill',    'lucide' => 'grid-3x3'],
+        'user'          => ['bi' => 'bi-person-circle',         'lucide' => 'user-circle'],
+        'logout'        => ['bi' => 'bi-box-arrow-right',       'lucide' => 'log-out'],
+        'login'         => ['bi' => 'bi-box-arrow-in-right',    'lucide' => 'log-in'],
+        'dark-mode'     => ['bi' => 'bi-moon',                  'lucide' => 'moon'],
+        'light-mode'    => ['bi' => 'bi-sun',                   'lucide' => 'sun'],
+        'chevron-down'  => ['bi' => 'bi-chevron-down',          'lucide' => 'chevron-down'],
+        'chevron-right' => ['bi' => 'bi-chevron-right',         'lucide' => 'chevron-right'],
+        'trash'         => ['bi' => 'bi-trash',                 'lucide' => 'trash-2'],
+        'edit'          => ['bi' => 'bi-pencil',                'lucide' => 'pencil'],
+        'check'         => ['bi' => 'bi-check-circle',          'lucide' => 'check-circle'],
+        'warning'       => ['bi' => 'bi-exclamation-triangle',  'lucide' => 'alert-triangle'],
+        'info'          => ['bi' => 'bi-info-circle',           'lucide' => 'info'],
+        'refresh'       => ['bi' => 'bi-arrow-clockwise',       'lucide' => 'refresh-cw'],
+        'download'      => ['bi' => 'bi-download',              'lucide' => 'download'],
+        'external'      => ['bi' => 'bi-box-arrow-up-right',    'lucide' => 'external-link'],
+    ];
 
-	public function showButton($name, $link, $htmlOptions = array())
-	{
-		echo Html::a($name, $link, $htmlOptions);
-	}
+    /**
+     * Render a scheme-appropriate icon element by canonical name.
+     *
+     * AdminLTE → <i class="bi {bi-name} {$extraClass}"></i>
+     * Tailwind  → <i data-lucide="{lucide-name}" class="{$extraClass}"></i>
+     * Legacy    → '' (legacy uses plain text; no icon library loaded)
+     *
+     * $extraClass adds to the element's class attribute — e.g. 'nav-icon' for
+     * AdminLTE sidebar items, or 'w-4 h-4' for Tailwind inline icons.
+     *
+     * Unknown canonical names log a warning and return an empty string.
+     */
+    public function icon(string $name, string $extraClass = ''): string
+    {
+        $map    = self::ICON_MAP[$name] ?? null;
+        $scheme = Yii::$app->LayoutManager->scheme;
 
-	public function showButtonPost($name, $htmlOptions)
-	{
-		echo Html::submitButton($name, $htmlOptions);
-	}
+        if (!$map) {
+            Yii::warning("ViewUtils::icon() — unknown canonical icon name '{$name}'", __CLASS__);
+            return '';
+        }
 
-	public function showTextTeaser($text, $more, $count = 120, $class = 'text')
-	{
-		if(empty($text)) return "";
+        if ($scheme === 'adminlte') {
+            $cls = trim('bi ' . $map['bi'] . ' ' . $extraClass);
+            return "<i class=\"{$cls}\"></i>";
+        }
 
-		$text = strip_tags($text);
-		if(strlen($text) < $count)
-		{
-			echo "<p class='$class'>$text</p>";
-			return;
-		}
+        if ($scheme === 'tailwind') {
+            $cls = trim($extraClass);
+            return $cls
+                ? "<i data-lucide=\"{$map['lucide']}\" class=\"{$cls}\"></i>"
+                : "<i data-lucide=\"{$map['lucide']}\"></i>";
+        }
 
-		$text = substr($text, 0, $count)."...";
-		echo "<p class='$class'>".$text." [".Html::a("more...", $more)."]</p>";
-	}
+        return ''; // legacy: no icon library
+    }
 
-	public function getTextTeaser($text, $count = 120)
-	{
-		if(empty($text)) return "";
+    // ── Generic helpers ───────────────────────────────────────────────────────
 
-		$text = strip_tags($text);
-		if(strlen($text) < $count)
-			return $text;
+    public function showButtonHeader(): void
+    {
+        echo "<div class='buttonwrapper'>";
+    }
 
-		$text = substr($text, 0, $count)."...";
-		return $text;
-	}
+    public function showButton(string $name, string $link, array $htmlOptions = []): void
+    {
+        echo Html::a($name, $link, $htmlOptions);
+    }
 
-	public function getTextTitle($text)
-	{
-		$b = preg_match('/([^\.\r\n]*)/', $text, $match);
-		return $match[1];
-	}
+    public function showButtonPost(string $name, array $htmlOptions): void
+    {
+        echo Html::submitButton($name, $htmlOptions);
+    }
 
-	public function showTableSorter($id, $options='')
-	{
-		$this->JavascriptReady("
-			$('#{$id}').tablesorter({$options});
-			$('.tablesorter-header').not('.sorter-false').css('cursor', 'pointer');"
-		);
-		echo "<table id='$id' class='dataGrid2'>";
-	}
-	public function JavascriptFile($filename)
-	{
-		echo Html::jsFile($filename);
-	}
+    public function showTextTeaser(string $text, string $more, int $count = 120, string $class = 'text'): void
+    {
+        if (empty($text)) return;
+        $text = strip_tags($text);
+        if (strlen($text) < $count) {
+            echo "<p class='$class'>$text</p>";
+            return;
+        }
+        echo "<p class='$class'>" . substr($text, 0, $count) . '... [' . Html::a('more...', $more) . ']</p>';
+    }
 
-	public function Javascript($javascript)
-	{
-		echo "<script>$javascript</script>";
-	}
+    public function getTextTeaser(string $text, int $count = 120): string
+    {
+        if (empty($text)) return '';
+        $text = strip_tags($text);
+        return strlen($text) < $count ? $text : substr($text, 0, $count) . '...';
+    }
 
-	public function JavascriptReady($javascript)
-	{
-		echo "<script>$(function(){ $javascript})</script>";
-	}
+    public function getTextTitle(string $text): string
+    {
+        preg_match('/([^\.\r\n]*)/', $text, $match);
+        return $match[1] ?? '';
+    }
 
-	// Functions commonly used in admin pages
+    public function JavascriptFile(string $filename): void
+    {
+        echo Html::jsFile($filename);
+    }
 
-	public function getAdminSideBarLinks()
-	{
-	$links = <<<end
-	<a href="/admin/exchange">Exchanges</a>&nbsp;
-	<a href="/admin/botnets">Botnets</a>&nbsp;
-	<a href="/admin/user">Users</a>&nbsp;
-	<a href="/admin/worker">Workers</a>&nbsp;
-	<a href="/admin/version">Version</a>&nbsp;
-	<a href="/admin/earning">Earnings</a>&nbsp;
-	<a href="/admin/payments">Payments</a>&nbsp;
-	<a href="/admin/monsters">Big Miners</a>&nbsp;
-	end;
-		return $links;
-	}
+    public function Javascript(string $javascript): void
+    {
+        echo "<script>$javascript</script>";
+    }
 
-	// shared by wallet "tabs", to move in another php file...
-	public function getAdminWalletLinks($coin, $info=NULL, $src='wallet')
-	{
-		$html = Html::a("<b>COIN PROPERTIES</b>", '/admin/coinwallet_update?id='.$coin->id);
-		if($info) {
-			$html .= ' || '.$coin->createExplorerLink("<b>EXPLORER</b>");
-			$html .= ' || '.Html::a("<b>PEERS</b>", '/admin/coinwallet_peers?id='.$coin->id);
-			if (YAAMP_ADMIN_WEBCONSOLE)
-				$html .= ' || '.Html::a("<b>CONSOLE</b>", '/admin/coinwallet_console?id='.$coin->id);
-			$html .= ' || '.Html::a("<b>TRIGGERS</b>", '/admin/cointriggers?id='.$coin->id);
-			if ($src != 'wallet')
-				$html .= ' || '.Html::a("<b>{$coin->symbol}</b>", '/admin/coin?id='.$coin->id);
-		}
+    public function JavascriptReady(string $javascript): void
+    {
+        echo "<script>$(function(){ $javascript})</script>";
+    }
 
-		if(!$info && $coin->enable)
-			$html .= '<br/>'.Html::a("<b>STOP COIND</b>", '/admin/stopcoin?id='.$coin->id);
+    // ── Layout-aware helpers ──────────────────────────────────────────────────
 
-		if($coin->auto_ready)
-			$html .= '<br/>'.Html::a("<b>UNSET AUTO</b>", '/admin/coinwallet_unsetauto?id='.$coin->id);
-		else
-			$html .= '<br/>'.Html::a("<b>SET AUTO</b>", '/admin/coinwallet_setauto?id='.$coin->id);
+    /**
+     * Render a per-scheme partial from views/layouts/{scheme}/partials/{name}.php.
+     * $params are extracted into the partial's scope.
+     */
+    private function renderLayoutPartial(string $name, array $params = []): string
+    {
+        $scheme  = Yii::$app->LayoutManager->scheme;
+        $partial = "@app/views/layouts/{$scheme}/partials/{$name}";
+        return Yii::$app->controller->renderPartial($partial, $params);
+    }
 
-		$html .= '<br/>';
+    /**
+     * Emit the opening <table> tag and register the per-scheme sort/filter JS.
+     *
+     * IMPORTANT: this method outputs a <table id="$id"> opening tag.
+     * Call it at the position in the view where the table should open;
+     * close the table with </table> in the view HTML.
+     * Do NOT call it in views that already define their own <table> element —
+     * the duplicate opening tag creates an unclosed table that breaks layout
+     * rendering below the call site (pagination, footers, etc.).
+     * For views with an existing table, call JavascriptReady() directly instead.
+     *
+     * Legacy + AdminLTE: jQuery tablesorter plugin.
+     * Tailwind: lightweight vanilla-JS sort + filter (no jQuery dependency).
+     */
+    public function showTableSorter(string $id, string $options = ''): void
+    {
+        echo "<table id='$id' class='dataGrid2'>";
 
-		if(!empty($coin->link_bitcointalk))
-			$html .= Html::a('forum', $coin->link_bitcointalk, array('target'=>'_blank')).' ';
+        if (Yii::$app->LayoutManager->isTailwind()) {
+            $this->emitVanillaSorter($id, $options);
+        } else {
+            $this->JavascriptReady("
+                $('#{$id}').tablesorter({$options});
+                $('.tablesorter-header').not('.sorter-false').css('cursor', 'pointer');
+            ");
+        }
+    }
 
-		if(!empty($coin->link_github))
-			$html .= Html::a('git', $coin->link_github, array('target'=>'_blank')).' ';
+    /**
+     * Vanilla-JS sort + filter that replaces jQuery tablesorter for the Tailwind
+     * scheme. Respects data-sorter="false" / data-sorter="" headers, the custom
+     * `data` attribute on cells for numeric sort, and the .search external filter.
+     */
+    private function emitVanillaSorter(string $id, string $options = ''): void
+    {
+        $jsId = json_encode($id);
+        echo <<<JS
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var table  = document.getElementById({$jsId});
+    if (!table) return;
+    var tbody  = table.tBodies[0];
+    var thead  = table.tHead;
+    if (!tbody || !thead) return;
+    var ths    = Array.from(thead.rows[0].cells);
+    var asc    = ths.map(function () { return true; });
 
-		if(!empty($coin->link_site))
-			$html .= Html::a('site', $coin->link_site, array('target'=>'_blank')).' ';
+    // Column sort on header click
+    ths.forEach(function (th, col) {
+        var sorter = th.dataset.sorter;
+        if (sorter === 'false' || sorter === '') return;
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', function () {
+            var rows   = Array.from(tbody.rows);
+            var isNum  = sorter === 'numeric' || sorter === 'currency';
+            rows.sort(function (a, b) {
+                var av = cellVal(a, col);
+                var bv = cellVal(b, col);
+                if (isNum) {
+                    var an = parseFloat(av), bn = parseFloat(bv);
+                    if (!isNaN(an) && !isNaN(bn)) return asc[col] ? an - bn : bn - an;
+                }
+                return asc[col] ? av.localeCompare(bv) : bv.localeCompare(av);
+            });
+            asc[col] = !asc[col];
+            rows.forEach(function (r) { tbody.appendChild(r); });
+        });
+    });
 
-		if(!empty($coin->link_explorer))
-			$html .= Html::a('chain', $coin->link_explorer, array('target'=>'_blank','title'=>'External Blockchain Explorer')).' ';
+    // External search filter — wires to the first .search input on the page
+    var search = document.querySelector('input.search');
+    if (search) {
+        search.addEventListener('input', function () {
+            var q = this.value.toLowerCase();
+            Array.from(tbody.rows).forEach(function (r) {
+                r.classList.toggle('filtered', q !== '' && r.textContent.toLowerCase().indexOf(q) === -1);
+            });
+        });
+    }
 
-		$html .= Html::a('google', 'http://google.com/search?q='.urlencode($coin->name.' '.$coin->symbol.' bitcointalk'), array('target'=>'_blank'));
+    function cellVal(row, col) {
+        var cell = row.cells[col];
+        if (!cell) return '';
+        return (cell.getAttribute('data') || cell.textContent || '').trim();
+    }
+});
+</script>
+JS;
+    }
 
-		return $html;
-	}
+    // ── Admin navigation ──────────────────────────────────────────────────────
 
+    /**
+     * Quick-nav bar shown at the top of admin view pages.
+     * Legacy: horizontal <a> list. Sidebar schemes: suppressed (sidebar already shows these links).
+     */
+    public function getAdminSideBarLinks(): string
+    {
+        return $this->renderLayoutPartial('admin_sidebar');
+    }
+
+    /**
+     * Full sidebar navigation rendered inside layout files.
+     * AdminLTE: <ul class="nav sidebar-menu"> with Bootstrap Icons.
+     * Tailwind: <nav> with Lucide icon placeholders.
+     * Legacy: empty (navigation lives in the Bootstrap NavBar widget).
+     */
+    public function renderSidebarNav(): string
+    {
+        $isAdmin    = !is_null(Yii::$app->user->identity)
+                    && Yii::$app->user->identity->is_admin;
+        $controller = Yii::$app->controller->id;
+        $action     = Yii::$app->controller->action?->id ?? 'index';
+        $hasAddress = Yii::$app->request->get('address') !== null;
+        return $this->renderLayoutPartial('sidebar_nav', [
+            'isAdmin'    => $isAdmin,
+            'controller' => $controller,
+            'action'     => $action,
+            'hasAddress' => $hasAddress,
+        ]);
+    }
+
+    // ── Coin wallet helpers ───────────────────────────────────────────────────
+
+    /**
+     * Coin management action bar shown on wallet/peers admin pages.
+     * Layout-aware: legacy uses inline bold links; adminlte uses button groups;
+     * tailwind uses Tailwind pill buttons.
+     */
+    public function getAdminWalletLinks(mixed $coin, mixed $info = null, string $src = 'wallet'): string
+    {
+        return $this->renderLayoutPartial('wallet_links', [
+            'coin' => $coin,
+            'info' => $info,
+            'src'  => $src,
+        ]);
+    }
 }

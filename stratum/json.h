@@ -169,7 +169,7 @@ typedef struct _json_value
          inline const struct _json_value &operator [] (int index) const
          {
             if (type != json_array || index < 0
-                     || ((unsigned int) index) >= u.array.length)
+                     || ((unsigned int) index) >= u.array.length || !u.array.values [index])
             {
                return json_value_none;
             }
@@ -179,12 +179,16 @@ typedef struct _json_value
 
          inline const struct _json_value &operator [] (const char * index) const
          {
-            if (type != json_object)
+            if (type != json_object || !index)
                return json_value_none;
 
             for (unsigned int i = 0; i < u.object.length; ++ i)
-               if (!strcmp (u.object.values [i].name, index))
-                  return *u.object.values [i].value;
+               if (u.object.values [i].name && !strcmp (u.object.values [i].name, index))
+               {
+                  if (u.object.values [i].value)
+                     return *u.object.values [i].value;
+                  break;
+               }
 
             return json_value_none;
          }
