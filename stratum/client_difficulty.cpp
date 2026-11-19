@@ -165,6 +165,7 @@ static const char *client_password_param(const char *password, const char *key, 
 			return p + keylen + 1;
 
 		p = strchr(p, ',');
+		if (!p) break;
 	}
 	return NULL;
 }
