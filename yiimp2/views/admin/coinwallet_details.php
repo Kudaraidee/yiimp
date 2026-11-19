@@ -96,8 +96,8 @@ $list = Markets::find()
 //$bestmarket = getBestMarket($coin);
 foreach ($list as $market) {
     $marketurl = '#';
-    $price     = Yii::$app->ConversionUtils->bitcoinvaluetoa($market->price);
-    $price2    = Yii::$app->ConversionUtils->bitcoinvaluetoa($market->price2);
+    $price     = Yii::$app->ConversionUtils->bitcoinvaluetoa(Yii::$app->YiimpUtils->marketBtcPrice($market, 'price'));
+    $price2    = Yii::$app->ConversionUtils->bitcoinvaluetoa(Yii::$app->YiimpUtils->marketBtcPrice($market, 'price2'));
 
     $marketurl = Yii::$app->YiimpUtils->getMarketUrl($coin, $market->name);
 
@@ -119,11 +119,10 @@ foreach ($list as $market) {
 
     echo '<td style="max-width: 800px; text-overflow: ellipsis; overflow: hidden;">';
     if (!empty($market->deposit_address)) {
-        $name = CJavaScript::encode($market->name);
-        $addr = CJavaScript::encode($market->deposit_address);
-        echo CHtml::link(YAAMP_ALLOW_EXCHANGE ? "sell" : "send", "javascript:;", array(
-            'onclick' => "return showSellAmountDialog($name, $addr, {$market->id});"
-        ));
+        $name = json_encode($market->name);
+        $addr = json_encode($market->deposit_address);
+        $label = YAAMP_ALLOW_EXCHANGE ? "sell" : "send";
+        echo '<a href="javascript:;" onclick="return showSellAmountDialog(' . $name . ', ' . $addr . ', ' . (int)$market->id . ');">' . $label . '</a>';
         echo ' ' . $market->deposit_address;
     }
     echo ' <a href="/market/update?id=' . $market->id . '">edit</a>';
@@ -508,7 +507,7 @@ foreach ($txs_array as $tx) {
             ':address' => $address
         ));
         if ($exists)
-            echo CHtml::link($address, '/?address=' . $address);
+            echo '<a href="/?address=' . urlencode($address) . '">' . htmlspecialchars($address) . '</a>';
         else
             echo $address . '<br>';
     }

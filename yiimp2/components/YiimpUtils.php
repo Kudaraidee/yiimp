@@ -193,6 +193,35 @@ class YiimpUtils extends Component
 	}
 
 	////////////////////////////////////////////////////////////////////////
+	// Market prices for pairs such as LRS/USDT are stored in the quote
+	// currency. Convert them to BTC using the rate cached by the backend in
+	// settings (usdt_btc, usdc_btc, ...).
+	public function quoteBtcPrice($symbol, $default = 0)
+	{
+		$symbol = strtoupper(trim((string) $symbol));
+		if ($symbol === '' || $symbol === 'BTC') return 1.0;
+
+		$row = (new \yii\db\Query())
+			->select(['value'])
+			->from('settings')
+			->where(['param' => strtolower($symbol).'_btc'])
+			->one();
+		if ($row && (float) $row['value'] > 0) return (float) $row['value'];
+
+		$coin = Coins::find()->where(['symbol' => $symbol])->one();
+		if ($coin && (float) $coin->price > 0) return (float) $coin->price;
+
+		return $default;
+	}
+
+	public function marketBtcPrice($market, $field = 'price')
+	{
+		$value = (float) (isset($market->$field) ? $market->$field : 0);
+		$base = isset($market->base_coin) ? $market->base_coin : '';
+		return $value * $this->quoteBtcPrice($base, 1);
+	}
+
+	////////////////////////////////////////////////////////////////////////
 	// profit / amount related functions
 	public function yiimp_profitability($coin , $coin_difficulty = null, $coin_reward = null, $coin_price = null)
 	{

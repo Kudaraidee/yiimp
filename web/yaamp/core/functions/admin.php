@@ -76,6 +76,14 @@ function ipCIDRCheck($IP, $CIDR)
 
 function isAdminIP($ip)
 {
+	// Behind a local trusted reverse proxy REMOTE_ADDR is loopback and the
+	// real client is in X-Real-IP. Only trust the header in that case;
+	// X-Forwarded-For is deliberately ignored because it is spoofable.
+	if (!empty($_SERVER['HTTP_X_REAL_IP'])
+		&& filter_var($_SERVER['HTTP_X_REAL_IP'], FILTER_VALIDATE_IP)
+		&& in_array(isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '', array('127.0.0.1', '::1'), true))
+		$ip = $_SERVER['HTTP_X_REAL_IP'];
+
 	foreach(explode(',', YAAMP_ADMIN_IP) as $range)
 	{
 		if (strpos($range, '/')) {

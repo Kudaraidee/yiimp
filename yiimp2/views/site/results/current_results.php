@@ -205,7 +205,7 @@ foreach ($algos as $item)
             $coin_stratum = Stratums::find()
                                 ->where(['algo' => $algo, 'symbol' => $symbol]);
             $port_count = $coin_stratum->count();
-            $port_db = ($port_count > 1) ? $coin_stratum->one():null;
+            $port_db = ($port_count >= 1) ? $coin_stratum->one():null;
 
             $auto_exchange = $coin->auto_exchange;
             if ($auto_exchange != 1) echo "<td align='center' valign='top' style='font-size: .8em;'><img width=13 src='/images/cancel.png'></td>";

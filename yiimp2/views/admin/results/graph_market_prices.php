@@ -38,19 +38,20 @@ foreach ($markets as $m) {
 				->orderBy('time')
 				->all();
 
+	$quote = Yii::$app->YiimpUtils->quoteBtcPrice($market->base_coin, 1);
 	foreach($stats as $histo)
 	{
 		$d = date('Y-m-d H:i', $histo->time);
-		$series[$m['name']][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa($histo->price));
+		$series[$m['name']][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa($histo->price * $quote));
 	}
 
 	if ($histo && $market->pricetime && $market->pricetime > $histo->time) {
 		$d = date('Y-m-d H:i', $market->pricetime);
-		$series[$m['name']][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa($market->price));
+		$series[$m['name']][] = array($d, (double) Yii::$app->ConversionUtils->bitcoinvaluetoa(Yii::$app->YiimpUtils->marketBtcPrice($market, 'price')));
 	}
 
-	$min = min($min, (double) $m['min']);
-	$max = max($max, (double) $m['max']);
+	$min = min($min, (double) $m['min'] * $quote);
+	$max = max($max, (double) $m['max'] * $quote);
 }
 
 if ($min == 999999999) {

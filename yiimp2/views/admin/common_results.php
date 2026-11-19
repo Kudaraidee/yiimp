@@ -483,7 +483,7 @@ echo '</thead><tbody>';
 
 foreach($list as $market)
 {
-	$price = Yii::$app->ConversionUtils->bitcoinvaluetoa($market->price);
+	$price = Yii::$app->ConversionUtils->bitcoinvaluetoa(Yii::$app->YiimpUtils->marketBtcPrice($market, 'price'));
 	$coin = Coins::find()
 				->where(['id' => $market->coinid])
 				->one();

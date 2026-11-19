@@ -56,10 +56,17 @@ printf 'delete yaamp_algo_list\r\ndelete yaamp_visible_algos\r\ndelete yaamp_unv
 - `rpcencoding` = `GETH`
 - `enable` = 1
 - `auto_ready` = 1
+- `installed` = 1 — ถ้าเป็น 0 `BackendCoinsUpdate()` จะข้าม coin นี้ ทำให้ `difficulty`, `block_height`, `connections` ค้างค่าเดิม
 - RPC host/port/user/pass ชี้ไปยัง node ที่รองรับ Ethash/Etchash
+- `master_wallet` = address ที่ node ใช้เป็น beneficiary
+- `block_time` / `network_ttf` = ค่าเฉลี่ยจริงของเชน (เช่น ~11 วิสำหรับ Larissa)
+- `powlimit_bits` = 0 — difficulty แบบ Ethereum เป็นจำนวน hash ที่คาดหวัง ไม่ต้องคูณ 2^32 แบบ Bitcoin (ตั้งที่ coin หรือปล่อยให้ค่าจากตาราง `algos` ใน migration ด้านบน)
+- `reward` = ผลตอบแทนต่อบล็อกจริง ตรวจจาก node/explorer แล้วอัปเดตเป็นระยะ (เช่น Larissa ลดทุกสัปดาห์)
 - symbol/contract/info อื่น ๆ ตามเหรียญที่ต้องการ เช่น `ETC` สำหรับ etchash
 
 ฝั่งเว็บไม่มี hardcoded algo allow-list — dropdown algo อ่านจากตาราง `algos` เลยหลังจาก migration ด้านบน algo ใหม่จะปรากฏเอง
+
+ถ้าตลาดที่ใช้เป็นสกุล quote อื่น (เช่น `LRS/USDT` บน nonkyc) ให้เก็บ `markets.price` เป็นราคาในสกุลนั้นตามข้อมูล exchange ฝั่ง backend จะดึงอัตรา `USDT/BTC` (หรือ `USDC/BTC`) เก็บในตาราง `settings` เป็น `usdt_btc` / `usdc_btc` แล้วแปลงเป็น `coins.price` ให้เอง ทั้งหน้าเว็บและ yiimp2 จะแสดงราคาตลาดเป็น BTC จากอัตราเดียวกันนี้
 
 ## 5. ไฟล์ config stratum
 

@@ -64,7 +64,7 @@ foreach($coins as $coin)
 
 	echo '<td><b><a href="/admin/coin_update?id='.$coin->id.'">'.$coin->name.'</a></b></td>';
 
-	echo "<td><b><a href='/admin/coinwallet_update?id=$coin->id'>$coin->symbol</a></b></td>";
+	echo "<td><b><a href='/admin/coinwallet?id=$coin->id'>$coin->symbol</a></b></td>";
 
 	echo "<td>$coin->algo</td>";
 

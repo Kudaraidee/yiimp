@@ -62,9 +62,15 @@ class WalletRPC {
 		}
 
 		if ($this->type == 'Ethereum') {
+			// A mining node does not need to expose a local wallet. Use the
+			// configured pool address instead of eth_accounts() when present.
 			if (!isset($this->accounts)) {
 				$this->accounts = $this->rpc->eth_accounts();
 				$this->error = $this->rpc->error;
+				if (!is_array($this->accounts) && !empty($this->account)) {
+					$this->accounts = array($this->account);
+					$this->error = '';
+				}
 			}
 			if (!is_array($this->accounts)) {
 				// if wallet is stopped
@@ -92,6 +98,8 @@ class WalletRPC {
 					$info['balance'] = $balances;
 					$this->height = $this->height ? $this->height : $this->rpc->eth_blockNumber();
 					$info['blocks'] = $this->height;
+					$block = $this->rpc->eth_getBlockByNumber('latest', false);
+					$info['difficulty'] = $this->rpc->decode_hex(objSafeVal($block, 'difficulty', 0));
 					$info['gasprice'] = (double) $this->rpc->eth_gasPrice();
 					$info['gasprice'] /= 1e18;
 					$info['connections'] = $this->rpc->net_peerCount();
@@ -100,16 +108,15 @@ class WalletRPC {
 				}
 				return $this->info;
 			case 'getdifficulty':
-				$this->height = $this->height ? $this->height : $this->rpc->eth_blockNumber();
 				$this->error = $this->rpc->error;
-				$block = $this->rpc->eth_getBlockByNumber($this->height);
+				$block = $this->rpc->eth_getBlockByNumber('latest', false);
 				$difficulty = objSafeVal($block, 'difficulty', 0);
 				return $this->rpc->decode_hex($difficulty);
 			case 'getmininginfo':
 				$info = array();
 				$this->height = $this->height ? $this->height : $this->rpc->eth_blockNumber();
 				$info['blocks'] = $this->height;
-				$block = $this->rpc->eth_getBlockByNumber($info['blocks']);
+				$block = $this->rpc->eth_getBlockByNumber('latest', false);
 				$difficulty = objSafeVal($block, 'difficulty', 0);
 				$info['difficulty'] = $this->rpc->decode_hex($difficulty);
 				$info['generate'] = $this->rpc->eth_mining();

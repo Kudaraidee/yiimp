@@ -86,7 +86,7 @@ class cBitcoinRPC implements iRPCConnector
 		if($method == 'getblocktemplate')
 		{
 			$param = isset($params[0]) ? $params[0] : '';
-			$request = "{\"method\":\"$method\",\"params\":[$param],\"id\":$this->id}";
+			$request = "{\"jsonrpc\":\"2.0\",\"method\":\"$method\",\"params\":[$param],\"id\":$this->id}";
 		//  debuglog($request);
 		}
 
@@ -96,6 +96,7 @@ class cBitcoinRPC implements iRPCConnector
 
 			// Build the request, it's ok that params might have any empty array
 			$request = json_encode(array(
+				'jsonrpc' => '2.0',
 				'method' => $method,
 				'params' => $params,
 				'id'     => $this->id

@@ -8,7 +8,10 @@ function BackendPricesUpdate()
 
 	settings_prefetch_all();
 
-	
+	// Quote currencies (USDT/USDC) must be priced in BTC before converting
+	// pairs such as LRS/USDT into the BTC price Yiimp stores in coins.price.
+	updateQuoteCoinPrices();
+
 	$exchanges = getdbolist('db_balances');
 	foreach ($exchanges as $exchange) {
 		BackendPricesUpdateExchange($exchange->name);
@@ -48,16 +51,15 @@ function BackendPricesUpdate()
 		$market = getBestMarket($coin);
 		if($market)
 		{
-			if (is_null($market->base_coin)) {
+			if (empty($market->base_coin) || strcasecmp($market->base_coin, 'BTC') === 0) {
 				$coin->price = $market->price*(1-YAAMP_FEES_EXCHANGE/100);
 				$coin->price2 = $market->price2;
 			}
 			else {
-				$base_coin = getdbosql('db_coins', "symbol='{$market->base_coin}'");
-				if($base_coin)
-				{
-					$coin->price = $market->price * $base_coin->price;
-					$coin->price2 = $market->price2 * $base_coin->price;
+				$quote = yiimp_quote_btc_price($market->base_coin, 0);
+				if ($quote > 0) {
+					$coin->price = $market->price * $quote;
+					$coin->price2 = $market->price2 * $quote;
 				}
 			}
 		}
@@ -71,6 +73,61 @@ function BackendPricesUpdate()
 		dborun("UPDATE markets SET message=NULL WHERE disabled=0 AND message='disabled from settings'");
 	}
 	debuglog("==== END BackendPricesUpdate ====");
+}
+
+// Nonkyc (and other) markets quote coins in USDT/USDC, while Yiimp stores
+// coins.price in BTC. Keep the quote rate in settings so both the backend
+// and the frontend can convert market prices consistently.
+function yiimp_quote_btc_price($symbol, $default = 0)
+{
+	$symbol = strtoupper(trim((string) $symbol));
+	if ($symbol === '' || $symbol === 'BTC') return 1.0;
+
+	$price = (double) settings_get(strtolower($symbol).'_btc', 0);
+	if ($price > 0) return $price;
+
+	// fall back to a coin row with the same symbol, if one was seeded
+	$coin = getdbosql('db_coins', "symbol=:sym", array(':sym'=>$symbol));
+	if ($coin && (double) $coin->price > 0) return (double) $coin->price;
+
+	return $default;
+}
+
+function updateQuoteCoinPrices()
+{
+	$quotes = array(
+		'USDT' => 'tether',
+		'USDC' => 'usd-coin',
+		'BUSD' => 'binance-usd',
+		'DAI'  => 'dai',
+	);
+
+	$ids = implode(',', array_values($quotes));
+	$json = @file_get_contents_curl("https://api.coingecko.com/api/v3/simple/price?ids={$ids}&vs_currencies=btc");
+	$data = json_decode($json, true);
+	if (is_array($data)) {
+		foreach ($quotes as $symbol => $cgid) {
+			$quote = arraySafeVal(arraySafeVal($data, $cgid, array()), 'btc', 0);
+			if ($quote > 0) settings_set(strtolower($symbol).'_btc', $quote);
+		}
+	}
+
+	// Cross-check/update the main stablecoins from Binance BTC/<quote> pairs.
+	$pairs = array('USDT' => 'BTCUSDT', 'USDC' => 'BTCUSDC');
+	$symbols = urlencode(json_encode(array_values($pairs)));
+	$json = @file_get_contents_curl("https://api.binance.com/api/v3/ticker/price?symbols={$symbols}");
+	$tickers = json_decode($json, true);
+	if (is_array($tickers)) {
+		$bySymbol = array();
+		foreach ($tickers as $ticker) {
+			if (isset($ticker['symbol'], $ticker['price']) && $ticker['price'] > 0)
+				$bySymbol[$ticker['symbol']] = (double) $ticker['price'];
+		}
+		foreach ($pairs as $symbol => $binanceSymbol) {
+			if (isset($bySymbol[$binanceSymbol]))
+				settings_set(strtolower($symbol).'_btc', 1 / $bySymbol[$binanceSymbol]);
+		}
+	}
 }
 
 function BackendPricesUpdateExchange($exchangename)
@@ -212,21 +269,17 @@ function getBestMarket($coin)
 		}
 	}
 
-	// select best market by btc-price
+	// select best market by BTC value (market prices can be in USDT/USDC)
 	if(!$market) {
-		$best_id = dboscalar("
-				SELECT markets.id,markets.priority,markets.base_coin,
-					CASE markets.base_coin
-			 			WHEN markets.base_coin THEN markets.price * coins.price
-			 			ELSE markets.price
-					END AS marketsprice
-				FROM markets 
-		   		LEFT JOIN coins ON coins.symbol=markets.base_coin
-		   		WHERE markets.coinid={$coin->id} AND markets.price!=0 
-						AND NOT markets.deleted AND NOT markets.disabled
-				ORDER BY markets.priority DESC, marketsprice DESC");
-		if (!empty($best_id)) {
-			$market = getdbosql('db_markets', "id={$best_id}");
+		$candidates = getdbolist('db_markets',
+			"coinid={$coin->id} AND price!=0 AND NOT deleted AND NOT disabled ORDER BY priority DESC");
+		$best_value = -1;
+		foreach ($candidates as $candidate) {
+			$value = (double) $candidate->price * yiimp_quote_btc_price($candidate->base_coin, 1);
+			if ($value > $best_value) {
+				$best_value = $value;
+				$market = $candidate;
+			}
 		}
 	}
 
@@ -593,8 +646,9 @@ function updateNonKYCMarkets()
 			$market->pricetime = time(); // $ticker->timestamp "2018-08-31T12:48:56Z"
 			$market->save();
 			if (empty($coin->price) && $ticker['ask']) {
-				$coin->price = $market->price;
-				$coin->price2 = $price2;
+				$quote = yiimp_quote_btc_price($market->base_coin, 1);
+				$coin->price = $market->price * $quote;
+				$coin->price2 = $price2 * $quote;
 				$coin->save();
 			}
 			// debuglog("$exchange: $pair price updated to {$market->price}");
@@ -610,8 +664,9 @@ function updateNonKYCMarkets()
 			$market->pricetime = time(); // $ticker->timestamp "2018-08-31T12:48:56Z"
 			$market->save();
 			if (empty($coin->price) && $tmpask) {
-				$coin->price = $market->price;
-				$coin->price2 = $price2;
+				$quote = yiimp_quote_btc_price($market->base_coin, 1);
+				$coin->price = $market->price * $quote;
+				$coin->price2 = $price2 * $quote;
 				$coin->save();
 			}
 			// debuglog("$exchange: $pair_reverse price updated to {$market->price}");
