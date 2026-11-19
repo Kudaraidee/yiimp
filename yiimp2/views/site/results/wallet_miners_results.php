@@ -6,6 +6,7 @@
 /** @var Exception $exception */
 
 use app\models\Coins;
+use app\models\Shares;
 use app\models\Workers;
 
 $user = Yii::$app->YiimpUtils->getuserbyaddress(Yii::$app->getRequest()->getQueryParam('address'));

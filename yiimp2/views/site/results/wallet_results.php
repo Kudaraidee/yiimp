@@ -120,7 +120,10 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 
 <table class="dataGrid2">
 <tbody>
-<?php foreach ($summaryRows as [$label, $val, $bold, $action = null]): ?>
+<?php foreach ($summaryRows as $summaryRow):
+    [$label, $val, $bold] = $summaryRow;
+    $action = $summaryRow[3] ?? null;
+?>
 <tr class="ssrow" style="border-top:1px solid #eee;">
     <td><img width="16" src="<?= Html::encode($refcoin->image ?? '') ?>"></td>
     <td colspan="4"><b><?= Html::encode($label) ?></b></td>
@@ -212,7 +215,10 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
     <div class="card-body p-0">
     <table class="table table-sm mb-0">
     <colgroup><col style="width:24px"><col><col style="width:160px"></colgroup>
-    <?php foreach ($summaryRows as [$label, $val, $bold, $action = null]): ?>
+    <?php foreach ($summaryRows as $summaryRow):
+        [$label, $val, $bold] = $summaryRow;
+        $action = $summaryRow[3] ?? null;
+    ?>
     <tr>
         <td class="ps-3 py-1"><?php if ($refcoin && !empty($refcoin->image)): ?>
             <img src="<?= Html::encode($refcoin->image) ?>" width="16" alt="" style="object-fit:contain">
@@ -326,7 +332,9 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
     </div>
 
     <table class="w-full text-xs">
-    <?php foreach ($summaryRows as $i => [$label, $val, $bold, $action = null]):
+    <?php foreach ($summaryRows as $i => $summaryRow):
+        [$label, $val, $bold] = $summaryRow;
+        $action = $summaryRow[3] ?? null;
         $sep = in_array($i, [1, 3, 4]) ? 'border-t-2 border-gray-200 dark:border-gray-700' : 'border-t border-gray-100 dark:border-gray-700/50';
     ?>
     <tr class="<?= $i === 0 ? '' : $sep ?>">
