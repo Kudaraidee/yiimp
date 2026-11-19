@@ -102,6 +102,35 @@ static YAAMP_JOB *job_get_last(int coinid)
 	return NULL;
 }
 
+// Prefer a job for a coin the miner explicitly requested with mc=SYMBOL.
+// This matters for Ethash/Etchash: a job from a different chain carries a
+// different seed hash, which forces a multi-gigabyte DAG rebuild on every
+// reconnect even when autoexchange is enabled.
+static YAAMP_JOB *job_get_last_for_client(YAAMP_CLIENT *client)
+{
+	if(client->coins_mining_list.empty()) return NULL;
+
+	g_list_job.Enter();
+	YAAMP_JOB *result = NULL;
+	for(CLI li = g_list_job.first; li; li = li->prev)
+	{
+		YAAMP_JOB *job = (YAAMP_JOB *)li->data;
+		if(!job_can_mine(job) || !job->coind) continue;
+
+		for(auto it = client->coins_mining_list.begin(); it != client->coins_mining_list.end(); ++it)
+		{
+			if(*it == job->coind->symbol || *it == job->coind->symbol2)
+			{
+				result = job;
+				break;
+			}
+		}
+		if(result) break;
+	}
+	g_list_job.Leave();
+	return result;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void job_send_last(YAAMP_CLIENT *client)
@@ -114,6 +143,7 @@ void job_send_last(YAAMP_CLIENT *client)
 		job = job_get_last(client->coinid);
 	}
 
+	if(!job) job = job_get_last_for_client(client);
 	if(!job) job = job_get_last(0);
 
 	if(!job) return;

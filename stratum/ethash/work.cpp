@@ -131,10 +131,12 @@ bool ethash_build_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ)
 
 	if (strcmp(to_hex(ethash::calculate_epoch_seed(epoch)).c_str(), seed) != 0)
 	{
-		const int from_height = ethash_epoch_for_height(height);
-		stratumlog("ethash: seed/epoch mismatch for %s (seed %d, height %d)\n",
-			coind->symbol, epoch, from_height);
-		epoch = from_height;
+		// The seed hash is what the miner sees in mining.notify, so it is the
+		// authoritative source for the verification context. Falling back to
+		// the height-derived epoch here would verify against a different DAG
+		// and reject every share on chains with custom epoch timing.
+		stratumlog("ethash: seed/epoch mismatch for %s (seed epoch %d, height %d)\n",
+			coind->symbol, epoch, ethash_epoch_for_height(height));
 	}
 
 	ethash_bin_to_hex(header_be, templ->eth_header);

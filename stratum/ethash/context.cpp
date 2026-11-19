@@ -36,9 +36,10 @@ ethash_context_ptr ethash_get_context(int epoch)
 	CommonLock(&g_ethash_context_mutex);
 	g_ethash_contexts[epoch] = context;
 
-	// Keep only the two most recent epochs. Existing shared_ptr holders keep
-	// older contexts alive until they are done verifying.
-	while (g_ethash_contexts.size() > 2)
+	// Keep a few epochs: miners may still submit late shares for a previous
+	// job, and pools can host more than one chain on the same algo port.
+	// Existing shared_ptr holders keep older contexts alive until done.
+	while (g_ethash_contexts.size() > 4)
 		g_ethash_contexts.erase(g_ethash_contexts.begin());
 
 	CommonUnlock(&g_ethash_context_mutex);

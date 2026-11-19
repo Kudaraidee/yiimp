@@ -146,8 +146,10 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 ตัวอย่าง Rigel:
 
 ```bash
-./rigel -a ethash -o ethstratum+tcp://pool.example.com:3639 -u WALLET -p c=LRS
+./rigel -a ethash -o ethstratum+tcp://pool.example.com:3639 -u WALLET -p c=LRS,mc=LRS
 ```
+
+**สำคัญ:** ถ้าเปิดหลาย coin ใน `algo='ethash'` เดียวกัน ให้ระบุ `mc=SYMBOL` เสมอ (หรือตั้ง `autoexchange = 0` ใน `[STRATUM]`) มิฉะนั้น stratum จะส่ง job จากทุก chain ให้ miner → seed hash เปลี่ยน → Rigel ต้องสร้าง DAG ใหม่หลาย GB ทุกครั้งที่ job เปลี่ยน และอาจหลุดการเชื่อมต่อ
 
 สิ่งที่ stratum ส่งให้ miner:
 
