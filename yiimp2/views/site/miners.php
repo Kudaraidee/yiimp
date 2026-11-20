@@ -4,6 +4,8 @@
 
 $isTailwind = Yii::$app->LayoutManager->isTailwind();
 $isLegacy   = Yii::$app->LayoutManager->isLegacy();
+
+$this->registerJsFile('@web/js/auto_refresh.js', ['depends' => [yii\web\JqueryAsset::class]]);
 ?>
 
 <?php if ($isLegacy): ?>
