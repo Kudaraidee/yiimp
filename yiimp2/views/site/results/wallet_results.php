@@ -168,7 +168,7 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 <tbody>
 <?php foreach ($payouts as $p): ?>
 <tr>
-    <td><span class="wl-val"><?= Html::encode($conv->datetoa2($p->time)) ?> ago</span><span class="wl-cap">paid</span></td>
+    <td title="<?= Html::encode(date('Y-m-d H:i:s', (int) $p->time)) ?> UTC"><span class="wl-val"><?= Html::encode(strip_tags($conv->datetoa2($p->time))) ?> ago</span><span class="wl-cap">paid</span></td>
     <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($p->amount)) ?></span><span class="wl-cap"><?= Html::encode($sym) ?></span></td>
     <td class="wl-left"><span class="wl-val" style="font-size:10px;"><?= $refcoin->createExplorerLink(Html::encode(substr($p->tx, 0, 30)) . '…', ['txid' => $p->tx], [], true) ?></span></td>
 </tr>
@@ -188,7 +188,7 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 <tbody>
 <?php foreach ($extraPayouts as $p): ?>
 <tr>
-    <td><span class="wl-val"><?= Html::encode($conv->datetoa2($p->time)) ?> ago</span></td>
+    <td title="<?= Html::encode(date('Y-m-d H:i:s', (int) $p->time)) ?> UTC"><span class="wl-val"><?= Html::encode(strip_tags($conv->datetoa2($p->time))) ?> ago</span></td>
     <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($p->amount)) ?></span></td>
     <td class="wl-left"><span class="wl-val" style="font-size:10px;"><?= $refcoin->createExplorerLink(Html::encode(substr($p->tx, 0, 30)) . '…', ['txid' => $p->tx], [], true) ?></span></td>
 </tr>
