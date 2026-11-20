@@ -285,11 +285,22 @@ class YiimpUtils extends Component
 	{
 		$refcoin = Coins::find()->where(['id' => $user->coinid])->one();
 		$value = 0.;
+
+		// Legacy callers pass SQL fragments such as "status=1" or "status!=2".
+		// Query::where() needs a condition array or a safe fragment, not the
+		// raw string as a column value.
+		if (is_string($status) && preg_match('/^\s*status\s*(=|!=|<>|>=|<=|>|<)\s*\d+\s*$/', $status)) {
+			$statusCond = $status;
+		} else {
+			$statusCond = ['status' => (int) $status];
+		}
+
 		if ($refcoin && !$refcoin->auto_exchange) {
 			$value = (new \yii\db\Query())
 							->select(['sum(amount)'])
 							->from('earnings')
-							->where(['status' => $status, 'userid' => $user->id, 'coinid' => $user->coinid])
+							->where($statusCond)
+							->andWhere(['userid' => $user->id, 'coinid' => $user->coinid])
 							->scalar();
 		} else if (YIIMP_ALLOW_EXCHANGE) {
 			if(!$refcoin) $refcoin = Coins::find()->where(['symbol' => 'BTC'])->one();
@@ -297,21 +308,24 @@ class YiimpUtils extends Component
 			$value = (new \yii\db\Query())
 							->select(['sum(amount*price)'])
 							->from('earnings')
-							->where(['status' => $status, 'userid' => $user->id])
+							->where($statusCond)
+							->andWhere(['userid' => $user->id])
 							->scalar();
 			$value = $value / $refcoin->price;
 		} else if ($refcoin && $refcoin->price > 0.) {
 			$value = (new \yii\db\Query())
 							->select(['sum(amount*price)'])
 							->from('earnings')
-							->where(['status' => $status, 'userid' => $user->id])
+							->where($statusCond)
+							->andWhere(['userid' => $user->id])
 							->scalar();
 			$value = $value / $refcoin->price;
 		} else if ($user->coinid) {
 			$value = (new \yii\db\Query())
 							->select(['sum(amount)'])
 							->from('earnings')
-							->where(['status' => $status, 'userid' => $user->id, 'coinid' => $user->coinid])
+							->where($statusCond)
+							->andWhere(['userid' => $user->id, 'coinid' => $user->coinid])
 							->scalar();
 		}
 		return $value;
