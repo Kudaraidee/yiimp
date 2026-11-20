@@ -82,18 +82,14 @@ class StatsController extends BaseController
 
         $dtMax = max(time() - $hour, (int) $dbMax);
 
-        // Aggregate stats per period (cached 5 min each)
-        $fetchRow = fn(int $since) => (new \yii\db\Query())
-            ->select(['AVG(hashrate) AS a', 'SUM(earnings) AS b'])
-            ->from('hashstats')
-            ->where(['algo' => $algo])
-            ->andWhere(['>', 'time', $since])
-            ->one();
+        // Aggregate stats per period (cached 5 min each).
+        // Bump the key suffix so old unfiltered values are not reused.
+        $fetchRow = fn(int $since) => $this->fetchStatsRow($algo, $since);
 
         $rows = [
-            1 => $cache->getOrSet("stats_col1-{$algo}", fn() => $fetchRow($dtMax - 2 * $days), 300) ?: [],
-            2 => $cache->getOrSet("stats_col2-{$algo}", fn() => $fetchRow($dtMax - 7 * $days), 300) ?: [],
-            3 => $cache->getOrSet("stats_col3-{$algo}", fn() => $fetchRow($dtMax - 30 * $days), 300) ?: [],
+            1 => $cache->getOrSet("stats_col1-v2-{$algo}", fn() => $fetchRow($dtMax - 2 * $days), 300) ?: [],
+            2 => $cache->getOrSet("stats_col2-v2-{$algo}", fn() => $fetchRow($dtMax - 7 * $days), 300) ?: [],
+            3 => $cache->getOrSet("stats_col3-v2-{$algo}", fn() => $fetchRow($dtMax - 30 * $days), 300) ?: [],
         ];
 
         $daysByPeriod = [1 => 2, 2 => 7, 3 => 30];
@@ -111,6 +107,46 @@ class StatsController extends BaseController
             ];
         }
         return $summaries;
+    }
+
+    /**
+     * Average hashstats while ignoring corrupt spikes (e.g. a stray 1.9 Th/s
+     * row in an otherwise ~100 Mh/s pool). The median of the window is used
+     * as a robust baseline; anything over 100x it is discarded. Earnings are
+     * still summed across every row.
+     *
+     * @return array{a:float,b:float}
+     */
+    private function fetchStatsRow(string $algo, int $since): array
+    {
+        $rows = (new \yii\db\Query())
+            ->select(['hashrate', 'earnings'])
+            ->from('hashstats')
+            ->where(['algo' => $algo])
+            ->andWhere(['>', 'time', $since])
+            ->all();
+
+        $rates = [];
+        $earnings = 0.0;
+        foreach ($rows as $row) {
+            $rate = (float) ($row['hashrate'] ?? 0);
+            if ($rate > 0) $rates[] = $rate;
+            $earnings += (float) ($row['earnings'] ?? 0);
+        }
+
+        if ($rates) {
+            sort($rates);
+            $median = $rates[intdiv(count($rates), 2)];
+            if ($median > 0) {
+                $cap = $median * 100;
+                $rates = array_filter($rates, fn(float $rate): bool => $rate <= $cap);
+            }
+        }
+
+        return [
+            'a' => $rates ? array_sum($rates) / count($rates) : 0.0,
+            'b' => $earnings,
+        ];
     }
 
     public function actionGraph_results_1(): string { return $this->renderPartial('graph_results_1'); }
