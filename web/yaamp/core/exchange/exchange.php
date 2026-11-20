@@ -86,7 +86,9 @@ function getMarketUrl($coin, $marketName)
 // $market can be a db_markets or a string (symbol)
 function exchange_update_market($exchange, $market)
 {
-	$fn_update = str_replace('-','',$exchange.'_update_market');
+	// Qualified market names (e.g. "safetrade USDT") must map to the same
+	// update helper as the bare exchange name.
+	$fn_update = str_replace(array('-', ' '), '', $exchange.'_update_market');
 	if (function_exists($fn_update)) {
 		return $fn_update($market);
 	} else {

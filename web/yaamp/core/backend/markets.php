@@ -298,76 +298,57 @@ function AverageIncrement($value1, $value2)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function updateSafeTradeMarkets() {
+function updateSafeTradeMarkets()
+{
 	debuglog(__FUNCTION__);
 
 	$exchange = 'safetrade';
-	debuglog ("====== $exchange =======");
+	debuglog("====== $exchange =======");
 	if (exchange_get($exchange, 'disabled')) return;
 
-	// marketnames to base/coin - symbols
-	$marketlist = safetrade_api_query('trade/public/markets', '', 'array');
-	if(empty($marketlist) || !is_array($marketlist)) return;
-	$marketnames = array();
-	foreach($marketlist as $data) {
-		$marketnames[$data['id']] = [ 'coinsymbol' => $data['base_unit'], 'basesymbol' => $data['quote_unit']];
-	}
+	$markets = safetrade_markets(true);
+	if (empty($markets)) return;
 
-	$tickers = safetrade_api_query('trade/public/tickers');
-	foreach($tickers as $ticker_key => $ticker_data) {
-		if (!isset($marketnames[$ticker_key])) continue;
-		
-		$symbol = strtoupper($marketnames[$ticker_key]['coinsymbol']);
-		$base = strtoupper($marketnames[$ticker_key]['basesymbol']);
-		if($base != 'BTC') continue;
+	$tickers = safetrade_api_query('trade/public/tickers', '', 'array');
+	if (!is_array($tickers)) return;
 
-		// debuglog("$symbol : $base");
-		$coin = getdbosql('db_coins', "symbol=:sym", array(':sym'=>$symbol));
-		if(!$coin) continue;
-		$market = getdbosql('db_markets', "coinid={$coin->id} AND name='$exchange' AND IFNULL(base_coin,'') IN ('','BTC')");
-		$symbol = $coin->getOfficialSymbol();
-		if(!$market)
-		{
-			//debuglog ("$symbol not found in db");
+	foreach ($tickers as $id => $ticker) {
+		$id = strtolower((string) $id);
+		if (!isset($markets[$id])) continue;
+
+		$meta = $markets[$id];
+		if (isset($meta['state']) && $meta['state'] !== 'enabled') continue;
+
+		$symbol = strtoupper(isset($meta['base_unit']) ? $meta['base_unit'] : '');
+		$base = strtoupper(isset($meta['quote_unit']) ? $meta['quote_unit'] : '');
+		if ($symbol === '' || !safetrade_supported_quote($base)) continue;
+
+		$coin = getdbosql('db_coins', 'symbol=:sym', array(':sym' => $symbol));
+		if (!$coin) continue;
+
+		$market = safetrade_find_market($coin, $base);
+		if (!$market) {
 			$market = new db_markets;
 			$market->coinid = $coin->id;
-			#$market->disabled = 0;
+			$market->name = safetrade_market_name($base);
+			$market->base_coin = ($base === 'BTC') ? 'BTC' : $base;
 			$market->deleted = 0;
-			$market->name = $exchange;
-			//continue;	
 		}
-		else
-		{
-			//debuglog ("$symbol found in db");
-			$symbol = $coin->getOfficialSymbol();
-			if (market_get($exchange, $symbol, "disabled")) {
-				#$market->disabled = 1;
-				$market->message = 'disabled from settings';
-				$market->save();
-				continue;
-			}
-		}
-		$bid = bitcoinvaluetoa($ticker_data->low);
-		$ask = bitcoinvaluetoa($ticker_data->high);
 
-		// $market->disabled = ($bid == 0);
-		$price2 = ((double)$ask + (double)$bid)/2;
-
-		$market->price2 = AverageIncrement($market->price2, $price2);
-		$market->price = AverageIncrement($market->price, (double)$bid);
-		$market->priority = -1; // not ready for trading
-		$market->txfee = 0.2;
-		//debuglog("$exchange: $symbol price set to ".bitcoinvaluetoa($market->price));
-		$market->pricetime = time(); // $m->updated_time;
-		$market->save();
-		if (!empty($market->price2))
-		{
-			if ((empty($coin->price2))||($coin->price2==0)) {
-				$coin->price = $market->price;
-				$coin->price2 = $market->price2;
-				$coin->save();
-			}
+		$official = $coin->getOfficialSymbol();
+		if (market_get($exchange, $official, 'disabled', null, $base)) {
+			$market->disabled = 1;
+			$market->message = 'disabled from settings';
+			$market->save();
+			continue;
 		}
+
+		// Ticker low/high are 24h extremes, not bid/ask. Use the public depth
+		// endpoint for real executable prices; last trade is a safe fallback.
+		$prices = safetrade_best_prices($id, $ticker);
+		if (!$prices) continue;
+
+		safetrade_apply_market_prices($market, $coin, $prices['bid'], $prices['ask'], $base);
 	}
 }
 

@@ -14,8 +14,9 @@ use app\exchanges\drivers\{
  *
  * Registry order matters: it controls the execution order when iterating
  * withBalance() (bitstamp → cexio → kraken → poloniex) and
- * withTrading() (binance → kucoin → yobit → nestex → nonkyc → exbitron),
- * withMarkets/withDiscover() includes klingex (markets + discover, USDT pairs).
+ * withTrading() (binance → kucoin → yobit → nestex → nonkyc → exbitron → safetrade),
+ * withBalance() includes safetrade, and withMarkets/withDiscover() includes
+ * klingex (markets + discover, USDT pairs) and safetrade (BTC + USDT pairs).
  */
 class ExchangeFactory
 {

@@ -146,6 +146,13 @@ function exchange_valid_keys()
 	//	'withdraw_btc_address'	=> 'Custom withdraw BTC address for the exchange',
 		'withdraw_min_btc'		=> 'Auto withdraw when your BTC balance reach this amount (0=disabled)',
 		'withdraw_fee_btc'		=> 'Fees in BTC required to withdraw BTCs on the exchange',
+
+		'deposit_network'		=> 'Default deposit blockchain_key (SafeTrade)',
+		'withdraw_beneficiary_id'=> 'Beneficiary ID used by SafeTrade automatic BTC withdrawals',
+		'withdraw_blockchain_key'=> 'BTC withdrawal blockchain_key (SafeTrade, default bitcoin-key)',
+		'withdraw_email_code'	=> 'SafeTrade withdrawal email code (only when no beneficiary ID)',
+		'withdraw_otp_code'		=> 'SafeTrade withdrawal OTP code (only when no beneficiary ID)',
+		'withdraw_password'		=> 'SafeTrade withdraw password, if enabled on the account',
 	);
 }
 

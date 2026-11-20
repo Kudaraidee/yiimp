@@ -188,15 +188,21 @@ function updateRawCoinExchange($marketname)
 	
 		case 'safetrade':
 			if (!exchange_get('safetrade', 'disabled')) {
-				$list = safetrade_api_query('trade/public/markets','','array');
+				$list = safetrade_markets(true);
 
-				if(is_array($list) && !empty($list)) {
-					dborun("UPDATE markets SET deleted=true WHERE name='safetrade'");
-					foreach ($list as $tickers) {
-						$base = strtoupper($tickers['quote_unit']);
-						if (strtoupper($base) !== 'BTC'||strtoupper($base) !== 'USDT')
-						$symbol = strtoupper($tickers['base_unit']);
-						updateRawCoin('safetrade', $symbol, $symbol, ($base == 'BTC')?null:$base);
+				if (!empty($list)) {
+					// Retire both the bare BTC row and the qualified quote rows.
+					dborun("UPDATE markets SET deleted=true WHERE name='safetrade' OR name LIKE 'safetrade %'");
+					foreach ($list as $meta) {
+						if (isset($meta['state']) && $meta['state'] !== 'enabled') continue;
+
+						$base = strtoupper(isset($meta['quote_unit']) ? $meta['quote_unit'] : '');
+						if (!safetrade_supported_quote($base)) continue;
+
+						$symbol = strtoupper(isset($meta['base_unit']) ? $meta['base_unit'] : '');
+						if ($symbol === '' || $symbol === 'BTC') continue;
+
+						updateRawCoin('safetrade', $symbol, $symbol, ($base === 'BTC') ? null : $base);
 					}
 				}
 			}

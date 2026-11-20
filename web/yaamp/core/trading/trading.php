@@ -8,9 +8,16 @@ require_once('yobit_trading.php');
 require_once('hitbtc_trading.php');
 require_once('kucoin_trading.php');
 require_once('nonkyc_trading.php');
+require_once('safetrade_trading.php');
 
 function cancelExchangeOrder($order=false)
 {
+	// SafeTrade USDT orders are stored as "safetrade USDT".
+	if ($order && strpos((string) $order->market, 'safetrade') === 0) {
+		doSafeTradeCancelOrder($order->uuid);
+		return;
+	}
+
 	if ($order)
 		switch ($order->market)
 		{
@@ -95,6 +102,11 @@ function runExchange($exchangeName=false)
 			case 'nonkyc':
 				doNonkycTrading(true);
 				updateNonkycMarkets();
+				break;
+
+			case 'safetrade':
+				doSafeTradeTrading(true);
+				updateSafeTradeMarkets();
 				break;
 
 			default:
