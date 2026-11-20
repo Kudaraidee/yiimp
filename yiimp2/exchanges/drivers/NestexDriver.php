@@ -95,8 +95,11 @@ class NestexDriver extends ExchangeDriver
                 $market->pricetime = time();
                 $market->save();
                 if (empty($coin->price) && $ask) {
-                    $coin->price  = $market->price;
-                    $coin->price2 = $price2;
+                    // NestEx only has USDT markets: convert the quote to BTC
+                    // using the cached rate, exactly like the NonKYC driver.
+                    $quote        = Yii::$app->YiimpUtils->quoteBtcPrice($market->base_coin, 1);
+                    $coin->price  = $market->price * $quote;
+                    $coin->price2 = $price2 * $quote;
                     $coin->save();
                 }
                 break;

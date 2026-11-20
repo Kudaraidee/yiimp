@@ -94,14 +94,16 @@ class MarketService
 
             $market = $this->getBestMarket($coin);
             if ($market) {
-                if (is_null($market->base_coin)) {
+                if (empty($market->base_coin) || strcasecmp($market->base_coin, 'BTC') === 0) {
                     $coin->price  = $market->price * (1 - $exchangeFee / 100);
                     $coin->price2 = $market->price2;
                 } else {
-                    $baseCoin = Coins::find()->where(['symbol' => $market->base_coin])->one();
-                    if ($baseCoin) {
-                        $coin->price  = $market->price * $baseCoin->price;
-                        $coin->price2 = $market->price2 * $baseCoin->price;
+                    // Pairs quoted in USDT/USDC must be converted to BTC using
+                    // the cached quote rate (the same rule as NonKYC).
+                    $quote = Yii::$app->YiimpUtils->quoteBtcPrice($market->base_coin, 0);
+                    if ($quote > 0) {
+                        $coin->price  = $market->price * $quote;
+                        $coin->price2 = $market->price2 * $quote;
                     }
                 }
             } else {
@@ -272,25 +274,24 @@ class MarketService
                 ->one();
         }
 
-        // Fall back to best price across all markets
+        // Fall back to best price across all markets. Market prices can be
+        // quoted in USDT/USDC, so compare converted BTC values, not raw quotes.
         if (!$market) {
-            $bestId = Yii::$app->db->createCommand(
-                "SELECT markets.id
-                 FROM markets
-                 LEFT JOIN coins ON coins.symbol = markets.base_coin
-                 WHERE markets.coinid = :cid AND markets.price != 0
-                   AND NOT markets.deleted AND NOT markets.disabled
-                 ORDER BY markets.priority DESC,
-                   CASE markets.base_coin
-                     WHEN markets.base_coin THEN markets.price * COALESCE(coins.price, 1)
-                     ELSE markets.price
-                   END DESC
-                 LIMIT 1",
-                [':cid' => $coin->id]
-            )->queryScalar();
+            $candidates = Markets::find()
+                ->where(['coinid' => $coin->id])
+                ->andWhere(['not', ['price' => 0]])
+                ->andWhere(['deleted' => 0, 'disabled' => 0])
+                ->orderBy(['priority' => SORT_DESC])
+                ->all();
 
-            if ($bestId) {
-                $market = Markets::findOne((int) $bestId);
+            $bestValue = -1;
+            foreach ($candidates as $candidate) {
+                $value = (float) $candidate->price
+                    * Yii::$app->YiimpUtils->quoteBtcPrice($candidate->base_coin, 1);
+                if ($value > $bestValue) {
+                    $bestValue = $value;
+                    $market    = $candidate;
+                }
             }
         }
 

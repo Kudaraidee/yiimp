@@ -478,8 +478,11 @@ function updateNestexMarkets()
 
 				if (empty($coin->price) && $ask)
 				{
-					$coin->price = $market->price;
-					$coin->price2 = $price2;
+					// Market prices are quoted in USDT; coins.price must stay in BTC.
+					// Convert exactly like updateNonKYCMarkets() does.
+					$quote = yiimp_quote_btc_price($market->base_coin, 1);
+					$coin->price = $market->price * $quote;
+					$coin->price2 = $price2 * $quote;
 					$coin->save();
 				}
 
