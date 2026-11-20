@@ -605,15 +605,18 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-		$rate = Yii::$app->cache->get("YIIMP_user_rate-$userid-$algo");
-		if (!$rate) {
+		// v2 key + 60s TTL: the old key never expired and left the wallet
+		// algo summary stuck at a stale hashrate.
+		$cacheKey = "YIIMP_user_rate_v2-$userid-$algo";
+		$rate = Yii::$app->cache->get($cacheKey);
+		if ($rate === false) {
 			$rate = (new \yii\db\Query())
 					->select(["(sum(difficulty) * $target / $interval / 1000)"])
 					->from('shares')
 					->where(['valid' => true, 'algo' => $algo, 'userid' => $userid])
 					->andWhere(['>', 'time', $delay])
 					->scalar();
-			Yii::$app->cache->set("YIIMP_user_rate-$userid-$algo", $rate);
+			Yii::$app->cache->set($cacheKey, $rate, 60);
 		}
 
 		return $rate;
@@ -627,13 +630,14 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-		$rate = Yii::$app->cache->get("YIIMP_user_shared_rate-$userid-$algo");
+		$cacheKey = "YIIMP_user_shared_rate_v2-$userid-$algo";
+		$rate = Yii::$app->cache->get($cacheKey);
 		if ($rate === false) {
 			$rate = Yii::$app->db->createCommand(
 				"SELECT (sum(difficulty) * $target / $interval / 1000) FROM shares WHERE valid AND time>$delay AND userid=:uid AND algo=:algo AND solo=0",
 				[':uid' => $userid, ':algo' => $algo]
 			)->queryScalar();
-			Yii::$app->cache->set("YIIMP_user_shared_rate-$userid-$algo", $rate);
+			Yii::$app->cache->set($cacheKey, $rate, 60);
 		}
 		return $rate;
 	}
@@ -646,13 +650,14 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-		$rate = Yii::$app->cache->get("YIIMP_user_solo_rate-$userid-$algo");
+		$cacheKey = "YIIMP_user_solo_rate_v2-$userid-$algo";
+		$rate = Yii::$app->cache->get($cacheKey);
 		if ($rate === false) {
 			$rate = Yii::$app->db->createCommand(
 				"SELECT (sum(difficulty) * $target / $interval / 1000) FROM shares WHERE valid AND time>$delay AND userid=:uid AND algo=:algo AND solo=1",
 				[':uid' => $userid, ':algo' => $algo]
 			)->queryScalar();
-			Yii::$app->cache->set("YIIMP_user_solo_rate-$userid-$algo", $rate);
+			Yii::$app->cache->set($cacheKey, $rate, 60);
 		}
 		return $rate;
 	}
