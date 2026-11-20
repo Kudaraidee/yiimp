@@ -343,7 +343,7 @@ class YiimpUtils extends Component
 		$coin_powlimit_bits = null;
 		
 		if (!is_null($coinid)) {
-			$coin = getdbo('db_coins', $coinid);
+			$coin = Coins::findOne((int) $coinid);
 			if (($coin) && (!is_null($coin->powlimit_bits))) {
 				$coin_powlimit_bits = $coin->powlimit_bits;
 			}

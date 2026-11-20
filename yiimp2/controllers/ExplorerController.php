@@ -50,7 +50,7 @@ class ExplorerController extends BaseController
 	public function createUrl($route,$params=array(),$ampersand='&')
 	{
 		if ($route == '/explorer' && isset($params['id'])) {
-			$coin = getdbo('db_coins', intval($params['id']));
+			$coin = Coins::findOne((int) $params['id']);
 			if ($coin && $coin->visible && !is_numeric($coin->symbol)) {
 				unset($params['id']);
 				$route = '/explorer/'.$coin->symbol.'?'.http_build_query($params,'',$ampersand);
@@ -84,12 +84,12 @@ class ExplorerController extends BaseController
 
 		$txid = Yii::$app->YiimpUtils->gethexparam('txid');
 		$q = Yii::$app->YiimpUtils->gethexparam('q');
-		if (strlen($q) >= 32 && ctype_xdigit($q)) {
+		if ($coin && strlen($q) >= 32 && ctype_xdigit($q)) {
 			$remote = new WalletRPC($coin);
 			$block = $remote->getblock($q);
 			if ($block) {
 				$hash = $q;
-				$height = Yii::$app->ConversionUtils->objSafeVal($hash, 'height');
+				$height = (int) Yii::$app->ConversionUtils->arraySafeVal($block, 'height');
 			} else {
 				$txid = $q;
 			}
@@ -123,17 +123,20 @@ class ExplorerController extends BaseController
 	// redirect POST request with url cleanup...
 	public function actionSearch()
 	{
-		$height = getiparam('height');
-		$txid = gethexparam('txid');
-		$hash = gethexparam('hash');
-		$q = gethexparam('q');
+		$request = Yii::$app->getRequest();
+		$height = (int) $request->getQueryParam('height');
+		$txid = Yii::$app->YiimpUtils->gethexparam('txid');
+		$hash = Yii::$app->YiimpUtils->gethexparam('hash');
+		$q = Yii::$app->YiimpUtils->gethexparam('q');
 		$url = '/'; // defaults to home on invalid search
-		if (isset($_GET['SYM'])) {
+		$sym = $request->getQueryParam('SYM');
+		if ($sym !== null) {
 			// only for visible coins
-			$url = "/explorer/".$_GET['SYM']."?";
-		} else if (isset($_GET['id'])) {
+			$sym = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $sym);
+			if ($sym !== '') $url = "/explorer/{$sym}?";
+		} else if ($request->getQueryParam('id') !== null) {
 			// only for hidden coins
-			$url = "/explorer/".$_GET['id']."?";
+			$url = '/explorer/'.(int) $request->getQueryParam('id').'?';
 		}
 		if (!empty($height)) $url .= "&height=$height";
 		if (!empty($txid)) $url .= "&txid=$txid";

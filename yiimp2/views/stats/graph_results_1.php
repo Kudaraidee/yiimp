@@ -1,11 +1,15 @@
 <?php
 
-$algo = user()->getState('yaamp-algo');
+$algo = Yii::$app->session->get('yaamp-algo', defined('YIIMP_DEFAULT_ALGO') ? YIIMP_DEFAULT_ALGO : 'all');
 
 $t = time() - 48*60*60;
-$stats = getdbolist('db_hashstats', "time>$t and algo=:algo", array(':algo'=>$algo));
+$stats = \app\models\HashStats::find()
+    ->where(['>', 'time', $t])
+    ->andWhere(['algo' => $algo])
+    ->orderBy(['time' => SORT_ASC])
+    ->all();
 
-$algo_unit_factor = YIIMP_algo_mBTC_factor($algo);
+$algo_unit_factor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
 
 $data = array();
 
