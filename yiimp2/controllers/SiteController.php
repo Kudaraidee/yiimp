@@ -376,7 +376,112 @@ class SiteController extends BaseController
      */
 	public function actionDiff()
 	{
-		return $this->render('diff');
+		$now       = time();
+		$configDir = dirname(Yii::$app->basePath) . '/config/stratum';
+		$rows      = [];
+
+		// Live stratum configuration from the runtime .conf files.
+		foreach (glob($configDir . '/*.conf') ?: [] as $file) {
+			$ini     = parse_ini_file($file, true) ?: [];
+			$section = $ini['STRATUM'] ?? [];
+			$algo    = (string) ($section['algo'] ?? basename($file, '.conf'));
+			$default = (float) ($section['difficulty'] ?? 0);
+
+			$rows[$algo] = [
+				'algo'         => $algo,
+				'port'         => (int) ($ini['TCP']['port'] ?? 0),
+				'config_file'  => basename($file),
+				'default'      => $default,
+				'min'          => isset($section['diff_min']) ? (float) $section['diff_min'] : $default / 2,
+				'max'          => isset($section['diff_max']) ? (float) $section['diff_max'] : $default * 8192,
+				'symbol'       => '',
+				'coin_name'    => '',
+				'network_diff' => null,
+				'workers'      => 0,
+				'fds'          => 0,
+				'pid'          => null,
+				'started'      => null,
+				'seen'         => null,
+				'hashrate'     => null,
+				'hr_time'      => null,
+			];
+		}
+
+		// Live process/connection stats written by each stratum instance.
+		$stratums = (new \yii\db\Query())->from('stratums')->all();
+		foreach ($stratums as $st) {
+			$algo = (string) ($st['algo'] ?? '');
+			if ($algo === '') continue;
+
+			if (!isset($rows[$algo])) {
+				$rows[$algo] = [
+					'algo' => $algo, 'port' => 0, 'config_file' => '',
+					'default' => 0, 'min' => 0, 'max' => 0,
+					'symbol' => '', 'coin_name' => '', 'network_diff' => null,
+					'workers' => 0, 'fds' => 0, 'pid' => null,
+					'started' => null, 'seen' => null, 'hashrate' => null, 'hr_time' => null,
+				];
+			}
+
+			$rows[$algo]['port']    = (int) ($st['port'] ?? 0) ?: $rows[$algo]['port'];
+			$rows[$algo]['symbol']  = (string) ($st['symbol'] ?? '') ?: $rows[$algo]['symbol'];
+			$rows[$algo]['workers'] = (int) ($st['workers'] ?? 0);
+			$rows[$algo]['fds']     = (int) ($st['fds'] ?? 0);
+			$rows[$algo]['pid']     = !empty($st['pid']) ? (int) $st['pid'] : null;
+			$rows[$algo]['started'] = !empty($st['started']) ? (int) $st['started'] : null;
+			$rows[$algo]['seen']    = !empty($st['time']) ? (int) $st['time'] : null;
+		}
+
+		// Live coin/network difficulty refreshed by the backend.
+		$coins = (new \yii\db\Query())
+			->select(['symbol', 'name', 'algo', 'difficulty'])
+			->from('coins')
+			->where(['enable' => 1, 'visible' => 1])
+			->all();
+		foreach ($coins as $coin) {
+			$algo = (string) ($coin['algo'] ?? '');
+			if (!isset($rows[$algo])) continue;
+			if ($rows[$algo]['symbol'] === '') {
+				$rows[$algo]['symbol']  = (string) $coin['symbol'];
+				$rows[$algo]['coin_name'] = (string) $coin['name'];
+			}
+			$rows[$algo]['network_diff'] = (float) $coin['difficulty'];
+		}
+
+		foreach ($rows as &$row) {
+			$hr = (new \yii\db\Query())
+				->select(['hashrate', 'time'])
+				->from('hashrate')
+				->where(['algo' => $row['algo']])
+				->orderBy(['time' => SORT_DESC])
+				->one();
+			if ($hr) {
+				$row['hashrate'] = (float) $hr['hashrate'];
+				$row['hr_time']  = (int) $hr['time'];
+			}
+		}
+		unset($row);
+
+		usort($rows, fn($a, $b) => ($a['port'] ?: 99999) <=> ($b['port'] ?: 99999));
+
+		$workers = (new \yii\db\Query())
+			->select(['worker', 'name', 'algo', 'difficulty', 'password', 'version', 'time'])
+			->from('workers')
+			->where(['>', 'time', $now - 3600])
+			->orderBy(['time' => SORT_DESC])
+			->limit(20)
+			->all();
+
+		$stratumUrl = defined('YAAMP_STRATUM_URL')
+			? YAAMP_STRATUM_URL
+			: (defined('YIIMP_STRATUM_URL') ? YIIMP_STRATUM_URL : 'localhost');
+
+		return $this->render('diff', [
+			'rows'       => $rows,
+			'workers'    => $workers,
+			'now'        => $now,
+			'stratumUrl' => $stratumUrl,
+		]);
 	}
 
     /**
