@@ -9,8 +9,9 @@ $isTailwind  = Yii::$app->LayoutManager->isTailwind();
 $isLegacy    = Yii::$app->LayoutManager->isLegacy();
 $conv        = Yii::$app->ConversionUtils;
 $defaultalgo = Yii::$app->session->get('yaamp-algo');
+$showestimates = true;
 
-// ── Build sorted algo list (business logic unchanged) ─────────────────────────
+// ── Determine the most profitable algo (kept from the old table) ──────────────
 $best_algo = '';
 $best_norm = 0;
 $algos     = [];
@@ -29,330 +30,321 @@ foreach (Yii::$app->YiimpUtils->get_algos() as $algo) {
 }
 usort($algos, fn($a, $b) => $a[0] < $b[0]);
 
-$total_coins = 0; $total_workers = 0; $total_solo_workers = 0; $total_users = 0;
-$showestimates = false;
+// The Algorithm bar on /site/mining drives this table.
+$selectedAlgo = ($defaultalgo && $defaultalgo !== 'all') ? $defaultalgo : null;
 
-// ── Table open ─────────────────────────────────────────────────────────────────
+// ── Wrapper ───────────────────────────────────────────────────────────────────
 if ($isLegacy) {
     echo "<div class='main-left-box'><div class='main-left-title'>Pool Status</div><div class='main-left-inner'>";
-    echo <<<'CSS'
-<style>
-/* Legacy Pool Status table: keep all 10 columns inside the narrow left panel. */
-#maintable1,
-#maintable1 th,
-#maintable1 td { box-sizing: border-box; }
-#maintable1 {
-    table-layout: fixed;
-    width: 100% !important;
-    font-size: 10px !important;
-    line-height: 1.2;
-}
-#maintable1 th,
-#maintable1 td {
-    padding: 2px 2px !important;
-    margin: 0 !important;
-    vertical-align: top;
-    white-space: normal !important;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-}
-#maintable1 th { font-size: 9px !important; font-weight: 600; }
-#maintable1 img { vertical-align: middle; }
-#maintable1 th:nth-child(1), #maintable1 td:nth-child(1) { width: 18%; }
-#maintable1 th:nth-child(2), #maintable1 td:nth-child(2) { width: 7%; }
-#maintable1 th:nth-child(3), #maintable1 td:nth-child(3) { width: 10%; }
-#maintable1 th:nth-child(4), #maintable1 td:nth-child(4) { width: 6%; }
-#maintable1 th:nth-child(5), #maintable1 td:nth-child(5) { width: 6%; }
-#maintable1 th:nth-child(6), #maintable1 td:nth-child(6) { width: 8%; }
-#maintable1 th:nth-child(7), #maintable1 td:nth-child(7) { width: 19%; }
-#maintable1 th:nth-child(8), #maintable1 td:nth-child(8) { width: 12%; }
-#maintable1 th:nth-child(9), #maintable1 td:nth-child(9) { width: 6%; }
-#maintable1 th:nth-child(10), #maintable1 td:nth-child(10) { width: 8%; }
-</style>
-CSS;
-    Yii::$app->ViewUtils->showTableSorter('maintable1', "{
-        tableClass: 'dataGrid2',
-        textExtraction: {
-            4: function(node,table,n){ return \$(node).attr('data'); },
-            8: function(node,table,n){ return \$(node).attr('data'); }
-        }
-    }");
 } elseif (!$isTailwind) {
-    echo '<div class="card shadow-sm mb-3"><div class="card-header py-2 small fw-semibold"><i class="bi bi-bar-chart me-1"></i>Pool Status</div>';
-    echo '<div class="card-body p-0"><div class="overflow-auto">';
-    echo '<table id="maintable1" class="table table-sm table-bordered mb-0">';
-    Yii::$app->ViewUtils->JavascriptReady("
-        \$('#maintable1').tablesorter({
-            textExtraction:{
-                4: function(node,table,n){ return \$(node).attr('data'); },
-                8: function(node,table,n){ return \$(node).attr('data'); }
-            }
-        });
-        \$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');
-    ");
+    echo '<div class="card shadow-sm mb-3"><div class="card-header py-2 small fw-semibold">'
+       . '<i class="bi bi-bar-chart me-1"></i>Pool Status</div><div class="card-body p-0">';
 } else {
     echo '<div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden mb-4">';
     echo '<div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">';
     echo '<i data-lucide="bar-chart-2" class="w-4 h-4 text-gray-400 shrink-0"></i>';
     echo '<span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Pool Status</span>';
-    echo '</div><div class="overflow-x-auto">';
-    echo '<table id="maintable1" class="w-full text-xs">';
+    echo '</div>';
 }
 
-// ── Thead ─────────────────────────────────────────────────────────────────────
+// ── Coin-list table styles ────────────────────────────────────────────────────
+echo <<<'CSS'
+<style>
+#maintable1.ps-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+#maintable1.ps-table th {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #8a94a6;
+    background: #f8fafc;
+    padding: 6px 7px;
+    text-align: left;
+    border-bottom: 1px solid #e8eef6;
+    white-space: nowrap;
+}
+#maintable1.ps-table th.num { text-align: right; }
+#maintable1.ps-table th .sort { opacity: .35; font-size: 8px; margin-left: 2px; }
+#maintable1.ps-table td {
+    padding: 7px;
+    border-bottom: 1px solid #eef2f7;
+    vertical-align: middle;
+}
+#maintable1.ps-table tr:last-child td { border-bottom: 0; }
+#maintable1.ps-table tbody tr:hover { background: #f7faff; }
+#maintable1.ps-table tr.is-active {
+    background: #eef4ff;
+    box-shadow: inset 3px 0 0 #2c5aa0;
+}
+#maintable1 .num { text-align: right; }
+#maintable1 .big {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #2b3d5b;
+    line-height: 1.25;
+}
+#maintable1 .sub {
+    display: block;
+    font-size: 9px;
+    color: #98a3b5;
+    line-height: 1.35;
+    margin-top: 1px;
+}
+#maintable1 .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+}
+#maintable1 .good { color: #1f9d55; }
+#maintable1 .coin { display: flex; align-items: center; gap: 7px; min-width: 0; }
+#maintable1 .coin-ico {
+    position: relative;
+    flex: 0 0 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    font-size: 7px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(135deg, #4f79c8, #2c5aa0);
+    overflow: hidden;
+}
+#maintable1 .coin-ico.firo { background: linear-gradient(135deg, #b06fd0, #7a3fa0); }
+#maintable1 .coin-ico img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 6px;
+}
+#maintable1 .coin-name {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #26385a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#maintable1 .coin-sym { font-size: 9px; color: #8a94a6; margin-left: 3px; }
+#maintable1 .coin-sub { font-size: 9px; color: #98a3b5; white-space: nowrap; margin-top: 1px; }
+#maintable1 .tag {
+    display: inline-block;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 8px;
+    font-weight: 700;
+    line-height: 13px;
+    vertical-align: 1px;
+    margin-right: 4px;
+    background: #e6f6ed;
+    color: #187d46;
+}
+#maintable1 .tag.manual { background: #f1f3f6; color: #8a94a6; }
+#maintable1 .algo {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 9px;
+    font-weight: 700;
+    border: 1px solid var(--c, #d8e2ef);
+    background: #f8fafc;
+    color: #33405a;
+    cursor: pointer;
+}
+#maintable1 .port { display: block; font-size: 9px; color: #8a94a6; margin-top: 3px; }
+#maintable1 .rpc { color: #5b8fd6; font-weight: 600; }
+#maintable1 .all-row td { background: #f8fafc; font-weight: 700; color: #5b6675; }
+#maintable1 .ps-foot {
+    padding: 6px 12px;
+    border-top: 1px solid #eef2f7;
+    background: #fbfdff;
+    font-size: 9px;
+    color: #98a3b5;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+#maintable1 .ps-foot b { color: #7d8aa0; }
+</style>
+CSS;
+
+// ── Sorting ───────────────────────────────────────────────────────────────────
+$sortConfig = "{tableClass:'dataGrid2',textExtraction:{"
+    . "2:function(node){return \$(node).attr('data')||\$(node).text()},"
+    . "3:function(node){return \$(node).attr('data')||\$(node).text()},"
+    . "4:function(node){return \$(node).attr('data')||\$(node).text()},"
+    . "5:function(node){return \$(node).attr('data')||\$(node).text()}"
+    . "}}";
+
 if ($isLegacy) {
-    echo <<<END
-<thead><tr>
-<th>Coins</th>
-<th data-sorter="numeric" align="center">Auto Exchanged</th>
-<th data-sorter="numeric" align="center">Minimum Payout</th>
-<th data-sorter="numeric" align="center">Port</th>
-<th data-sorter="numeric" align="center">Users (Active)</th>
-<th data-sorter="numeric" align="center">Workers<br>Share/Solo</th>
-<th data-sorter="numeric" align="center">Pool HashRate<br>Share/Solo/Total</th>
-<th data-sorter="numeric" align="center">Network Hashrate</th>
-<th data-sorter="currency" align="center">Fees<br>Share/Solo</th>
-<th data-sorter="currency" align="center">24 Hours<br>Actual</th>
-</tr></thead>
-END;
-} elseif (!$isTailwind) {
-    echo '<thead class="table-light"><tr>';
-    foreach (['Algo/Coin','Excl.','Min Pay','Port','Users','Workers S/S','Hashrate S/S/T','Net Hash','Fees','24h Act.'] as $h)
-        echo "<th class='text-center small' style='white-space:nowrap'>" . Html::encode($h) . "</th>";
-    echo '</tr></thead>';
+    Yii::$app->ViewUtils->showTableSorter('maintable1', $sortConfig);
 } else {
-    echo '<thead><tr class="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">';
-    foreach (['Algo/Coin','Excl.','Min Pay','Port','Users','Workers','Hashrate','Net Hash','Fees','24h Act.'] as $h)
-        echo '<th class="px-2 py-2.5 text-center">' . Html::encode($h) . '</th>';
-    echo '</tr></thead>';
+    Yii::$app->ViewUtils->JavascriptReady("\$('#maintable1').tablesorter(" . $sortConfig . ");"
+        . "\$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');");
 }
 
-echo '<tbody>';
+// ── Table open + header ───────────────────────────────────────────────────────
+echo '<div class="" style="overflow-x:auto;">';
+echo '<table id="maintable1" class="ps-table">';
+echo '<thead><tr>';
+echo '<th style="width:34%">Coin</th>';
+echo '<th style="width:15%">Algo</th>';
+echo '<th class="num" style="width:12%">Workers<span class="sort">↕</span></th>';
+echo '<th class="num" style="width:15%">Pool hash<span class="sort">↕</span></th>';
+echo '<th class="num" style="width:13%">Network<span class="sort">↕</span></th>';
+if ($showestimates) echo '<th class="num" style="width:11%">24h est<span class="sort">↕</span></th>';
+echo '</tr></thead><tbody>';
 
+$total_coins   = 0;
+$total_workers = 0;
+$total_solo    = 0;
+$total_pool    = 0.0;
+
+// ── One row per coin ──────────────────────────────────────────────────────────
 foreach ($algos as $item) {
-    $norm = $item[0];
     $algo = $item[1];
-    $coinsym = '';
-    $users_total = 0;
+    if ($selectedAlgo && $algo !== $selectedAlgo) continue;
 
-    $coins = Coins::find()->where(['enable' => 1, 'visible' => 1, 'auto_ready' => 1, 'algo' => $algo])
-                          ->orderBy(['index_avg' => SORT_DESC]);
-    if (!$coins || $coins->count() == 0) continue;
+    $coins = Coins::find()
+        ->where(['enable' => 1, 'visible' => 1, 'algo' => $algo])
+        ->orderBy(['index_avg' => SORT_DESC]);
+    if (!$coins->count()) continue;
 
     $workers      = Workers::find()->where(['algo' => $algo])->andFilterWhere(['not like', 'password', 'm=solo'])->count();
     $solo_workers = Workers::find()->where(['algo' => $algo])->andFilterWhere(['like', 'password', 'm=solo'])->count();
 
-    $hashrate = Yii::$app->cache->get("current_hashrate-{$algo}");
-    if (!$hashrate) {
-        $hashrate = (new \yii\db\Query())->select(['hashrate'])->from('hashrate')
-            ->where(['algo' => $algo])->orderBy(['time' => SORT_DESC])->scalar();
-        Yii::$app->cache->set("current_hashrate-{$algo}", $hashrate);
-    }
-
-    $price = Yii::$app->cache->get("current_price-{$algo}");
-    if (!$price) {
-        $price = (new \yii\db\Query())->select(['price'])->from('hashrate')
-            ->where(['algo' => $algo])->orderBy(['time' => SORT_DESC])->scalar();
-        Yii::$app->cache->set("current_price-{$algo}", $price);
-    }
-    $price_fmt = $price ? $conv->mbitcoinvaluetoa(Yii::$app->YiimpUtils->take_yiimp_fee($price, $algo)) : '-';
-    $norm_fmt  = $conv->mbitcoinvaluetoa($norm);
-
-    $t         = time() - 86400;
-    $avgprice  = Yii::$app->cache->get("current_avgprice-{$algo}");
-    if (!$avgprice) {
-        $avgprice = (new \yii\db\Query())->select(['avg(price)'])->from('hashrate')
-            ->where(['algo' => $algo])->andWhere(['>', 'time', $t])->scalar();
-        Yii::$app->cache->set("current_avgprice-{$algo}", $avgprice);
-    }
-
-    $total1 = Yii::$app->cache->get("current_total-{$algo}");
-    if (!$total1) {
-        $total1 = (new \yii\db\Query())->select(['SUM(amount*price)'])->from('blocks')
-            ->where(['algo' => $algo])->andWhere(['>', 'time', $t])
-            ->andWhere(['not in', 'category', ['orphan','stake','generated']])->scalar();
-        Yii::$app->cache->set("current_total-{$algo}", $total1);
-    }
-    $hashrate1 = Yii::$app->cache->get("current_hashrate1-{$algo}");
-    if (!$hashrate1) {
-        $hashrate1 = (new \yii\db\Query())->select(['avg(hashrate)'])->from('hashrate')
-            ->where(['algo' => $algo])->andWhere(['>', 'time', $t])->scalar();
-        Yii::$app->cache->set("current_hashrate1-{$algo}", $hashrate1);
-    }
-
-    $algo_unit_factor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
-    $btcmhday1 = $hashrate1 != 0 ? $conv->mbitcoinvaluetoa($total1 / $hashrate1 * 1000000 * 1000 * $algo_unit_factor) : '';
     $fees      = Yii::$app->YiimpUtils->yiimp_fee($algo);
     $fees_solo = Yii::$app->YiimpUtils->yiimp_fee_solo($algo);
-    $isBest    = ($algo === $best_algo);
-
-    // ── Algo header row ───────────────────────────────────────────────────────
+    $algoColor = Html::encode(Yii::$app->YiimpUtils->getAlgoColors($algo));
     $isSelected = ($defaultalgo === $algo);
-    if ($isLegacy) {
-        $bg = $isSelected ? "style='cursor:pointer;background-color:#d9d9d9;'" : "style='cursor:pointer' class='ssrow'";
-        echo "<tr {$bg} onclick='javascript:select_algo(\"{$algo}\")'>";
-        echo "<td style='font-size:110%;background-color:#f2f2f2;'><b>{$algo}</b></td>";
-        for ($i = 0; $i < 7; $i++) echo "<td align='center' style='font-size:.8em;background-color:#f2f2f2;'></td>";
-        echo $isBest
-            ? "<td class='estimate' align='center' style='font-size:.8em;background-color:#f2f2f2;' title='normalized {$norm_fmt}'><b>{$price_fmt}</b></td>"
-            : "<td class='estimate' align='center' style='font-size:.8em;background-color:#f2f2f2;' title='normalized {$norm_fmt}'>{$price_fmt}</td>";
-        echo "<td align='center' style='font-size:.8em;background-color:#f2f2f2;' data='{$btcmhday1}'>" . ($isBest ? "<b>{$btcmhday1}*</b>" : $btcmhday1) . "</td>";
-        echo '</tr>';
-    } elseif (!$isTailwind) {
-        $rowCls = $isSelected ? 'table-secondary fw-bold' : 'table-light';
-        echo "<tr class='{$rowCls}' style='cursor:pointer;' onclick='select_algo(\"{$algo}\")'>";
-        echo "<td class='small fw-bold'>" . Html::encode($algo) . "</td>";
-        for ($i = 0; $i < 7; $i++) echo "<td></td>";
-        echo "<td class='text-center small" . ($isBest ? " fw-bold" : "") . "' title='normalized {$norm_fmt}'>{$price_fmt}</td>";
-        echo "<td class='text-center small font-monospace" . ($isBest ? " fw-bold" : "") . "' data='{$btcmhday1}'>" . ($isBest ? "{$btcmhday1}*" : $btcmhday1) . "</td>";
-        echo '</tr>';
-    } else {
-        $rowCls = $isSelected
-            ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-2 border-indigo-500'
-            : 'bg-gray-50 dark:bg-gray-700/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10';
-        echo "<tr class='{$rowCls} cursor-pointer transition-colors' onclick='select_algo(\"{$algo}\")'>";
-        echo "<td class='px-2 py-2 font-bold " . ($isSelected ? "text-indigo-700 dark:text-indigo-300" : "text-gray-800 dark:text-gray-100") . "'>" . Html::encode($algo) . "</td>";
-        for ($i = 0; $i < 7; $i++) echo "<td></td>";
-        echo "<td class='px-2 py-2 text-center font-mono" . ($isBest ? " font-bold text-green-600 dark:text-green-400" : " text-gray-500 dark:text-gray-400") . "' title='normalized {$norm_fmt}'>{$price_fmt}</td>";
-        echo "<td class='px-2 py-2 text-center font-mono tabular-nums" . ($isBest ? " font-bold text-green-600 dark:text-green-400" : " text-gray-500 dark:text-gray-400") . "' data='{$btcmhday1}'>" . ($isBest ? "{$btcmhday1}*" : $btcmhday1) . "</td>";
-        echo '</tr>';
-    }
 
-    // ── Per-coin rows ─────────────────────────────────────────────────────────
     foreach ($coins->all() as $coin) {
         $name   = Html::encode(substr($coin->name, 0, 20));
         $symbol = $coin->getOfficialSymbol();
+        $symEnc = Html::encode((string) $symbol);
 
         $coin_stratum = Stratums::find()->where(['algo' => $algo, 'symbol' => $symbol]);
-        $port_count   = $coin_stratum->count();
-        $port_db      = $port_count >= 1 ? $coin_stratum->one() : null;
+        $port_db      = $coin_stratum->count() >= 1 ? $coin_stratum->one() : null;
+        $display_port = $port_db ? (int) $port_db->port : '—';
 
-        $auto_exchange = $coin->auto_exchange;
         $min_payout    = max(floatval(YIIMP_PAYMENTS_MINI), floatval($coin->payout_min));
-
-        $subq = (new \yii\db\Query())->select(['userid'])->from('workers')->distinct();
-        $users_total = (new \yii\db\Query())->select(['count(id)'])->from('accounts')
-            ->where(['in', 'id', $subq])->scalar();
-        $users_coins = (new \yii\db\Query())->select(['count(id)'])->from('accounts')
-            ->where(['coinid' => $coin->id])->andWhere(['in', 'id', $subq])->scalar();
 
         $wq = (new \yii\db\Query())->select(['count(id)'])->from('workers')
             ->where(['algo' => $algo, 'pid' => ($port_db ? $port_db->pid : 0)]);
-        $workers_coins      = (clone $wq)->andWhere(['not like', 'password', 'm=solo'])->scalar();
-        $solo_workers_coins = (clone $wq)->andWhere(['like', 'password', 'm=solo'])->scalar();
+        $workers_coins      = (int) (clone $wq)->andWhere(['not like', 'password', 'm=solo'])->scalar();
+        $solo_workers_coins = (int) (clone $wq)->andWhere(['like', 'password', 'm=solo'])->scalar();
+        $workers_display    = $workers_coins + $solo_workers_coins;
 
-        $pool_hash         = Yii::$app->YiimpUtils->coin_rate($coin->id);
-        $pool_hash_sfx     = $pool_hash ? $conv->Itoa2($pool_hash) . 'h/s' : '0 h/s';
-        $pool_shared       = Yii::$app->YiimpUtils->coin_shared_rate($coin->id);
-        $pool_shared_sfx   = $pool_shared ? $conv->Itoa2($pool_shared) . 'h/s' : '0 h/s';
-        $pool_solo_h       = Yii::$app->YiimpUtils->coin_solo_rate($coin->id);
-        $pool_solo_sfx     = $pool_solo_h ? $conv->Itoa2($pool_solo_h) . 'h/s' : '0 h/s';
-        $nethash           = Yii::$app->YiimpUtils->display_network_hashrate($coin);
-        $nethash_sfx       = $nethash ? strtoupper($conv->Itoa2($nethash)) . 'H/s' : '';
-        $btcmhd            = $conv->mbitcoinvaluetoa(Yii::$app->YiimpUtils->yiimp_profitability($coin));
+        $pool_hash       = (float) Yii::$app->YiimpUtils->coin_rate($coin->id);
+        $pool_shared     = (float) Yii::$app->YiimpUtils->coin_shared_rate($coin->id);
+        $pool_solo       = (float) Yii::$app->YiimpUtils->coin_solo_rate($coin->id);
+        $pool_hash_sfx   = $pool_hash   ? $conv->Itoa2($pool_hash)   . 'h/s' : '0 h/s';
+        $pool_shared_sfx = $pool_shared ? $conv->Itoa2($pool_shared) . 'h/s' : '0 h/s';
+        $pool_solo_sfx   = $pool_solo   ? $conv->Itoa2($pool_solo)   . 'h/s' : '0 h/s';
 
-        $display_users   = $port_count >= 1 ? $users_coins : $users_total;
-        $display_workers = $port_count >= 1 ? "{$workers_coins}/{$solo_workers_coins}" : "{$workers}/{$solo_workers}";
-        $display_port    = $port_db ? $port_db->port : '—';
-        $display_hash    = "{$pool_shared_sfx}/{$pool_solo_sfx}/{$pool_hash_sfx}";
+        $nethash     = Yii::$app->YiimpUtils->display_network_hashrate($coin);
+        $nethash_sfx = $nethash ? strtoupper($conv->Itoa2($nethash)) . 'H/s' : '—';
 
-        if ($isLegacy) {
-            echo '<tr>';
-            echo "<td align='left' valign='top' style='font-size:.8em;'><img width='10' src='" . Html::encode($coin->image) . "'>&nbsp;<b>{$name} ({$coin->symbol})</b></td>";
-            echo "<td align='center' valign='top' style='font-size:.8em;'><img width='13' src='" . ($auto_exchange ? '/images/ok.png' : '/images/cancel.png') . "'></td>";
-            echo "<td align='center' style='font-size:.8em;'><b>{$min_payout} {$symbol}</b></td>";
-            echo "<td align='center' style='font-size:.8em;'><b>{$display_port}</b></td>";
-            echo "<td align='center' style='font-size:.8em;'>{$display_users}</td>";
-            echo "<td align='center' style='font-size:.8em;'>{$display_workers}</td>";
-            echo "<td align='center' style='font-size:.8em;'>{$display_hash}</td>";
-            echo "<td align='center' style='font-size:.8em;' data='{$pool_hash}'>{$nethash_sfx}</td>";
-            echo "<td align='center' style='font-size:.8em;'>{$fees}%/{$fees_solo}%</td>";
-            echo "<td align='center' style='font-size:.8em;'>{$btcmhd}</td>";
-            echo '</tr>';
-        } elseif (!$isTailwind) {
-            echo '<tr>';
-            $coinImg = !empty($coin->image) ? "<img src='" . Html::encode($coin->image) . "' width='14' style='object-fit:contain' onerror='this.style.display=\"none\"'>&nbsp;" : '';
-            echo "<td class='small'>{$coinImg}<b>{$name}</b> <span class='text-muted'>({$coin->symbol})</span></td>";
-            $exchIco = $auto_exchange ? "<i class='bi bi-check-circle-fill text-success'></i>" : "<i class='bi bi-x-circle-fill text-danger'></i>";
-            echo "<td class='text-center small'>{$exchIco}</td>";
-            echo "<td class='text-center small font-monospace'>{$min_payout} {$symbol}</td>";
-            echo "<td class='text-center small font-monospace fw-bold'>{$display_port}</td>";
-            echo "<td class='text-center small tabular-nums'>{$display_users}</td>";
-            echo "<td class='text-center small tabular-nums'>{$display_workers}</td>";
-            echo "<td class='text-center small font-monospace'>{$display_hash}</td>";
-            echo "<td class='text-center small font-monospace' data='{$pool_hash}'>{$nethash_sfx}</td>";
-            echo "<td class='text-center small'>{$fees}%/{$fees_solo}%</td>";
-            echo "<td class='text-center small font-monospace'>{$btcmhd}</td>";
-            echo '</tr>';
-        } else {
-            echo '<tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/10 transition-colors border-b border-gray-100 dark:border-gray-700/50">';
-            $coinImg = !empty($coin->image) ? "<img src='" . Html::encode($coin->image) . "' width='14' height='14' class='inline rounded object-contain mr-1' onerror='this.style.display=\"none\"'>" : '';
-            echo "<td class='px-2 py-1.5 font-medium text-gray-800 dark:text-gray-200'>{$coinImg}{$name} <span class='text-gray-400 dark:text-gray-500 font-mono'>({$coin->symbol})</span></td>";
-            $exchEl = $auto_exchange
-                ? '<i data-lucide="check-circle" class="w-3.5 h-3.5 text-green-500 dark:text-green-400 inline"></i>'
-                : '<i data-lucide="x-circle" class="w-3.5 h-3.5 text-red-500 dark:text-red-400 inline"></i>';
-            echo "<td class='px-2 py-1.5 text-center'>{$exchEl}</td>";
-            echo "<td class='px-2 py-1.5 text-center font-mono text-gray-600 dark:text-gray-300'>{$min_payout} {$symbol}</td>";
-            echo "<td class='px-2 py-1.5 text-center font-mono font-bold text-gray-800 dark:text-gray-200'>{$display_port}</td>";
-            echo "<td class='px-2 py-1.5 text-center tabular-nums text-gray-600 dark:text-gray-300'>{$display_users}</td>";
-            echo "<td class='px-2 py-1.5 text-center tabular-nums font-mono text-gray-600 dark:text-gray-300'>{$display_workers}</td>";
-            echo "<td class='px-2 py-1.5 text-center font-mono text-gray-600 dark:text-gray-300'>{$display_hash}</td>";
-            echo "<td class='px-2 py-1.5 text-center font-mono text-gray-500 dark:text-gray-400' data='{$pool_hash}'>{$nethash_sfx}</td>";
-            echo "<td class='px-2 py-1.5 text-center text-gray-500 dark:text-gray-400'>{$fees}%/{$fees_solo}%</td>";
-            echo "<td class='px-2 py-1.5 text-center font-mono font-semibold text-indigo-600 dark:text-indigo-400'>{$btcmhd}</td>";
-            echo '</tr>';
+        $btcmhd = $conv->mbitcoinvaluetoa(Yii::$app->YiimpUtils->yiimp_profitability($coin));
+        $isBest = ($algo === $best_algo);
+
+        $initials = strtoupper(substr($coin->symbol, 0, 3));
+        $img = !empty($coin->image)
+            ? "<img src='" . Html::encode($coin->image) . "' alt='' onerror=\"this.remove()\">"
+            : '';
+        $icoClass = str_contains($algo, 'firo') ? 'coin-ico firo' : 'coin-ico';
+
+        echo '<tr class="' . ($isSelected ? 'is-active' : '') . '">';
+
+        // Coin
+        echo '<td>';
+        echo '<div class="coin">';
+        echo "<span class='{$icoClass}'>{$initials}{$img}</span>";
+        echo '<div style="min-width:0">';
+        echo "<div class='coin-name'>{$name}<span class='coin-sym'>{$symEnc}</span></div>";
+        echo '<div class="coin-sub">';
+        echo $coin->auto_exchange
+            ? '<span class="tag">AUTO</span>'
+            : '<span class="tag manual">MANUAL</span>';
+        echo 'Min ' . Html::encode((string) $min_payout) . ' ' . $symEnc;
+        echo ' · Fee ' . Html::encode((string) $fees) . '%/' . Html::encode((string) $fees_solo) . '%';
+        echo '</div></div></div></td>';
+
+        // Algo + port
+        echo '<td>';
+        echo "<span class='algo' style='--c:{$algoColor}' title='Select " . Html::encode($algo) . "'"
+           . " onclick='if(typeof select_algo===\"function\")select_algo(" . json_encode($algo) . ")'>"
+           . Html::encode($algo) . '</span>';
+        echo "<span class='port mono'>:{$display_port}</span>";
+        echo '</td>';
+
+        // Workers
+        echo "<td class='num' data='{$workers_display}'>";
+        echo "<span class='big mono'>{$workers_display}</span>";
+        echo "<span class='sub mono'>{$workers_coins}/{$solo_workers_coins} S/So</span>";
+        echo '</td>';
+
+        // Pool hash
+        echo "<td class='num' data='{$pool_hash}'>";
+        echo "<span class='big mono'>{$pool_hash_sfx}</span>";
+        echo "<span class='sub mono'>{$pool_shared_sfx}/{$pool_solo_sfx} shared/solo</span>";
+        echo '</td>';
+
+        // Network
+        echo "<td class='num' data='" . (float) $nethash . "'>";
+        echo "<span class='big mono rpc'>{$nethash_sfx}</span>";
+        echo '<span class="sub">RPC</span>';
+        echo '</td>';
+
+        // Estimate
+        if ($showestimates) {
+            echo "<td class='num" . ($isBest ? ' good' : '') . "' data='{$btcmhd}'"
+               . " title='best algo estimate'>";
+            echo "<span class='big mono'>" . ($isBest ? $btcmhd . '*' : $btcmhd) . '</span>';
+            echo '<span class="sub">mBTC/MH</span>';
+            echo '</td>';
         }
 
-        $total_users = $users_total;
+        echo '</tr>';
+
+        $total_pool += $pool_hash;
     }
 
-    $total_coins        += $coins->count();
-    $total_workers      += $workers;
-    $total_solo_workers += $solo_workers;
+    $total_coins   += $coins->count();
+    $total_workers += $workers;
+    $total_solo    += $solo_workers;
 }
 
-// ── "All" footer row ──────────────────────────────────────────────────────────
-$isAllSelected = ($defaultalgo === 'all');
-if ($isLegacy) {
-    $bg = $isAllSelected ? "style='cursor:pointer;background-color:#d9d9d9;'" : "style='cursor:pointer' class='ssrow'";
-    echo "<tr {$bg} onclick='javascript:select_algo(\"all\")'>";
-    echo "<td><b>all</b></td><td></td>";
-    echo "<td align='center' style='font-size:.8em;'>{$total_coins} Coins</td><td></td>";
-    echo "<td align='center' style='font-size:.8em;'>{$total_users} Users</td>";
-    echo "<td align='center' style='font-size:.8em;'>Shared: {$total_workers}<br>Solo: {$total_solo_workers}</td>";
-    echo "<td></td><td class='estimate'></td><td class='estimate'></td><td></td>";
-    echo '</tr>';
-} elseif (!$isTailwind) {
-    $rowCls = $isAllSelected ? 'table-secondary fw-bold' : 'table-light';
-    echo "<tr class='{$rowCls}' style='cursor:pointer;' onclick='select_algo(\"all\")'>";
-    echo "<td class='small fw-bold'>all</td><td></td>";
-    echo "<td class='text-center small'>{$total_coins} coins</td><td></td>";
-    echo "<td class='text-center small'>{$total_users} users</td>";
-    echo "<td class='text-center small'>{$total_workers}S/{$total_solo_workers}So</td>";
-    echo "<td></td><td></td><td></td><td></td>";
-    echo '</tr>';
-} else {
-    $rowCls = $isAllSelected
-        ? 'bg-indigo-50 dark:bg-indigo-900/20 border-l-2 border-indigo-500'
-        : 'bg-gray-50 dark:bg-gray-700/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10';
-    echo "<tr class='{$rowCls} cursor-pointer transition-colors' onclick='select_algo(\"all\")'>";
-    echo "<td class='px-2 py-2 font-bold " . ($isAllSelected ? "text-indigo-700 dark:text-indigo-300" : "text-gray-800 dark:text-gray-100") . "'>all</td><td></td>";
-    echo "<td class='px-2 py-2 text-center text-gray-500 dark:text-gray-400'>{$total_coins} coins</td><td></td>";
-    echo "<td class='px-2 py-2 text-center text-gray-500 dark:text-gray-400'>{$total_users}</td>";
-    echo "<td class='px-2 py-2 text-center font-mono text-gray-500 dark:text-gray-400'>{$total_workers}S/{$total_solo_workers}So</td>";
-    echo "<td></td><td></td><td></td><td></td>";
-    echo '</tr>';
-}
+// ── Summary footer row ────────────────────────────────────────────────────────
+$total_pool_fmt = $total_pool > 0 ? $conv->Itoa2($total_pool) . 'h/s' : '0 h/s';
+echo '<tr class="all-row">';
+echo "<td>All · {$total_coins} coins</td>";
+echo '<td>—</td>';
+echo "<td class='num mono' data='{$total_workers}'>{$total_workers}</td>";
+echo "<td class='num mono' data='{$total_pool}'>{$total_pool_fmt}</td>";
+echo '<td class="num">—</td>';
+if ($showestimates) echo '<td class="num">—</td>';
+echo '</tr>';
 
-echo '</tbody></table>';
+echo '</tbody></table></div>';
 
+// ── Footer note + wrapper close ───────────────────────────────────────────────
+$note = '* mBTC/MH/day, per GH for sha &amp; blake';
 if ($isLegacy) {
-    echo '<p style="font-size:.8em;">&nbsp;* values in mBTC/MH/day, per GH for sha & blake</p>';
+    echo '<p style="font-size:.8em;">&nbsp;' . $note . '</p>';
     echo '</div></div><br>';
-    if (!$showestimates) echo '<style>#maintable1 .estimate{display:none;}</style>';
 } elseif (!$isTailwind) {
+    echo '<div class="card-footer text-muted small py-1">' . $note . '</div>';
     echo '</div></div>';
-    echo '<div class="card-footer text-muted small py-1">* mBTC/MH/day, per GH for sha &amp; blake</div></div>';
 } else {
-    echo '<div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">* mBTC/MH/day (GH for sha &amp; blake)</div></div>';
+    echo '<div class="px-4 py-2 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-400 dark:text-gray-500">'
+       . $note . '</div></div>';
 }

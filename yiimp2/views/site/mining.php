@@ -174,7 +174,7 @@ $hasGraphs = ($algo !== 'all');
 
 <div class="row gx-3">
     <div class="col-12 col-lg-8 mining-col mining-new">
-        <div class="mining-new-label">MINERS VERSION · merged from /site/miners</div>
+        <div class="mining-new-label">MINERS VERSION</div>
         <div id="miners_results" style="overflow-x:auto;"></div>
     </div>
     <div class="col-12 col-lg-4 mining-col" style="overflow-x:auto;">
