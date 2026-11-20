@@ -6,6 +6,7 @@
 /** @var array{found:array,orphan:array}     $blockCounts */
 
 use yii\helpers\Html;
+use app\services\MarketService;
 
 $usdBtc     = $mining->usdbtc ?? 0;
 $isTailwind = Yii::$app->LayoutManager->isTailwind();
@@ -16,7 +17,8 @@ $utils      = Yii::$app->YiimpUtils;
 // ── Shared per-coin computation ───────────────────────────────────────────────
 // Runs regardless of scheme; each branch renders from these variables.
 
-$rows = [];
+$rows       = [];
+$marketSvc  = new MarketService();
 foreach ($coins as $coin) {
     $algoColor  = $utils->getAlgoColors($coin->algo);
     $version    = $conv->formatWalletVersion($coin);
@@ -43,11 +45,14 @@ foreach ($coins as $coin) {
     $syncPct     = ($coin->block_height < $coin->target_height && $coin->target_height)
                    ? round($coin->block_height * 100 / $coin->target_height, 1) : null;
 
+    $bestMarket = $marketSvc->getBestMarket($coin);
+    $marketName = $bestMarket ? (string) $bestMarket->name : '';
+
     $rows[] = compact(
         'coin', 'algoColor', 'version', 'difficulty',
         'btcmhd', 'ss1', 'ss2', 'price', 'price2',
         'btcBalance', 'btcAvailable', 'fiatBalance', 'fiatAvailable',
-        'hasDeficit', 'hasDontsell', 'syncPct'
+        'hasDeficit', 'hasDontsell', 'syncPct', 'marketName'
     );
 }
 
@@ -56,15 +61,115 @@ if ($isLegacy):
 ?>
 <style type="text/css">
 tr.ssrow.filtered { display: none; }
-th.status, td.status { min-width: 28px; max-width: 48px; text-align: center; }
-td.status { font-family: monospace; font-size: 9pt; letter-spacing: 3px; }
-td.status span.progress { font-size: .8em; letter-spacing: 0; }
-td.status span.hidden { visibility: hidden; }
-span.eov { opacity: 0.5; }
+span.eov { opacity: .45; }
+
+/* Coin wallet grid — same card chrome as /site/mining */
+#cw-card { color: #334155; font-size: 11px; margin-bottom: 12px; }
+#cw-card .main-left-box {
+    border: 1px solid #d8e2ef !important; border-radius: 7px !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04); overflow: hidden; background: #fff;
+}
+#cw-card .main-left-title {
+    display: flex !important; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 40px; padding: 9px 13px !important;
+    background: #f8fafc !important; border-bottom: 1px solid #e8eef6;
+}
+#cw-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
+#cw-ico {
+    flex: 0 0 26px; height: 26px; border-radius: 6px; display: grid; place-items: center;
+    color: #fff; font-size: 12px; font-weight: 800;
+    background: linear-gradient(135deg,#4f79c8,#2c5aa0);
+}
+#cw-title { display: block; font-size: 13px; font-weight: 800; color: #26385a; line-height: 1.2; }
+#cw-subtitle { display: block; font-size: 10px; color: #8a94a6; font-weight: 500; }
+#cw-pill {
+    display: inline-block; border: 1px solid #d7e5ff; background: #eef4ff;
+    color: #2c5aa0; border-radius: 999px; padding: 2px 9px;
+    font-size: 9px; font-weight: 800; line-height: 15px; white-space: nowrap;
+}
+#cw-scroll { max-height: 72vh; overflow: auto; }
+#cw-card table#maintable {
+    width: 100% !important; min-width: 1180px; margin: 0 !important;
+    border-collapse: collapse; table-layout: fixed; font-size: 11px; color: #334155;
+}
+#cw-card table#maintable th {
+    position: sticky; top: 0; z-index: 2;
+    background: #f8fafc !important; padding: 8px 9px !important;
+    font-size: 9px !important; font-weight: 800 !important; letter-spacing: .05em;
+    text-transform: uppercase; color: #8a94a6; text-align: right;
+    border-bottom: 1px solid #e2e8f0 !important; white-space: nowrap;
+}
+#cw-card table#maintable td {
+    padding: 8px 9px !important; border-bottom: 1px solid #eef2f7 !important;
+    vertical-align: middle; text-align: right;
+}
+#cw-card table#maintable tbody tr:hover td { background: #f7faff; }
+#cw-card table#maintable tbody tr:last-child td { border-bottom: 0; }
+#cw-card table#maintable tfoot th {
+    position: static; background: #fcfdff !important; text-align: left;
+    color: #64748b; font-size: 10px; letter-spacing: 0; text-transform: none;
+    padding: 7px 11px !important; border-top: 1px solid #e8eef6;
+}
+#cw-card .cw-left { text-align: left !important; }
+#cw-card .cw-center { text-align: center !important; }
+#cw-card .cw-w-ico { width: 42px; }
+#cw-card .cw-w-status { width: 66px; }
+#cw-card .cw-w-coin { width: 172px; }
+#cw-card .cw-w-node { width: 178px; }
+#cw-card .cw-w-num { width: 108px; }
+#cw-card .cw-w-small { width: 92px; }
+#cw-card .cw-coin { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#cw-card .cw-avatar {
+    flex: 0 0 28px; width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid #e8eef6; background: #fff; display: grid; place-items: center; overflow: hidden;
+}
+#cw-card .cw-avatar img { width: 22px; height: 22px; object-fit: contain; }
+#cw-card .cw-coin a { color: #26385a; font-weight: 800; text-decoration: none; }
+#cw-card .cw-coin a:hover { color: #2c5aa0; text-decoration: underline; }
+#cw-card .cw-meta { display: block; font-size: 9px; color: #94a3b8; font-family: ui-monospace, monospace; }
+#cw-card .cw-status { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+#cw-card .cw-badges, #cw-card .cw-dots { display: flex; gap: 3px; justify-content: center; }
+#cw-card .cw-badge {
+    min-width: 17px; padding: 1px 4px; border-radius: 4px; border: 1px solid transparent;
+    font-size: 9px; font-weight: 800; line-height: 14px;
+}
+#cw-card .cw-badge.on { background: #e8f7ee; color: #187d46; border-color: #ccebd8; }
+#cw-card .cw-badge.off { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; }
+#cw-card .cw-badge.warn { background: #fff5e6; color: #b45309; border-color: #fde3b8; }
+#cw-card .cw-badge.err { background: #fdecec; color: #b91c1c; border-color: #f8caca; }
+#cw-card .cw-dot { width: 6px; height: 6px; border-radius: 50%; background: #e2e8f0; }
+#cw-card .cw-dot.on { background: #3b82f6; }
+#cw-card .cw-sync { font-size: 9px; color: #64748b; font-weight: 700; }
+#cw-card .cw-algo {
+    display: inline-block; border-radius: 4px; padding: 1px 6px;
+    color: #26385a; font-size: 9px; font-weight: 800; line-height: 15px;
+}
+#cw-card .cw-conn { color: #187d46; font-size: 9px; font-weight: 800; }
+#cw-card .cw-val {
+    display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10.5px; line-height: 1.45; color: #334155;
+}
+#cw-card .cw-val.sub { color: #94a3b8; font-size: 9.5px; }
+#cw-card .cw-val.strong { color: #26385a; font-weight: 800; }
+#cw-card .cw-val.good { color: #187d46; font-weight: 800; }
+#cw-card .cw-val.bad { color: #c0564a; font-weight: 800; }
+#cw-card .cw-row-error td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
+#cw-card .cw-warn-cell { background: #fff8ef !important; }
+#cw-card .cw-deficit { color: #c0564a !important; }
 </style>
 
+<div id="cw-card">
+<div class="main-left-box">
+<div class="main-left-title">
+    <span id="cw-head">
+        <span id="cw-ico">▦</span>
+        <span><span id="cw-title">Coin Wallets</span><span id="cw-subtitle">node status · balances · markets</span></span>
+    </span>
+    <span class="cw-pill"><?= count($coins) ?> coins</span>
+</div>
+<div id="cw-scroll">
 <?php Yii::$app->ViewUtils->showTableSorter('maintable', '{
-tableClass: "dataGrid",
+tableClass: "dataGrid cw-table",
 widgets: ["zebra","filter","Storage","saveSort"],
 widgetOptions: {
 	saveSort: true,
@@ -77,92 +182,133 @@ widgetOptions: {
 
 <thead>
 <tr>
-<th data-sorter="" width="30"></th>
-<th data-sorter="text" width="30" class="status"></th>
-<th data-sorter="text">Name</th>
-<th data-sorter="text">Server</th>
-<th data-sorter="currency" align="right">Difficulty<br/>Height</th>
-<th data-sorter="currency" align="right" title="mBTC profit. shown in mining status">Profit<br/>Pool Net</th>
-<th data-sorter="currency" align="right">Bid Price<br/>Ask Price</th>
-<th data-sorter="currency" align="right">Immature<br/>Cleared</th>
-<th data-sorter="currency" align="right">Balance<br/>Available</th>
-<th data-sorter="currency" align="right">BTC</th>
-<th data-sorter="currency" align="right">USD</th>
-<th data-sorter="currency" align="right">Win<br/>Market</th>
+<th class="cw-w-ico" data-sorter=""></th>
+<th class="cw-w-status cw-center" data-sorter="text">Status</th>
+<th class="cw-w-coin cw-left" data-sorter="text">Coin</th>
+<th class="cw-w-node cw-left" data-sorter="text">Node / Server</th>
+<th class="cw-w-num" data-sorter="currency" title="Network difficulty / current height">Difficulty<br/>Height</th>
+<th class="cw-w-small" data-sorter="currency" title="mBTC/MH/day · pool share of last 100 blocks">Profit<br/>Pool %</th>
+<th class="cw-w-num" data-sorter="currency">Bid<br/>Ask</th>
+<th class="cw-w-num" data-sorter="currency">Immature<br/>Cleared</th>
+<th class="cw-w-num" data-sorter="currency">Balance<br/>Available</th>
+<th class="cw-w-small" data-sorter="currency">BTC</th>
+<th class="cw-w-small" data-sorter="currency">USD</th>
+<th class="cw-w-num" data-sorter="currency">Reward<br/>Market</th>
 </tr>
 </thead><tbody>
 
 <?php foreach ($rows as $r):
     $coin      = $r['coin'];
     $algoColor = $r['algoColor'];
+    $hasError  = !empty($coin->errors);
 
-    $cellImmature = $conv->valuetocell($coin->mint)    . '<br/>' . $conv->valuetocell($coin->cleared);
-    $cellBalance  = $conv->valuetocell($coin->balance) . '<br/>' . $conv->valuetocell($coin->available);
-    $deficitClass = $r['hasDeficit']  ? ' class="red"' : '';
-    $priceStyle   = $r['hasDontsell'] ? 'background-color: #ffaaaa' : '';
+    $enableBadge = !$coin->enable
+        ? '<span class="cw-badge err" title="Coin disabled">X</span>'
+        : ($coin->auto_ready
+            ? '<span class="cw-badge on" title="Auto enable">A</span>'
+            : '<span class="cw-badge warn" title="Stratum disabled">D</span>');
+    $visibleBadge = $coin->visible
+        ? '<span class="cw-badge on" title="Visible to public">V</span>'
+        : '<span class="cw-badge off" title="Hidden">H</span>';
+    $auxBadge = $coin->auxpow ? '<span class="cw-badge warn" title="AUX PoW">X</span>' : '';
 
-    $statusCell  = (!$coin->enable    ? '<span class="hidden" title="Coin disabled">X</span>'
-                 : ($coin->auto_ready ? '<span class="green"  title="Auto enable">A</span>'
-                                      : '<span class="red"    title="Stratum disabled">D</span>'))
-                 . ($coin->visible ? '<span title="Visible to public">V</span>' : '<span title="Hidden">H</span>')
-                 . ($coin->auxpow  ? '<span title="AUX PoW">X</span>' : '&nbsp;')
-                 . '<br/>'
-                 . ($coin->rpccurl ? '<span title="RPC with Curl">C</span>' : '&nbsp;')
-                 . ($coin->rpcssl  ? '<span title="RPC over SSL">S</span>'  : '&nbsp;')
-                 . ($coin->watch   ? '<span title="Watched (history)">W</span>' : '&nbsp;');
-    if ($r['syncPct'] !== null)
-        $statusCell .= '<br/><span class="progress">' . $r['syncPct'] . '%</span>';
+    $dot = function (bool $on, string $title): string {
+        return '<span class="cw-dot' . ($on ? ' on' : '') . '" title="' . Html::encode($title) . '"></span>';
+    };
+    $statusCell = '<div class="cw-status">'
+        . '<div class="cw-badges">' . $enableBadge . $visibleBadge . $auxBadge . '</div>'
+        . '<div class="cw-dots">'
+        . $dot((bool) $coin->rpccurl, 'RPC with Curl')
+        . $dot((bool) $coin->rpcssl, 'RPC over SSL')
+        . $dot((bool) $coin->watch, 'Watched (history)')
+        . '</div>'
+        . ($r['syncPct'] !== null ? '<span class="cw-sync">' . $r['syncPct'] . '%</span>' : '')
+        . '</div>';
 ?>
-<tr class="ssrow">
-    <td><?= Html::img(Html::encode($coin->image), ['width' => 24]) ?></td>
-    <td class="status" style="background-color: <?= $algoColor ?>;"><?= $statusCell ?></td>
+<tr class="ssrow<?= $hasError ? ' cw-row-error' : '' ?>">
     <td>
-        <b><?= Html::a(Html::encode("{$coin->name} ({$coin->symbol})"), ['/admin/coinwallet', 'id' => $coin->id]) ?></b>
-        <br><span style="font-size:.8em"><?= Html::encode($r['version']) ?></span>
+        <span class="cw-avatar"><?= Html::img(Html::encode($coin->image), ['alt' => '']) ?></span>
     </td>
-    <td>
-        <?= Html::encode("{$coin->rpchost}:{$coin->rpcport}") ?>
-        <?= $coin->connections ? ' (' . (int) $coin->connections . ')' : '' ?>
-        <br><span style="font-size:.8em">
-            <?= Html::encode($coin->rpcencoding) ?>
-            <span style="background-color:<?= $algoColor ?>;">&nbsp; <?= Html::encode($coin->algo) ?> &nbsp;</span>
+    <td class="cw-center" style="box-shadow: inset 3px 0 0 <?= $algoColor ?>;"><?= $statusCell ?></td>
+    <td class="cw-left">
+        <span class="cw-coin">
+            <span>
+                <?= Html::a(Html::encode("{$coin->name} ({$coin->symbol})"), ['/admin/coinwallet', 'id' => $coin->id]) ?>
+                <span class="cw-meta"><?= Html::encode($r['version']) ?></span>
+            </span>
         </span>
     </td>
-    <?php if (!empty($coin->errors)): ?>
-        <td align="right" style="font-size:.9em;" class="red" title="<?= Html::encode($coin->errors) ?>">
-            <b><?= $r['difficulty'] ?></b><br/><?= (int) $coin->block_height ?>
-        </td>
-    <?php else: ?>
-        <td align="right" style="font-size:.9em;">
-            <b><?= $r['difficulty'] ?></b><br><?= (int) $coin->block_height ?>
-        </td>
-    <?php endif ?>
-    <td align="right" style="font-size:.9em;" title="Pool % of last 100 net blocks">
-        <b><?= $r['btcmhd'] ?></b><br/>
-        <?= $r['ss1'] > 50 ? '<span class="blue">' . $r['ss1'] . '%</span>' : ($r['ss1'] ? $r['ss1'] . '%' : '') ?>
-        <span class="red" title="orphans"> <?= $r['ss2'] ? $r['ss2'] . '%' : '' ?></span>
+    <td class="cw-left">
+        <span class="cw-val strong"><?= Html::encode("{$coin->rpchost}:{$coin->rpcport}") ?></span>
+        <span class="cw-val sub">
+            <span class="cw-algo" style="background-color:<?= $algoColor ?>"><?= Html::encode($coin->algo) ?></span>
+            <?= Html::encode($coin->rpcencoding) ?>
+            <?php if ($coin->connections): ?>
+                <span class="cw-conn">● <?= (int) $coin->connections ?></span>
+            <?php endif ?>
+        </span>
     </td>
-    <td align="right" style="font-size:.9em;<?= $priceStyle ? " $priceStyle" : '' ?>">
-        <?= $r['price'] ?><br><?= $r['price2'] ?>
+    <td title="<?= Html::encode((string) $coin->errors) ?>">
+        <span class="cw-val strong<?= $hasError ? ' bad' : '' ?>"><?= $r['difficulty'] ?></span>
+        <span class="cw-val sub"><?= number_format((int) $coin->block_height) ?></span>
     </td>
-    <td align="right" style="font-size:.9em;"<?= $deficitClass ?>><?= $cellImmature ?></td>
-    <td align="right" style="font-size:.9em;"><?= $cellBalance ?></td>
-    <td align="right" style="font-size:.9em;"><?= $r['btcBalance'] ?><br/><?= $r['btcAvailable'] ?></td>
-    <td align="right" style="font-size:.9em;"><?= $r['fiatBalance'] ?> $<br/><?= $r['fiatAvailable'] ?> $</td>
-    <td align="right" style="font-size:.9em;"><?= Html::encode((string) $coin->reward) ?></td>
+    <td title="Pool % of last 100 net blocks">
+        <span class="cw-val<?= $r['ss1'] > 50 ? ' good' : '' ?>"><?= $r['btcmhd'] ?></span>
+        <span class="cw-val sub">
+            <?php if ($r['ss1']): ?><?= $r['ss1'] ?>%<?php endif ?>
+            <?php if ($r['ss2']): ?><span class="cw-val bad" title="orphans"><?= $r['ss2'] ?>%</span><?php endif ?>
+        </span>
+    </td>
+    <td class="<?= $r['hasDontsell'] ? 'cw-warn-cell' : '' ?>">
+        <span class="cw-val"><?= $r['price'] ?></span>
+        <span class="cw-val sub"><?= $r['price2'] ?></span>
+    </td>
+    <td class="<?= $r['hasDeficit'] ? 'cw-deficit' : '' ?>">
+        <span class="cw-val"><?= $conv->valuetocell($coin->mint) ?></span>
+        <span class="cw-val sub"><?= $conv->valuetocell($coin->cleared) ?></span>
+    </td>
+    <td class="<?= $r['hasDeficit'] ? 'cw-deficit' : '' ?>">
+        <span class="cw-val"><?= $conv->valuetocell($coin->balance) ?></span>
+        <span class="cw-val sub"><?= $conv->valuetocell($coin->available) ?></span>
+    </td>
+    <td>
+        <span class="cw-val"><?= $r['btcBalance'] ?></span>
+        <span class="cw-val sub"><?= $r['btcAvailable'] ?></span>
+    </td>
+    <td>
+        <span class="cw-val"><?= $r['fiatBalance'] ?> $</span>
+        <span class="cw-val sub"><?= $r['fiatAvailable'] ?> $</span>
+    </td>
+    <td>
+        <span class="cw-val strong"><?= Html::encode((string) $coin->reward) ?></span>
+        <?php if ($r['marketName'] !== ''): ?>
+            <span class="cw-val sub"><?= Html::encode($r['marketName']) ?></span>
+        <?php endif ?>
+    </td>
 </tr>
 <?php endforeach ?>
 </tbody>
-<tr><th colspan="12"><?= count($coins) ?> wallets</th></tr>
+<tfoot>
+<tr><th colspan="12"><?= count($coins) ?> wallets · auto-refresh 30s</th></tr>
+</tfoot>
 </table>
+</div>
+</div>
+</div>
 <br/>
-
 <?php
 // ── AdminLTE ──────────────────────────────────────────────────────────────────
 elseif (!$isTailwind):
 ?>
 
 <div class="card shadow-sm">
+    <div class="card-header py-2 d-flex align-items-center justify-content-between gap-2">
+        <span class="small fw-semibold">
+            <i class="bi bi-wallet2 text-secondary me-1"></i>Coin Wallets
+            <span class="text-muted fw-normal">· node status · balances · markets</span>
+        </span>
+        <span class="badge bg-primary-subtle text-primary"><?= count($coins) ?> coins</span>
+    </div>
     <div class="card-body p-0">
         <div class="overflow-x-auto">
         <table id="maintable" class="table table-hover table-sm table-bordered mb-0">
@@ -179,7 +325,7 @@ elseif (!$isTailwind):
             <th data-sorter="currency" class="text-end">Balance<br/><small>Available</small></th>
             <th data-sorter="currency" class="text-end">BTC</th>
             <th data-sorter="currency" class="text-end">USD</th>
-            <th data-sorter="currency" class="text-end">Reward</th>
+            <th data-sorter="currency" class="text-end">Reward<br/><small>Market</small></th>
         </tr>
         </thead>
         <tbody>
@@ -275,7 +421,12 @@ elseif (!$isTailwind):
                 <span class="text-muted"><?= $r['fiatAvailable'] ?> $</span>
             </td>
 
-            <td class="text-end small"><?= Html::encode((string) $coin->reward) ?></td>
+            <td class="text-end small">
+                <?= Html::encode((string) $coin->reward) ?>
+                <?php if ($r['marketName'] !== ''): ?>
+                    <br><span class="text-muted small"><?= Html::encode($r['marketName']) ?></span>
+                <?php endif ?>
+            </td>
 
         </tr>
         <?php endforeach ?>
@@ -309,6 +460,15 @@ else:
 
 <div class="rounded-xl border border-gray-200 dark:border-gray-700
             bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+    <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
+                flex items-center justify-between gap-3">
+        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+            <i data-lucide="wallet" class="w-4 h-4 text-gray-400"></i>Coin Wallets
+            <span class="text-xs font-normal text-gray-400">· node status · balances · markets</span>
+        </span>
+        <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-900/30
+                     text-indigo-600 dark:text-indigo-300"><?= count($coins) ?> coins</span>
+    </div>
     <div class="overflow-x-auto">
     <table id="maintable" class="w-full text-xs">
     <thead>
@@ -325,7 +485,7 @@ else:
         <th class="px-3 py-2.5 text-right" data-sorter="currency">Balance / Avail</th>
         <th class="px-3 py-2.5 text-right" data-sorter="currency">BTC</th>
         <th class="px-3 py-2.5 text-right" data-sorter="currency">USD</th>
-        <th class="px-3 py-2.5 text-right" data-sorter="currency">Reward</th>
+        <th class="px-3 py-2.5 text-right" data-sorter="currency">Reward / Market</th>
     </tr>
     </thead>
     <tbody class="divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -444,7 +604,10 @@ else:
         </td>
 
         <td class="px-3 py-2 text-right text-gray-600 dark:text-gray-400">
-            <?= Html::encode((string) $coin->reward) ?>
+            <div><?= Html::encode((string) $coin->reward) ?></div>
+            <?php if ($r['marketName'] !== ''): ?>
+                <div class="text-gray-400 dark:text-gray-500"><?= Html::encode($r['marketName']) ?></div>
+            <?php endif ?>
         </td>
 
     </tr>

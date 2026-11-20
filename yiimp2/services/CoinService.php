@@ -547,11 +547,14 @@ class CoinService
      */
     public static function getCoinWalletList(?string $server): array
     {
+        // Match the original yiimp admin page: show every coin that is
+        // installed, enabled for mining, or watched for history. Requiring
+        // installed AND watch hides almost every wallet when watch is unused.
         $query = Coins::find()
-            ->where(['installed' => 1, 'watch' => 1])
+            ->where(['or', ['installed' => 1], ['enable' => 1], ['watch' => 1]])
             ->orderBy('algo, index_avg DESC');
 
-        if (!empty($server)) {
+        if ($server !== null && $server !== '') {
             $query->andWhere(['rpchost' => $server]);
         }
 

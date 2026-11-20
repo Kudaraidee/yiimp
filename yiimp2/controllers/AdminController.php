@@ -592,7 +592,7 @@ class AdminController extends BaseController
 
 	public function actionCoinwallet_results()
 	{
-		$server      = Yii::$app->getRequest()->getQueryParam('server');
+		$server      = (string) Yii::$app->getRequest()->getQueryParam('server');
 		$coins       = CoinService::getCoinWalletList($server);
 		$mining      = Mining::find()->one();
 		$coinIds     = array_map(fn($c) => $c->id, $coins);
