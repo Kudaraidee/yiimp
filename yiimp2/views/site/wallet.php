@@ -240,9 +240,53 @@ $jsHomeUrl  = json_encode($homeUrl);
     <b>Auto refresh is paused — click to resume</b>
 </div>
 
-<div id="wallet-cards" class="row gx-4 mt-2">
+<div id="wallet-cards" class="mt-2">
+<div class="row gx-4">
+    <div class="col-12 wallet-col">
+        <div id="wallet-search-card" class="main-left-box">
+            <div class="main-left-title">
+                <span class="wl-head-main">
+                    <span class="wl-title">Search Wallet</span>
+                    <span class="wl-sub">Look up balance, workers and blocks</span>
+                </span>
+                <span class="wl-chips"><span class="wl-pill blue"><?= count($recents) ?> recent</span></span>
+            </div>
+            <div class="main-left-inner">
+                <form action="<?= Html::encode($homeUrl) ?>" method="get" class="wl-form">
+                    <input type="text" name="address" class="wl-input" placeholder="Wallet Address">
+                    <input type="submit" value="Search" class="wl-submit">
+                </form>
+                <table class="dataGrid2">
+                    <thead><tr><th style="width:30px">Coin</th><th class="wl-left">Address</th><th style="width:20px"></th></tr></thead>
+                    <tbody>
+                    <?php $recentRows = 0; foreach ($recents as $addr):
+                        if (empty($addr)) continue;
+                        $rUser = $recentUsers[$addr] ?? null; if (!$rUser) continue;
+                        $rCoin = $recentCoins[$rUser->coinid] ?? null;
+                        $active = $rUser->username === $username;
+                        $del   = $address !== $addr
+                            ? '<img class="wl-del" src="/images/base/delete.png" onclick="drop_cookie(this);" alt="remove">'
+                            : '';
+                        $recentRows++;
+                    ?>
+                    <tr class="<?= $active ? 'wl-total' : '' ?>">
+                        <td><?php if ($rCoin && !empty($rCoin->image)): ?><img width="16" height="16" src="<?= Html::encode($rCoin->image) ?>" alt=""><?php endif ?></td>
+                        <td class="wl-left"><?= Html::a(Html::encode($addr), $homeUrl . '?address=' . urlencode($addr), ['class' => 'wl-link address']) ?></td>
+                        <td><?= $del ?></td>
+                    </tr>
+                    <?php endforeach; if (!$recentRows): ?>
+                    <tr><td colspan="3" class="wl-empty">No Recent Wallets</td></tr>
+                    <?php endif ?>
+                    </tbody>
+                </table>
+                <div class="wl-foot"><span>Recent wallets are stored in this browser for 30 days</span><span>Refresh 60s</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php if ($user): ?>
+<div class="row gx-4">
     <div class="col-12 col-md-6 wallet-col">
-        <?php if ($user): ?>
         <div id="main_wallet_results" class="ajax-placeholder"></div>
         <div id="wallet-balance-card" class="main-left-box">
             <div class="main-left-title">
@@ -263,53 +307,12 @@ $jsHomeUrl  = json_encode($homeUrl);
         <div id="main_graphs_results"  class="ajax-placeholder"></div>
         <div id="main_miners_results"  class="ajax-placeholder"></div>
         <div id="main_found_results"   class="ajax-placeholder"></div>
-        <?php endif ?>
-        <div id="wallet-search-card" class="main-left-box">
-            <div class="main-left-title">
-                <span class="wl-head-main">
-                    <span class="wl-title">Search Wallet</span>
-                    <span class="wl-sub">Look up balance, workers and blocks</span>
-                </span>
-                <span class="wl-chips"><span class="wl-pill blue"><?= count($recents) ?> recent</span></span>
-            </div>
-            <div class="main-left-inner">
-                <form action="<?= Html::encode($homeUrl) ?>" method="get" class="wl-form">
-                    <input type="text" name="address" class="wl-input" placeholder="Wallet Address">
-                    <input type="submit" value="Search" class="wl-submit">
-                </form>
-                <table class="dataGrid2">
-                    <thead><tr><th style="width:30px">Coin</th><th class="wl-left">Address</th><th>Balance</th><th style="width:20px"></th></tr></thead>
-                    <tbody>
-                    <?php $recentRows = 0; foreach ($recents as $addr):
-                        if (empty($addr)) continue;
-                        $rUser = $recentUsers[$addr] ?? null; if (!$rUser) continue;
-                        $rCoin = $recentCoins[$rUser->coinid] ?? null;
-                        $bal   = Yii::$app->ConversionUtils->bitcoinvaluetoa($rUser->balance);
-                        $balD  = $rCoin && $bal > 0 ? "{$bal} {$rCoin->symbol}" : ($bal > 0 ? "{$bal} BTC" : '—');
-                        $active = $rUser->username === $username;
-                        $del   = $address !== $addr
-                            ? '<img class="wl-del" src="/images/base/delete.png" onclick="drop_cookie(this);" alt="remove">'
-                            : '';
-                        $recentRows++;
-                    ?>
-                    <tr class="<?= $active ? 'wl-total' : '' ?>">
-                        <td><?php if ($rCoin && !empty($rCoin->image)): ?><img width="16" height="16" src="<?= Html::encode($rCoin->image) ?>" alt=""><?php endif ?></td>
-                        <td class="wl-left"><?= Html::a(Html::encode($addr), $homeUrl . '?address=' . urlencode($addr), ['class' => 'wl-link address']) ?></td>
-                        <td><span class="wl-val"><?= Html::encode($balD) ?></span></td>
-                        <td><?= $del ?></td>
-                    </tr>
-                    <?php endforeach; if (!$recentRows): ?>
-                    <tr><td colspan="4" class="wl-empty">No Recent Wallets</td></tr>
-                    <?php endif ?>
-                    </tbody>
-                </table>
-                <div class="wl-foot"><span>Recent wallets are stored in this browser for 30 days</span><span>Refresh 60s</span></div>
-            </div>
-        </div>
     </div>
     <div class="col-12 col-md-6 wallet-col" style="overflow-x:auto;">
-        <?php if ($user): ?><div id="found_results" class="ajax-placeholder"></div><?php endif ?>
+        <div id="found_results" class="ajax-placeholder"></div>
     </div>
+</div>
+<?php endif ?>
 </div>
 
 
