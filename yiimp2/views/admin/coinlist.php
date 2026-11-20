@@ -19,6 +19,29 @@ $coins           = $provider->models;
 $pageSizeOptions = [25, 50, 100, 250];
 $isTailwind      = Yii::$app->LayoutManager->isTailwind();
 
+// Keep long coin names, versions and error messages inside their cells.
+// The wrapper below scrolls horizontally on narrow screens.
+$this->registerCss(<<<'CSS'
+#maintable {
+    width: 100%;
+    min-width: 820px;
+    table-layout: fixed;
+}
+#maintable th,
+#maintable td {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: top;
+}
+#maintable .coinlist-truncate {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+CSS);
+
 $pagerWidget = fn(string $extraClass = '') => LinkPager::widget([
     'pagination'            => $pagination,
     'options'               => ['class' => "pagination pagination-sm mb-0 $extraClass"],
@@ -149,7 +172,17 @@ if ($isTailwind) {
 
     <!-- ── Table ────────────────────────────────────────────────────────────── -->
     <div class="overflow-x-auto">
-        <table id="maintable" class="w-full text-sm">
+        <table id="maintable" class="w-full table-fixed text-sm">
+        <colgroup>
+            <col style="width:20%">
+            <col style="width:8%">
+            <col style="width:8%">
+            <col style="width:11%">
+            <col style="width:7%">
+            <col style="width:10%">
+            <col style="width:18%">
+            <col style="width:18%">
+        </colgroup>
         <thead>
         <tr class="bg-gray-50 dark:bg-gray-700/50 text-xs font-semibold
                    text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -168,6 +201,8 @@ if ($isTailwind) {
             $markets    = $marketsMap[$coin->id] ?? [];
             $hasError   = !empty($coin->errors);
             $created    = Yii::$app->ConversionUtils->datetoa2($coin->created);
+            $version    = (string) $coin->version;
+            $errors     = (string) $coin->errors;
         ?>
         <tr class="<?= $hasError ? 'bg-red-50/50 dark:bg-red-900/10' : 'hover:bg-gray-50/70 dark:hover:bg-gray-700/20' ?>
                    transition-colors">
@@ -181,13 +216,13 @@ if ($isTailwind) {
                     <?php else: ?>
                     <span class="w-5 flex-shrink-0"></span>
                     <?php endif ?>
-                    <div>
+                    <div class="min-w-0">
                         <div class="font-medium text-gray-900 dark:text-gray-100 leading-tight">
                             <?= Html::a(Html::encode($coin->name),
                                 ['/admin/coinwallet', 'id' => $coin->id],
                                 ['class' => 'hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors']) ?>
                         </div>
-                        <div class="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                        <div class="text-xs text-gray-400 dark:text-gray-500 font-mono coinlist-truncate">
                             <?= Html::a(Html::encode($coin->symbol),
                                 ['/admin/coinwallet_update', 'id' => $coin->id],
                                 ['class' => 'hover:text-indigo-500 transition-colors']) ?>
@@ -200,7 +235,7 @@ if ($isTailwind) {
             <td class="px-3 py-2.5"><?= $statusBadgeFn($coin) ?></td>
 
             <td class="px-3 py-2.5 text-xs font-mono text-gray-500 dark:text-gray-400">
-                <?= Html::encode(substr((string) $coin->version, 0, 22)) ?>
+                <span class="coinlist-truncate" title="<?= Html::encode($version) ?>"><?= Html::encode(substr($version, 0, 22)) ?></span>
             </td>
 
             <td class="px-3 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400 tabular-nums">
@@ -213,7 +248,7 @@ if ($isTailwind) {
             </td>
 
             <td class="px-3 py-2.5 text-xs <?= $hasError ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-400 dark:text-gray-500' ?>">
-                <?= Html::encode(substr((string) $coin->errors, 0, 40)) ?>
+                <span class="coinlist-truncate" title="<?= Html::encode($errors) ?>"><?= Html::encode(substr($errors, 0, 40)) ?></span>
             </td>
 
             <td class="px-3 py-2.5">
@@ -336,15 +371,26 @@ document.addEventListener('DOMContentLoaded', function () {
     <?php else: ?>
 
     <div class="card-body p-0">
+      <div class="table-responsive">
         <table id="maintable" class="table table-hover table-sm table-bordered mb-0">
+        <colgroup>
+            <col style="width:20%">
+            <col style="width:8%">
+            <col style="width:8%">
+            <col style="width:11%">
+            <col style="width:7%">
+            <col style="width:10%">
+            <col style="width:18%">
+            <col style="width:18%">
+        </colgroup>
         <thead class="table-light">
         <tr>
-            <th data-sorter="text" style="width:260px">Coin</th>
-            <th data-sorter="text" style="width:90px">Algo</th>
-            <th data-sorter="text" style="width:90px">Status</th>
-            <th data-sorter="text" style="width:115px">Version</th>
-            <th data-sorter="numeric" style="width:80px" class="text-end">Height</th>
-            <th data-sorter="numeric" style="width:100px">Added</th>
+            <th data-sorter="text">Coin</th>
+            <th data-sorter="text">Algo</th>
+            <th data-sorter="text">Status</th>
+            <th data-sorter="text">Version</th>
+            <th data-sorter="numeric" class="text-end">Height</th>
+            <th data-sorter="numeric">Added</th>
             <th data-sorter="text">Message</th>
             <th data-sorter="false">Links</th>
         </tr>
@@ -354,6 +400,8 @@ document.addEventListener('DOMContentLoaded', function () {
             $markets  = $marketsMap[$coin->id] ?? [];
             $hasError = !empty($coin->errors);
             $created  = Yii::$app->ConversionUtils->datetoa2($coin->created);
+            $version  = (string) $coin->version;
+            $errors   = (string) $coin->errors;
         ?>
         <tr class="<?= $hasError ? 'table-danger' : '' ?>">
             <td>
@@ -365,11 +413,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     <?php else: ?>
                     <span style="width:20px;flex-shrink:0;"></span>
                     <?php endif ?>
-                    <div class="lh-sm">
-                        <div><?= Html::a('<strong>' . Html::encode($coin->name) . '</strong>',
+                    <div class="lh-sm" style="min-width:0;">
+                        <div class="text-break"><?= Html::a('<strong>' . Html::encode($coin->name) . '</strong>',
                             ['/admin/coinwallet', 'id' => $coin->id],
                             ['encode' => false, 'class' => 'text-decoration-none']) ?></div>
-                        <div class="text-muted" style="font-size:.75rem;">
+                        <div class="text-muted text-truncate" style="font-size:.75rem;">
                             <?= Html::a(Html::encode($coin->symbol),
                                 ['/admin/coinwallet_update', 'id' => $coin->id],
                                 ['class' => 'text-muted']) ?>
@@ -380,33 +428,36 @@ document.addEventListener('DOMContentLoaded', function () {
             <td><?= $algoBadgeFn($coin->algo) ?></td>
             <td><?= $statusBadgeFn($coin) ?></td>
             <td class="text-muted small font-monospace">
-                <?= Html::encode(substr((string) $coin->version, 0, 22)) ?>
+                <span class="coinlist-truncate" title="<?= Html::encode($version) ?>"><?= Html::encode(substr($version, 0, 22)) ?></span>
             </td>
             <td class="text-end text-muted small">
                 <?= number_format((int) $coin->block_height) ?>
             </td>
             <td class="text-muted small" data="<?= (int) $coin->created ?>"><?= $created ?></td>
             <td class="small <?= $hasError ? 'text-danger fw-semibold' : 'text-muted' ?>">
-                <?= Html::encode(substr((string) $coin->errors, 0, 40)) ?>
+                <span class="coinlist-truncate" title="<?= Html::encode($errors) ?>"><?= Html::encode(substr($errors, 0, 40)) ?></span>
             </td>
             <td class="small">
-                <?php if (!empty($coin->link_bitcointalk)): ?>
-                    <?= Html::a('forum', $coin->link_bitcointalk, ['target' => '_blank', 'class' => 'me-1']) ?>
-                <?php endif ?>
-                <?php if (!empty($coin->link_github)): ?>
-                    <?= Html::a('git', $coin->link_github, ['target' => '_blank', 'class' => 'me-1']) ?>
-                <?php endif ?>
-                <?= Html::a('google',
-                    'https://google.com/search?q=' . urlencode($coin->name . ' ' . $coin->symbol . ' bitcointalk'),
-                    ['target' => '_blank', 'class' => 'me-1 text-muted']) ?>
-                <?php foreach ($markets as $m): ?>
-                    <?= $marketBadgeFn($m) ?>
-                <?php endforeach ?>
+                <div class="d-flex flex-wrap align-items-center gap-1">
+                    <?php if (!empty($coin->link_bitcointalk)): ?>
+                        <?= Html::a('forum', $coin->link_bitcointalk, ['target' => '_blank']) ?>
+                    <?php endif ?>
+                    <?php if (!empty($coin->link_github)): ?>
+                        <?= Html::a('git', $coin->link_github, ['target' => '_blank']) ?>
+                    <?php endif ?>
+                    <?= Html::a('google',
+                        'https://google.com/search?q=' . urlencode($coin->name . ' ' . $coin->symbol . ' bitcointalk'),
+                        ['target' => '_blank', 'class' => 'text-muted']) ?>
+                    <?php foreach ($markets as $m): ?>
+                        <?= $marketBadgeFn($m) ?>
+                    <?php endforeach ?>
+                </div>
             </td>
         </tr>
         <?php endforeach ?>
         </tbody>
         </table>
+      </div>
     </div>
 
     <div class="card-footer d-flex align-items-center justify-content-between py-2">
