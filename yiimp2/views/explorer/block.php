@@ -106,36 +106,141 @@ div.json b { font-style:normal; color:#7f0000; }
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<style>.page .footer { width:auto; }</style>
-
-<table class="dataGrid1">
-<tr><td width=100></td><td></td></tr>
-<tr><td>Coin:</td><td><b><?= $coin->createExplorerLink($coin->name) ?></b></td></tr>
-<tr><td>Blockhash:</td><td><span class="txid monospace"><?= Html::encode($hash) ?></span></td></tr>
-</tr><tr class="raw" style="display:none;"><td colspan="2"><div class="json">
+<style>
+/* ── Block detail — mirrors /site/mining ───────────────────────────────────── */
+.page .footer { width:auto; }
+#block-detail, #block-txs { margin-bottom:12px; }
+#block-detail .main-left-box, #block-txs .main-left-box {
+    border:1px solid #d8e2ef !important; border-radius:7px !important;
+    box-shadow:0 1px 2px rgba(20,40,80,.04); overflow:hidden;
+}
+#block-detail .main-left-title, #block-txs .main-left-title {
+    display:flex !important; align-items:center; justify-content:space-between; gap:10px;
+    min-height:34px; padding:9px 12px !important;
+    background:#f8fafc !important; border-bottom:1px solid #e8eef6;
+    color:#26385a; font-size:13px !important; font-weight:800 !important; line-height:1.3;
+}
+#block-detail .bd-head, #block-txs .bd-head { display:flex; align-items:center; gap:8px; min-width:0; }
+#block-detail .bd-ico {
+    flex:0 0 26px; height:26px; border-radius:6px; overflow:hidden; display:grid; place-items:center;
+    color:#fff; font-size:7px; font-weight:800; background:linear-gradient(135deg,#4f79c8,#2c5aa0);
+}
+#block-detail .bd-ico img { width:100%; height:100%; object-fit:contain; background:#fff; }
+#block-detail .bd-title, #block-txs .bd-title { font-size:13px; font-weight:800; color:#26385a; }
+#block-detail .bd-sub, #block-txs .bd-sub { font-size:10px; color:#8a94a6; font-weight:500; }
+#block-detail .bd-chips { display:flex; gap:5px; flex-wrap:wrap; }
+#block-detail .bd-pill, #block-txs .bd-pill {
+    display:inline-block; border-radius:999px; padding:2px 7px;
+    font-size:9px; font-weight:700; line-height:14px; white-space:nowrap;
+    background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; text-decoration:none;
+}
+#block-detail .bd-pill.green { background:#e8f7ee; color:#187d46; border-color:#ccebd8; }
+#block-detail .bd-pill.blue { background:#eef4ff; color:#2c5aa0; border-color:#d7e5ff; }
+#block-detail .main-left-inner, #block-txs .main-left-inner { padding:0 !important; }
+#block-detail table, #block-txs #tx-table {
+    width:100% !important; border-collapse:collapse; table-layout:fixed;
+    font-size:11px; color:#334155; margin:0 !important;
+}
+#block-detail th {
+    width:150px; padding:7px 12px !important; text-align:left;
+    font-size:9px !important; font-weight:700 !important; letter-spacing:.05em;
+    text-transform:uppercase; color:#8a94a6; border-bottom:1px solid #eef2f7;
+    vertical-align:top;
+}
+#block-detail td {
+    padding:7px 12px !important; border-bottom:1px solid #eef2f7;
+    vertical-align:middle; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:10px; word-break:break-all;
+}
+#block-detail tbody tr:last-child td { border-bottom:0; }
+#block-detail tr:hover td, #block-detail tr:hover th { background:#f7faff; }
+#block-detail .txid { cursor:pointer; color:#2c5aa0; font-weight:700; }
+#block-detail .txid:hover { text-decoration:underline; }
+#block-detail td .profile-link, #block-txs td .profile-link { color:#2c5aa0; text-decoration:none; }
+#block-detail td .profile-link:hover { text-decoration:underline; }
+#block-detail tr.raw td, #block-txs tr.raw td {
+    padding:10px 12px !important; background:#fcfdff; border-bottom:1px solid #eef2f7;
+}
+#block-detail div.json, #block-txs div.json {
+    font-size:10px; white-space:pre-wrap; word-break:break-word;
+    padding:8px 10px; overflow-x:auto; background:#fcfdff !important;
+    border:1px solid #e8eef6 !important; border-radius:7px; color:#475569;
+}
+#block-txs #tx-table th {
+    background:#fff !important; padding:7px 9px !important; text-align:right;
+    font-size:9px !important; font-weight:700 !important; letter-spacing:.05em;
+    text-transform:uppercase; color:#8a94a6; border-bottom:1px solid #e8eef6; white-space:nowrap;
+}
+#block-txs #tx-table td {
+    padding:8px 9px !important; border-bottom:1px solid #eef2f7;
+    text-align:right; vertical-align:middle;
+}
+#block-txs #tx-table tbody tr:not(.raw):last-child td { border-bottom:0; }
+#block-txs #tx-table tbody tr:hover { background:#f7faff; }
+#block-txs #tx-table .ce-left { text-align:left !important; }
+#block-txs #tx-table .ntx { width:28px; color:#98a3b5; font-size:10px; }
+#block-txs #tx-table .txid { cursor:pointer; color:#2c5aa0; font-size:10px; word-break:break-all; }
+#block-txs #tx-table .txid:hover { text-decoration:underline; }
+#block-txs .bd-foot {
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:8px 12px; background:#fcfdff; border-top:1px solid #eef2f7;
+}
+#block-txs .bd-foot form { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+#block-txs .main-text-input {
+    border:1px solid #d8e2ef; border-radius:7px; padding:4px 8px;
+    font-size:10px; color:#334155; background:#fff; outline:none;
+}
+#block-txs .main-text-input:focus { border-color:#2c5aa0; }
+#block-txs .main-submit-button {
+    border:1px solid #2c5aa0; border-radius:7px; padding:4px 10px;
+    font-size:10px; font-weight:700; color:#fff; background:#2c5aa0; cursor:pointer;
+}
+@media(max-width:820px){
+    #block-detail table, #block-txs #tx-table { table-layout:auto; }
+    #block-detail .bd-chips { display:none; }
+}
+</style>
+<div id="block-detail">
+<div class="main-left-box">
+<div class="main-left-title">
+    <span class="bd-head">
+        <span class="bd-ico"><?php if (!empty($coin->image)): ?><img src="<?= Html::encode($coin->image) ?>" alt="" onerror="this.remove()"><?php endif ?></span>
+        <span class="bd-title"><?= Html::encode($coin->name) ?> Block</span>
+        <span class="bd-sub">height <?= Html::encode((string)$block['height']) ?> · <?= Html::encode($d) ?></span>
+    </span>
+    <span class="bd-chips"><span class="bd-pill green"><?= Html::encode((string)$confirms) ?> conf</span><span class="bd-pill blue"><?= $txcount ?> tx</span></span>
+</div>
+<div class="main-left-inner">
+<table>
+<tbody>
+<tr><th>Coin</th><td><?= $coin->createExplorerLink(Html::encode($coin->name)) ?></td></tr>
+<tr><th>Blockhash</th><td><span class="txid monospace"><?= Html::encode($hash) ?></span></td></tr>
+<tr class="raw" style="display:none;"><td colspan="2"><div class="json">
 <?= colorizeJson(json_encode($block, 128)) ?>
-</div></td>
-<tr><td>Confirmations:</td><td><?= Html::encode((string)$confirms) ?></td></tr>
-<tr><td>Height:</td><td><?= Html::encode((string)$block['height']) ?></td></tr>
-<tr><td>Time:</td><td><?= $d ?> (<?= $block['time'] ?>)</td></tr>
-<tr><td>Difficulty:</td><td><?= $block['difficulty'] ?></td></tr>
-<tr><td>Bits:</td><td><span class="monospace"><?= Html::encode($block['bits']) ?></span></td></tr>
-<tr><td>Nonce:</td><td><span class="monospace"><?= Html::encode((string)$nonce) ?></span></td></tr>
-<tr><td>Version:</td><td><span class="monospace"><?= Html::encode($version) ?></span></td></tr>
-<tr><td>Size:</td><td><?= (int)$block['size'] ?> bytes</td></tr>
-<?php if (isset($block['flags'])): ?><tr><td>Flags:</td><td><span class="monospace"><?= Html::encode($block['flags']) ?></span></td></tr><?php endif ?>
+</div></td></tr>
+<tr><th>Confirmations</th><td><?= Html::encode((string)$confirms) ?></td></tr>
+<tr><th>Height</th><td><?= Html::encode((string)$block['height']) ?></td></tr>
+<tr><th>Time</th><td><?= Html::encode($d) ?> (<?= (int)$block['time'] ?>)</td></tr>
+<tr><th>Difficulty</th><td><?= Html::encode((string)$block['difficulty']) ?></td></tr>
+<tr><th>Bits</th><td><?= Html::encode($block['bits']) ?></td></tr>
+<tr><th>Nonce</th><td><?= Html::encode((string)$nonce) ?></td></tr>
+<tr><th>Version</th><td><?= Html::encode($version) ?></td></tr>
+<tr><th>Size</th><td><?= (int)$block['size'] ?> bytes</td></tr>
+<?php if (isset($block['flags'])): ?><tr><th>Flags</th><td><?= Html::encode($block['flags']) ?></td></tr><?php endif ?>
 <?php if (isset($block['previousblockhash']) && $coin->algo === 'x16r'): ?>
-<tr><td>Hash order:</td><td><span class="monospace"><?= Html::encode(substr($block['previousblockhash'], -16)) ?></span></td></tr>
+<tr><th>Hash order</th><td><?= Html::encode(substr($block['previousblockhash'], -16)) ?></td></tr>
 <?php endif ?>
 <?php if (isset($block['previousblockhash'])): ?>
-<tr><td>Previous Hash:</td><td><span class="monospace"><?= $coin->createExplorerLink($block['previousblockhash'], ['hash' => $block['previousblockhash']]) ?></span></td></tr>
+<tr><th>Previous Hash</th><td><?= $coin->createExplorerLink($block['previousblockhash'], ['hash' => $block['previousblockhash']]) ?></td></tr>
 <?php endif ?>
 <?php if (isset($block['nextblockhash'])): ?>
-<tr><td>Next Hash:</td><td><span class="monospace"><?= $coin->createExplorerLink($block['nextblockhash'], ['hash' => $block['nextblockhash']]) ?></span></td></tr>
+<tr><th>Next Hash</th><td><?= $coin->createExplorerLink($block['nextblockhash'], ['hash' => $block['nextblockhash']]) ?></td></tr>
 <?php endif ?>
-<tr><td>Merkle Root:</td><td><span class="monospace"><?= Html::encode($block['merkleroot']) ?></span></td></tr>
-<tr><td>Transactions:</td><td><?= $txcount ?></td></tr>
-</table><br>
+<tr><th>Merkle Root</th><td><?= Html::encode($block['merkleroot']) ?></td></tr>
+<tr><th>Transactions</th><td><?= $txcount ?></td></tr>
+</tbody></table>
+</div></div>
+</div>
 
 
 <?php elseif (!$isTailwind): ?>
@@ -246,25 +351,35 @@ div.json b { font-style:normal; color:#7f0000; }
 // ── Scheme helpers for the transaction table ──────────────────────────────────
 
 if ($isLegacy) {
-    $tblOpen     = '<table class="dataGrid">';
-    $tblClose    = '</table>';
-    $thRow       = '<thead><tr><th width="8px" class="ntx">#</th><th>Transaction Hash</th>'
-                 . '<th>Size</th><th>Value</th><th>From</th><th>To (amount)</th></tr></thead>';
-    $trOpen      = '<tr class="ssrow">';
+    $tblOpen     = '<div id="block-txs"><div class="main-left-box">'
+                 . '<div class="main-left-title"><span class="bd-head"><span class="bd-title">Transactions</span>'
+                 . '<span class="bd-sub">' . $txcount . ' in block · click hash for raw JSON</span></span>'
+                 . '<span class="bd-pill blue">' . $txcount . ' tx</span></div>'
+                 . '<div class="main-left-inner"><div style="overflow-x:auto">'
+                 . '<table id="tx-table">';
+    $tblClose    = '</table></div><div class="bd-foot">'
+                 . '<form action="' . Html::encode($actionUrl) . '" method="POST">'
+                 . '<input type="text" name="height" class="main-text-input" placeholder="Block height" style="width:100px;">'
+                 . '<input type="text" name="txid" class="main-text-input" placeholder="Transaction hash" style="width:260px;">'
+                 . '<input type="submit" value="Search" class="main-submit-button">'
+                 . '</form></div></div></div></div>';
+    $thRow       = '<thead><tr><th class="ce-left ntx">#</th><th class="ce-left">Transaction Hash</th>'
+                 . '<th>Size</th><th>Value</th><th class="ce-left">From</th><th class="ce-left">To (amount)</th></tr></thead>';
+    $trOpen      = '<tr>';
     $trClose     = '</tr>';
     $tdNum       = fn($n) => '<td class="ntx">' . $n . '</td>';
-    $tdTxid      = fn($v) => '<td><span class="txid monospace">' . $v . '</span></td>';
+    $tdTxid      = fn($v) => '<td class="ce-left"><span class="txid monospace">' . $v . '</span></td>';
     $tdNum2      = fn($v) => '<td>' . $v . '</td>';
-    $tdFromOpen  = '<td>';
+    $tdFromOpen  = '<td class="ce-left">';
     $tdFromClose = '</td>';
-    $tdToOpen    = '<td>';
+    $tdToOpen    = '<td class="ce-left">';
     $tdToClose   = '</td>';
     $spanAddr    = fn($a) => '<span class="monospace">' . $a . '</span>';
     $rawColspan  = 6;
     $rawOpen     = '<tr class="raw" style="display:none;"><td colspan="6"><div class="json">';
     $rawClose    = '</div></td></tr>';
-    $tooMany     = fn() => '<tr class="ssrow"><td colspan="6">Too many transactions to display...</td></tr>';
-    $stakeHdr    = '<tr><th class="section" colspan="6">Stake</th></tr>';
+    $tooMany     = fn() => '<tr><td colspan="6" class="ce-left" style="color:#98a3b5;padding:10px 12px;font-size:10px;">Too many transactions to display...</td></tr>';
+    $stakeHdr    = '<tr><th class="ce-left" colspan="6" style="background:#f8fafc;color:#26385a;padding:7px 9px;font-size:9px;text-transform:uppercase;letter-spacing:.05em;">Stake Transactions</th></tr>';
 } elseif (!$isTailwind) {
     // AdminLTE
     $tblOpen     = '<div class="card shadow-sm mt-3"><div class="card-header py-2 small fw-semibold">'
@@ -456,11 +571,7 @@ echo '</tbody>' . $tblClose;
 ?>
 
 <?php if ($isLegacy): ?>
-<form action="<?= Html::encode($actionUrl) ?>" method="POST" style="padding:8px;padding-left:0;">
-    <input type="text" name="height" class="main-text-input" placeholder="block height" style="width:80px;">
-    <input type="text" name="txid"   class="main-text-input" placeholder="tx hash" style="width:450px;margin:4px;">
-    <input type="submit" value="Search" class="main-submit-button">
-</form>
+    <!-- search form is rendered inside the legacy transaction card footer -->
 <?php elseif (!$isTailwind): ?>
 <div class="mt-3">
 <form action="<?= Html::encode($actionUrl) ?>" method="POST"
