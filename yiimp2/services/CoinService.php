@@ -115,20 +115,25 @@ class CoinService
                 $coin->rpcencoding = $this->detectRpcEncoding($coin, $remote);
             }
 
+            // Ethereum-style nodes do not implement Bitcoin-only RPC methods
+            // such as submitblock/getauxblock/getblocktemplate. Skip those
+            // probes; the GETH/NIRO readiness branch below still applies.
+            $isEthRpc = in_array(strtoupper((string) $coin->rpcencoding), ['GETH', 'NIRO'], true);
+
             // Detect submitblock support
-            if (is_null($coin->hassubmitblock)) {
+            if (!$isEthRpc && is_null($coin->hassubmitblock)) {
                 $remote->submitblock('');
                 $coin->hassubmitblock = strcasecmp((string) $remote->error, 'method not found') !== 0;
             }
 
             // Detect AuxPoW support
-            if (is_null($coin->auxpow)) {
+            if (!$isEthRpc && is_null($coin->auxpow)) {
                 $remote->getauxblock();
                 $coin->auxpow = strcasecmp((string) $remote->error, 'method not found') !== 0;
             }
 
             // Block template / reward
-            $template = $this->getBlockTemplate($coin, $remote);
+            $template = $isEthRpc ? null : $this->getBlockTemplate($coin, $remote);
 
             if ($template && isset($template['coinbasevalue'])) {
                 $coin->reward = $template['coinbasevalue'] / 1e8 * $coin->reward_mul;

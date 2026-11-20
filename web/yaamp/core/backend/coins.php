@@ -147,7 +147,12 @@ function BackendCoinsUpdate()
 			}
 		}
 
-		if(is_null($coin->hassubmitblock))
+		// Ethereum-style nodes do not implement Bitcoin-only RPC methods such
+		// as submitblock/getauxblock/getblocktemplate. Skip those probes; the
+		// GETH/NIRO readiness branch below still handles auto_ready.
+		$isEthRpc = in_array(strtoupper((string) $coin->rpcencoding), ['GETH', 'NIRO'], true);
+
+		if(!$isEthRpc && is_null($coin->hassubmitblock))
 		{
 			$remote->submitblock('');
 			if(strcasecmp($remote->error, 'method not found') == 0)
@@ -156,7 +161,7 @@ function BackendCoinsUpdate()
 				$coin->hassubmitblock = true;
 		}
 
-		if(is_null($coin->auxpow))
+		if(!$isEthRpc && is_null($coin->auxpow))
 		{
 			$ret = $remote->getauxblock();
 
@@ -166,10 +171,15 @@ function BackendCoinsUpdate()
 				$coin->auxpow = true;
 		}
 
+        if ($isEthRpc) {
+            // geth/NIRO have no getblocktemplate; leave $template empty so the
+            // GETH/NIRO branch below only checks node connectivity.
+            $template = false;
+        }
         // Kiiro Core requires explicit segwit rule support and the pool wallet
         // in the GBT request; otherwise it rejects the call and the backend
         // would clear auto_ready.
-        if ($coin->algo == 'firopow' || $coin->symbol == 'KIIRO') {
+        else if ($coin->algo == 'firopow' || $coin->symbol == 'KIIRO') {
             $template = $remote->getblocktemplate('{"mode":"template","rules":["segwit"]},' . json_encode((string) $coin->master_wallet));
         }
         // Change for segwit
