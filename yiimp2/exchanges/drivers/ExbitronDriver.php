@@ -147,12 +147,12 @@ class ExbitronDriver extends ExchangeDriver
             }
             $coins = Coins::find()->where(['or', ['symbol' => $sym], ['symbol2' => $sym]])->all();
             foreach ($coins as $coin) {
-                $market = Markets::find()->where(['coinid' => $coin->id, 'name' => $this->name()])->one();
-                if (!$market) continue;
-                $market->balance     = (float) $balance['balance'];
-                $market->ontrade     = (float) $balance['lockedBalance'];
-                $market->balancetime = time();
-                $market->save();
+                foreach ($this->marketsForCoin($coin) as $market) {
+                    $market->balance     = (float) $balance['balance'];
+                    $market->ontrade     = (float) $balance['lockedBalance'];
+                    $market->balancetime = time();
+                    $market->save();
+                }
             }
         }
 

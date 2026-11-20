@@ -178,21 +178,26 @@ class KuCoinDriver extends ExchangeDriver
             }
             $coins = Coins::find()->where(['or', ['symbol' => $balance->coinType], ['symbol2' => $balance->coinType]])->all();
             foreach ($coins as $coin) {
-                $market = Markets::find()->where(['coinid' => $coin->id, 'name' => $this->name()])->orderBy('balance')->one();
-                if (!$market) continue;
-                $market->balance     = (float) $balance->balance;
-                $market->ontrade     = (float) $balance->freezeBalance;
-                $market->balancetime = time();
-                $market->save();
+                $markets = $this->marketsForCoin($coin);
+                if (empty($markets)) continue;
+                foreach ($markets as $market) {
+                    $market->balance     = (float) $balance->balance;
+                    $market->ontrade     = (float) $balance->freezeBalance;
+                    $market->balancetime = time();
+                    $market->save();
+                }
+                $market = $markets[0];
                 $cacheKey = $this->name() . "-deposit_address-check-{$coin->symbol}";
                 if ($coin->installed && !Yii::$app->cache->get($cacheKey)) {
                     sleep(1);
                     $obj = $this->authenticatedRequest("account/{$coin->symbol}/wallet/address");
                     if (!$this->kucoinResultValid($obj)) continue;
                     $addr = $obj->data->address ?? null;
-                    if (!empty($addr) && $addr !== $market->deposit_address) {
-                        $market->deposit_address = $addr;
-                        $market->save();
+                    if (!empty($addr)) {
+                        foreach ($markets as $row) {
+                            $row->deposit_address = $addr;
+                            $row->save();
+                        }
                         Yii::info($this->name() . ": deposit address for {$coin->symbol} updated", __CLASS__);
                     }
                     Yii::$app->cache->set($cacheKey, time(), 24 * 3600);

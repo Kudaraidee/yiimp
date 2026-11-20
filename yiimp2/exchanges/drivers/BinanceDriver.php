@@ -163,12 +163,12 @@ class BinanceDriver extends ExchangeDriver
             }
             $coins = Coins::find()->where(['or', ['symbol' => $balance->asset], ['symbol2' => $balance->asset]])->all();
             foreach ($coins as $coin) {
-                $market = Markets::find()->where(['coinid' => $coin->id, 'name' => $this->name()])->orderBy('balance')->one();
-                if (!$market) continue;
-                $market->balance = (float) $balance->free;
-                $market->ontrade = (float) $balance->locked;
-                $market->balancetime = time();
-                $market->save();
+                foreach ($this->marketsForCoin($coin) as $market) {
+                    $market->balance = (float) $balance->free;
+                    $market->ontrade = (float) $balance->locked;
+                    $market->balancetime = time();
+                    $market->save();
+                }
             }
         }
     }

@@ -138,12 +138,12 @@ class PoloniexDriver extends ExchangeDriver
                 }
                 $coins = Coins::find()->where(['or', ['symbol' => $symbol], ['symbol2' => $symbol]])->all();
                 foreach ($coins as $coin) {
-                    $market = Markets::find()->where(['coinid' => $coin->id, 'name' => $this->name()])->one();
-                    if (!$market) continue;
-                    $market->balance     = (float) ($balance['available'] ?? 0);
-                    $market->ontrade     = (float) ($balance['onOrders'] ?? 0);
-                    $market->balancetime = time();
-                    $market->save();
+                    foreach ($this->marketsForCoin($coin) as $market) {
+                        $market->balance     = (float) ($balance['available'] ?? 0);
+                        $market->ontrade     = (float) ($balance['onOrders'] ?? 0);
+                        $market->balancetime = time();
+                        $market->save();
+                    }
                 }
             }
         }

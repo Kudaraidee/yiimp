@@ -69,18 +69,60 @@ abstract class ExchangeDriver
         return false;
     }
 
+    /**
+     * Market row name for a quote currency.
+     * BTC pairs keep the bare exchange name; other pairs use "exchange BASECOIN".
+     */
+    final protected function marketName(?string $baseCoin = null): string
+    {
+        if ($baseCoin === null || strtoupper($baseCoin) === 'BTC') {
+            return $this->name();
+        }
+        return $this->name() . ' ' . strtoupper($baseCoin);
+    }
+
+    /** Find the market row for a specific quote currency (null = BTC). */
+    final protected function findMarket(Coins $coin, ?string $baseCoin = null): ?Markets
+    {
+        $baseCoin = ($baseCoin === null || strtoupper($baseCoin) === 'BTC') ? null : strtoupper($baseCoin);
+
+        $query = Markets::find()->where(['coinid' => $coin->id]);
+        if ($baseCoin === null) {
+            $query->andWhere(['name' => $this->marketName()])
+                  ->andWhere(['or', ['base_coin' => null], ['base_coin' => ''], ['base_coin' => 'BTC']]);
+        } else {
+            // Accept both the qualified name and a legacy bare row carrying the
+            // same base_coin, so old records keep working after discovery.
+            $query->andWhere(['or',
+                ['name' => $this->marketName($baseCoin)],
+                ['and', ['name' => $this->name()], ['base_coin' => $baseCoin]],
+            ]);
+        }
+
+        return $query->one();
+    }
+
+    /** All market rows for this exchange and coin, including non-BTC pairs. */
+    final protected function marketsForCoin(Coins $coin): array
+    {
+        return Markets::find()
+            ->where(['coinid' => $coin->id])
+            ->andWhere(['or',
+                ['name' => $this->name()],
+                ['like', 'name', $this->name() . ' %', false],
+            ])
+            ->all();
+    }
+
     final protected function findOrCreateMarket(Coins $coin): Markets
     {
-        $market = Markets::find()
-            ->where(['coinid' => $coin->id, 'name' => $this->name()])
-            ->andWhere(['or', ['base_coin' => null], ['base_coin' => ''], ['base_coin' => 'BTC']])
-            ->one();
+        $market = $this->findMarket($coin);
 
         if (!$market) {
             $market          = new Markets();
             $market->coinid  = $coin->id;
             $market->deleted = 0;
-            $market->name    = $this->name();
+            $market->name    = $this->marketName();
         }
 
         return $market;
@@ -97,9 +139,11 @@ abstract class ExchangeDriver
      */
     final protected function softDeleteMarkets(): void
     {
+        // BTC pairs use the bare exchange name; all other pairs use
+        // "exchange BASECOIN" (e.g. "nonkyc USDT"). Both must be retired.
         Yii::$app->db->createCommand(
-            'UPDATE markets SET deleted=true WHERE name=:ex',
-            [':ex' => $this->name()]
+            'UPDATE markets SET deleted=true WHERE name=:ex OR name LIKE :prefix',
+            [':ex' => $this->name(), ':prefix' => $this->name() . ' %']
         )->execute();
     }
 
@@ -144,7 +188,7 @@ abstract class ExchangeDriver
 
         // Non-BTC markets are named "exchange BASECOIN" (e.g. "nonkyc USDT").
         // BTC markets keep the bare exchange name.
-        $marketName = ($baseCoin !== null) ? "{$exchange} {$baseCoin}" : $exchange;
+        $marketName = $this->marketName($baseCoin);
 
         foreach (Coins::find()->where(['symbol' => $symbol])->orWhere(['symbol2' => $symbol])->all() as $c) {
             $query = Markets::find()->where(['coinid' => $c->id]);

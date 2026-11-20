@@ -184,12 +184,12 @@ class YobitDriver extends ExchangeDriver
             $sym   = strtoupper($symbol);
             $coins = Coins::find()->where(['or', ['symbol' => $sym], ['symbol2' => $sym]])->all();
             foreach ($coins as $coin) {
-                $market = Markets::find()->where(['coinid' => $coin->id, 'name' => $this->name()])->one();
-                if (!$market) continue;
-                $market->balance     = (float) $amount;
-                $market->ontrade     = ($fundsAll[$symbol] ?? 0.0) - (float) $amount;
-                $market->balancetime = time();
-                $market->save();
+                foreach ($this->marketsForCoin($coin) as $market) {
+                    $market->balance     = (float) $amount;
+                    $market->ontrade     = ($fundsAll[$symbol] ?? 0.0) - (float) $amount;
+                    $market->balancetime = time();
+                    $market->save();
+                }
             }
         }
 

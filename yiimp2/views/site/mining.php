@@ -413,6 +413,13 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
     #mining-cards #pool_current_results .main-left-inner > div { min-width: 0; }
     #maintable1.ps-table { min-width: 620px; }
     #maintable1.ps-table .coin-sub { white-space: normal; overflow-wrap: anywhere; }
+    /* Blocks table: keep Type/Status badges from colliding on narrow screens. */
+    #mining-cards #found-table { min-width: 620px; }
+    #mining-cards #found-table th,
+    #mining-cards #found-table td { padding-left: 5px !important; padding-right: 5px !important; }
+    #mining-cards #found-table .bf-status,
+    #mining-cards #found-table .bf-type { padding-left: 4px; padding-right: 4px; font-size: 8px; }
+    #mining-cards #found-table .bf-status em { display: none; }
 }
 </style>
 

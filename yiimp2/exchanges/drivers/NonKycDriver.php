@@ -71,6 +71,44 @@ class NonKycDriver extends ExchangeDriver
         return true;
     }
 
+    /** Auto-withdraw accumulated BTC back to the pool wallet. */
+    private function autoWithdrawBtc($saveBalance): void
+    {
+        if (!$saveBalance) return;
+
+        $withdrawMin = $this->configFloat('withdraw_min_btc', defined('EXCH_AUTO_WITHDRAW') ? (float) EXCH_AUTO_WITHDRAW : 0.0);
+        $withdrawFee = $this->configFloat('withdraw_fee_btc', 0.0001);
+        $btcAddr     = defined('YIIMP_BTCADDRESS') ? YIIMP_BTCADDRESS : '';
+
+        if ($withdrawMin <= 0 || !$btcAddr) return;
+        if ((float) $saveBalance->balance < ($withdrawMin + $withdrawFee)) return;
+
+        $amount = (float) $saveBalance->balance - $withdrawFee;
+        Yii::info($this->name() . ": withdraw {$amount} BTC to {$btcAddr}", __CLASS__);
+
+        $res = $this->authenticatedRequest('createwithdrawal', json_encode([
+            'ticker'   => 'BTC',
+            'quantity' => number_format($amount, 8, '.', ''),
+            'address'  => $btcAddr,
+        ]), 'POST', 'array');
+
+        // NonKyc returns an object with an id on success. Treat an explicit
+        // failure flag as an error, and log anything unexpected instead of
+        // assuming the withdrawal succeeded.
+        $ok = is_array($res) && empty($res['error']) && (
+            !empty($res['success']) || !empty($res['result']) ||
+            isset($res['id']) || isset($res['withdrawal_id']) || isset($res['txid'])
+        );
+        if (!$ok) {
+            Yii::warning($this->name() . ': withdraw failed: ' . json_encode($res), __CLASS__);
+            return;
+        }
+
+        $this->recordWithdrawal($btcAddr, $amount);
+        $saveBalance->balance = 0;
+        $saveBalance->save();
+    }
+
     // ── Operations ────────────────────────────────────────────────────────────
 
     public function updateMarkets(): void
@@ -161,12 +199,15 @@ class NonKycDriver extends ExchangeDriver
             }
             $coins = Coins::find()->where(['or', ['symbol' => $sym], ['symbol2' => $sym]])->all();
             foreach ($coins as $coin) {
-                $market = Markets::find()->where(['coinid' => $coin->id, 'name' => $this->name()])->one();
-                if (!$market) continue;
-                $market->balance = (float) ($balance['available'] ?? 0); $market->ontrade = (float) ($balance['held'] ?? 0);
-                $market->balancetime = time(); $market->save();
+                foreach ($this->marketsForCoin($coin) as $market) {
+                    $market->balance = (float) ($balance['available'] ?? 0); $market->ontrade = (float) ($balance['held'] ?? 0);
+                    $market->balancetime = time(); $market->save();
+                }
             }
         }
+
+        // Withdrawal is controlled by withdraw_min_btc, not by the auto-trade flag.
+        $this->autoWithdrawBtc($saveBalance);
 
         if (!defined('YIIMP_ALLOW_EXCHANGE') || !YIIMP_ALLOW_EXCHANGE) return;
 
@@ -187,7 +228,8 @@ class NonKycDriver extends ExchangeDriver
             $coin = Coins::find()->where(['symbol' => $sym, 'dontsell' => 0])->one();
             if (!$coin) continue;
             $symbol = !empty($coin->symbol2) ? $coin->symbol2 : $coin->symbol;
-            $market = Markets::find()->where(['coinid' => $coin->id, 'name' => $this->name()])->one();
+            // Trading below is always against BTC, so use the bare-name market.
+            $market = $this->findMarket($coin);
             if (!$market) continue;
             $held = (float) ($balance['held'] ?? 0);
             $exOrders = [];

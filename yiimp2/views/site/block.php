@@ -11,6 +11,7 @@ $this->title = $coin ? 'Blocks — ' . $coin->symbol : 'Blocks';
 $isTailwind = Yii::$app->LayoutManager->isTailwind();
 $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $resultsUrl = Yii::$app->homeUrl . 'site/block_results?id=' . $id;
+$coinDetails = $coin ? Yii::$app->controller->renderPartial('results/coin_details', ['coin' => $coin]) : '';
 
 ?>
 
@@ -18,6 +19,7 @@ $resultsUrl = Yii::$app->homeUrl . 'site/block_results?id=' . $id;
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
+<?= $coinDetails ?>
 <div id="main_results">
     <p style="color:#aaa;margin:24px 0;">Loading&hellip;</p>
 </div>
@@ -45,6 +47,7 @@ $resultsUrl = Yii::$app->homeUrl . 'site/block_results?id=' . $id;
 <div class="mb-3" style="height:3px;background:#e9ecef;border-radius:1px;">
     <div id="refresh-bar" class="h-100" style="width:100%;background:#0d6efd;transition:width 1s linear;border-radius:1px;"></div>
 </div>
+<?= $coinDetails ?>
 <div id="main_results">
     <div class="text-center text-muted py-4 small">Loading&hellip;</div>
 </div>
@@ -71,6 +74,7 @@ $resultsUrl = Yii::$app->homeUrl . 'site/block_results?id=' . $id;
 <div class="mb-4 h-0.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
     <div id="refresh-bar" class="h-full bg-indigo-500 transition-all duration-1000 rounded-full" style="width:100%"></div>
 </div>
+<?= $coinDetails ?>
 <div id="main_results">
     <div class="text-center text-gray-400 dark:text-gray-500 py-8 text-sm">Loading&hellip;</div>
 </div>
