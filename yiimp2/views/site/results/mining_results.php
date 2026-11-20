@@ -28,20 +28,122 @@ $worker = $algo === 'all'
 $coin_count  = $count > 1 ? "on {$count} wallets" : 'on a single wallet';
 $miner_count = $worker > 1 ? "{$worker} miners" : "{$worker} miner";
 $title       = "Mining {$coin_count} {$total_rate_d}, {$miner_count}";
+$scopeLabel  = ($algo === 'all') ? 'all algos' : $algo;
+$rateText    = $total_rate ? $conv->Itoa2($total_rate) . 'h/s' : '—';
+$coinLabel   = $count > 1 ? "{$count} coins" : '1 coin';
 
 // ── Table open ────────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo "<div class='main-left-box'>";
-    echo "<div class='main-left-title'>" . Html::encode($title) . "</div>";
-    echo "<div class='main-left-inner'>";
-    Yii::$app->ViewUtils->showTableSorter('maintable3', "{
-        tableClass: 'dataGrid2',
-        textExtraction: {
-            3: function(node,table,n){ return \$(node).attr('data'); },
-            6: function(node,table,n){ return \$(node).attr('data'); },
-            7: function(node,table,n){ return \$(node).attr('data'); }
-        }
-    }");
+    echo <<<'CSS'
+<style>
+#mining-card > .main-left-title {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: #f8fafc; border-bottom: 1px solid #e8eef6; padding: 9px 12px;
+}
+#mining-card .mn-head-main { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; min-width: 0; }
+#mining-card .mn-title { font-size: 13px; font-weight: 800; color: #26385a; letter-spacing: .01em; }
+#mining-card .mn-sub { font-size: 10px; color: #8a94a6; font-weight: 500; }
+#mining-card .mn-scope {
+    font-size: 9px; font-weight: 700; color: #2c5aa0; background: #eef4ff;
+    border: 1px solid #d7e5ff; border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+}
+#mining-card .main-left-inner { padding: 0; }
+#mining-card .mn-summary {
+    display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 12px;
+    background: #fcfdff; border-bottom: 1px solid #eef2f7;
+    font-size: 10px; color: #8a94a6;
+}
+#mining-card .mn-summary b { color: #33405a; font-weight: 700; }
+#mining-card .mn-summary i {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #2fae5a; box-shadow: 0 0 0 3px rgba(47,174,90,.12); margin-right: 5px;
+}
+#maintable3.mn-table {
+    width: 100% !important; border-collapse: collapse; table-layout: fixed;
+    font-size: 11px; color: #334155;
+}
+#maintable3.mn-table th {
+    background: #fff; padding: 7px 9px; text-align: right;
+    font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: #8a94a6; border-bottom: 1px solid #e8eef6; white-space: nowrap;
+}
+#maintable3.mn-table th:first-child, #maintable3.mn-table td:first-child { text-align: left; }
+#maintable3.mn-table th.tablesorter-header { cursor: pointer; }
+#maintable3.mn-table th.tablesorter-header:hover { color: #2c5aa0; }
+#maintable3.mn-table td {
+    padding: 8px 9px; border-bottom: 1px solid #eef2f7;
+    text-align: right; vertical-align: middle;
+}
+#maintable3.mn-table tbody tr:last-child td { border-bottom: 0; }
+#maintable3.mn-table tbody tr:hover { background: #f7faff; }
+#maintable3.mn-table tr.mn-dim { opacity: .55; }
+#maintable3.mn-table tr.mn-group td {
+    background: #f8fafc; color: #8a94a6; font-size: 9px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; text-align: left; padding: 5px 9px;
+}
+#mining-card .mn-coin { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#mining-card .mn-ico {
+    position: relative; flex: 0 0 26px; height: 26px; border-radius: 6px; overflow: hidden;
+    display: grid; place-items: center; color: #fff; font-size: 7px; font-weight: 800;
+    background: linear-gradient(135deg, #4f79c8, #2c5aa0);
+}
+#mining-card .mn-ico.firo { background: linear-gradient(135deg, #b06fd0, #7a3fa0); }
+#mining-card .mn-ico img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+#mining-card .mn-coin-main { min-width: 0; }
+#mining-card .mn-link { font-size: 11px; font-weight: 700; color: #26385a; text-decoration: none; }
+#mining-card .mn-link:hover { color: #2c5aa0; }
+#mining-card .mn-link.warn { color: #c55; }
+#mining-card .mn-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 2px; }
+#mining-card .mn-algo, #mining-card .mn-pay {
+    display: inline-block; border-radius: 3px; padding: 0 4px;
+    font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap;
+}
+#mining-card .mn-algo { background: #eef4ff; color: #2c5aa0; border: 1px solid #d7e5ff; }
+#mining-card .mn-pay { background: #eef4ff; color: #2c5aa0; border: 1px solid #d7e5ff; }
+#mining-card .mn-pay.manual { background: #fff7e8; color: #a86400; border-color: #ffe2b8; }
+#mining-card .mn-val {
+    display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; color: #2b3d5b;
+    white-space: nowrap;
+}
+#mining-card .mn-cap { display: block; font-size: 9px; color: #98a3b5; margin-top: 1px; white-space: nowrap; }
+#mining-card .mn-good .mn-val { color: #1f9d55; }
+#mining-card .mn-muted .mn-val { color: #94a3b8; }
+#mining-card .mn-val.mn-warn { color: #d9534f; }
+#mining-card .mn-foot {
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 7px 12px; background: #fcfdff; border-top: 1px solid #eef2f7;
+    font-size: 9px; color: #98a3b5;
+}
+@media(max-width:720px){
+    #maintable3.mn-table { table-layout: auto; }
+    #mining-card .mn-summary { gap: 10px; }
+}
+</style>
+CSS;
+    echo "<div id='mining-card' class='main-left-box'>";
+    echo "<div class='main-left-title'>";
+    echo "<span class='mn-head-main'><span class='mn-title'>Mining</span>"
+       . "<span class='mn-sub'>" . Html::encode($coinLabel . ' · ' . $rateText . ' · ' . $miner_count) . "</span></span>";
+    echo "<span class='mn-scope'>" . Html::encode($scopeLabel) . "</span>";
+    echo "</div><div class='main-left-inner'>";
+    echo "<div class='mn-summary'><span><i></i><b>" . Html::encode($coinLabel) . "</b> in scope</span>"
+       . "<span>Pool speed <b>" . Html::encode($rateText) . "</b></span>"
+       . "<span>Active workers <b>" . (int) $worker . "</b></span></div>";
+    echo "<div style='overflow-x:auto'>";
+    echo "<table id='maintable3' class='mn-table'>";
+    Yii::$app->ViewUtils->JavascriptReady("
+        \$('#maintable3').tablesorter({
+            tableClass: 'dataGrid2',
+            textExtraction: {
+                2: function(node){ return \$(node).attr('data') || \$(node).text(); },
+                3: function(node){ return \$(node).attr('data') || \$(node).text(); },
+                5: function(node){ return \$(node).attr('data') || \$(node).text(); },
+                6: function(node){ return \$(node).attr('data') || \$(node).text(); }
+            }
+        });
+        \$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');
+    ");
 } elseif (!$isTailwind) {
     echo '<div class="card shadow-sm mb-3">';
     echo '<div class="card-header d-flex align-items-center gap-2 py-2">';
@@ -93,14 +195,13 @@ if ($isLegacy) {
 if ($isLegacy) {
     echo <<<END
 <thead><tr>
-<th data-sorter=""></th>
-<th data-sorter="text">Name</th>
-<th align="right">Amount</th>
-<th data-sorter="numeric" align="right">Diff</th>
-<th align="right">Block</th>
-<th align="right">TTF***</th>
-<th data-sorter="numeric" align="right">Hash**</th>
-<th data-sorter="currency" align="right">Profit*</th>
+<th data-sorter="text" style="width:30%">Coin</th>
+<th style="width:10%">Reward</th>
+<th data-sorter="numeric" style="width:12%">Difficulty</th>
+<th data-sorter="numeric" style="width:13%">Height</th>
+<th style="width:12%">Est. block</th>
+<th data-sorter="numeric" style="width:12%">Pool hash</th>
+<th data-sorter="currency" style="width:11%">24h est</th>
 </tr></thead>
 END;
 } elseif (!$isTailwind) {
@@ -134,7 +235,7 @@ foreach ($list as $coin) {
     if ($coin->auxpow && !$separate_aux) {
         $separate_aux = 1;
         if ($isLegacy) {
-            echo "<tr class='ssrow'><td></td><td>merged mined coins</td></tr>";
+            echo "<tr class='mn-group'><td colspan='7'>Merged mined coins</td></tr>";
         } elseif (!$isTailwind) {
             echo "<tr><td></td><td colspan='7' class='small text-muted'>Merged mined coins</td></tr>";
         } else {
@@ -186,28 +287,48 @@ foreach ($list as $coin) {
     $short = YIIMP_ALLOW_EXCHANGE && $coin->balance + $coin->mint < $owed * 0.9;
 
     if ($isLegacy) {
-        $rowStyle = $coin->auto_ready ? "class='ssrow'" : "style='opacity:0.4;'";
-        echo "<tr {$rowStyle}>";
-        echo '<td width="18">' . $coin->createExplorerLink('<img width="16" src="' . $coin->image . '">') . '</td>';
+        $paySymbol = Html::encode((string) ($coin->symbol ?: $coin->symbol_show));
+        $showSymbol = Html::encode((string) $coin->symbol_show);
+        $payBadge = $coin->auto_exchange
+            ? "<span class='mn-pay' title='Rewards are automatically exchanged'>⇄ Auto-exchange</span>"
+            : "<span class='mn-pay manual' title='Auto-exchange is off — rewards are paid in {$paySymbol}'>Paid in {$paySymbol}</span>";
+
+        $coinHint = '';
+        $linkClass = 'mn-link';
         if ($short) {
             $owed2  = $conv->bitcoinvaluetoa($owed - $coin->balance);
             $symbol = $coin->getOfficialSymbol();
-            $hint   = "We are short of this currency ({$owed2} {$symbol}).";
-            echo "<td><b><a href='/site/block?id={$coin->id}' title='{$hint}' style='color:#c55;'>{$name}</a></b><span style='font-size:.8em;'> ({$coin->algo})</span></td>";
-        } else {
-            echo "<td><b><a href='/site/block?id={$coin->id}'>{$name}</a></b><span style='font-size:.8em;'> ({$coin->algo})</span>";
-            if (!$coin->auto_exchange) echo "<span style='font-size:.8em;color:red;font-weight:bold;'>(no autotrade)</span>";
-            echo "</td>";
+            $coinHint = " title='We are short of this currency ({$owed2} {$symbol}).'";
+            $linkClass .= ' warn';
         }
-        echo "<td align=right style='font-size:.8em;'><b>{$reward} {$coin->symbol_show}</b></td>";
-        echo "<td align=right style='font-size:.8em;' data='{$coin->difficulty}' title='POW {$coin->difficulty}'>{$difficulty}</td>";
-        echo $coin->errors
-            ? "<td align=right style='font-size:.8em;color:red;' title='{$coin->errors}'>{$height}</td>"
-            : "<td align=right style='font-size:.8em;'>{$height}</td>";
-        echo "<td align=right style='font-size:.8em;' title='{$ttfTitle}'>{$displayTtf}</td>";
-        $auxNote = $coin->auxpow && $coin->auto_ready ? "style='font-size:.8em;opacity:0.6;'" : "style='font-size:.8em;'";
-        echo "<td align=right {$auxNote} title='Network: {$nethash_str}' data='{$pool_hash}'>{$pool_hash_sfx}</td>";
-        echo "<td align=right style='font-size:.8em;' data='{$btcmhd}'><b>{$btcmhd_fmt}</b></td>";
+
+        $initials = strtoupper(substr((string) $coin->symbol, 0, 3));
+        $icoClass = str_contains((string) $coin->algo, 'firo') ? 'mn-ico firo' : 'mn-ico';
+        $img = !empty($coin->image)
+            ? "<img src='" . Html::encode($coin->image) . "' alt='' onerror=\"this.remove()\">"
+            : '';
+        $profitClass = $btcmhd > 0 ? 'mn-good' : 'mn-muted';
+        $heightClass = $coin->errors ? 'mn-warn' : '';
+        $heightTitle = $coin->errors ? " title='" . Html::encode($coin->errors) . "'" : '';
+
+        echo "<tr class='" . ($coin->auto_ready ? '' : 'mn-dim') . "'>";
+        echo "<td><div class='mn-coin'><span class='{$icoClass}'>{$initials}{$img}</span><div class='mn-coin-main'>";
+        echo "<a class='{$linkClass}' href='/site/block?id={$coin->id}'{$coinHint}>{$name}</a>";
+        echo "<div class='mn-meta'><span class='mn-algo'>" . Html::encode($coin->algo) . "</span>{$payBadge}</div>";
+        echo "</div></div></td>";
+        echo "<td class='mn-val'><span>{$reward} {$showSymbol}</span><span class='mn-cap'>per block</span></td>";
+        echo "<td data='" . Html::encode((string) $coin->difficulty) . "' title='POW " . Html::encode((string) $coin->difficulty) . "'>"
+           . "<span class='mn-val'>{$difficulty}</span><span class='mn-cap'>difficulty</span></td>";
+        echo "<td data='" . Html::encode((string) $coin->block_height) . "'{$heightTitle}>"
+           . "<span class='mn-val{$heightClass}'>{$height}</span><span class='mn-cap'>height</span></td>";
+        echo "<td title='" . Html::encode($ttfTitle) . "'>"
+           . "<span class='mn-val'>" . ($displayTtf !== '' ? Html::encode($displayTtf) : '—') . "</span>"
+           . "<span class='mn-cap'>est. time</span></td>";
+        echo "<td data='" . Html::encode((string) $pool_hash) . "' title='Network: " . Html::encode($nethash_str) . "'>"
+           . "<span class='mn-val'>" . ($pool_hash_sfx !== '' ? Html::encode($pool_hash_sfx) : '—') . "</span>"
+           . "<span class='mn-cap'>pool hash</span></td>";
+        echo "<td class='{$profitClass}' data='" . Html::encode((string) $btcmhd) . "'>"
+           . "<span class='mn-val'>{$btcmhd_fmt}</span><span class='mn-cap'>mBTC/MH/day</span></td>";
         echo "</tr>";
 
     } elseif (!$isTailwind) {
@@ -259,10 +380,9 @@ echo '</tbody>';
 
 // ── Table close ───────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo '</table>';
-    echo '<p style="font-size:.8em;">&nbsp;*** estimated average time to find a block at full pool speed<br>'
-       . '&nbsp;** approximate from the last 5 minutes submitted shares<br>'
-       . '&nbsp;* 24h estimation in mBTC/MH/day (GH/day for sha & blake)</p>';
+    echo '</table></div>';
+    echo "<div class='mn-foot'><span>* 24h estimate in mBTC/MH/day · per GH for sha &amp; blake</span>"
+       . "<span>** pool hash from last 5min shares<br>*** estimated time at full pool speed</span></div>";
     echo '</div></div><br>';
 } elseif (!$isTailwind) {
     echo '</table></div></div>';
