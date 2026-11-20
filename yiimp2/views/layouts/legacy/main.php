@@ -51,7 +51,6 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
             ['label' => 'Pool', 'url' => ['/site/mining']],
             ['label' => 'Wallet', 'url' => ['/?address=']],
             ['label' => 'Graphs', 'url' => ['/stats'], 'active' => in_array(\Yii::$app->controller->id, ['stats']),],
-            ['label' => 'Miners', 'url' => ['/site/miners']],
             ['label' => 'API', 'url' => ['/site/api']],
             ['label' => 'Explorers', 'url' => ['/explorer'], 'active' => in_array(\Yii::$app->controller->id, ['explorer']),],
     ];

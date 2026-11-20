@@ -41,7 +41,6 @@ $publicNav = [
     ['pool',     'Pool',      '/site/mining'],
     ['wallet',   'Wallet',    '/?address='],
     ['graphs',   'Graphs',    '/stats'],
-    ['miners',   'Miners',    '/site/miners'],
     ['api',      'API',       '/site/api'],
     ['explorer', 'Explorers', '/explorer'],
 ];
