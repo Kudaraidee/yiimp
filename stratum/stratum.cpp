@@ -99,6 +99,7 @@ bool is_phihash = false;
 bool is_meowpow = false;
 bool is_ethash = false;
 bool is_etchash = false;
+bool is_randomscash = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -225,6 +226,7 @@ YAAMP_ALGO g_algos[] =
 	{"quark", quark_hash, 1, 0, 0},
 	{"qubit", qubit_hash, 1, 0, 0},
 	{"rainforest", rainforest_hash, 0x100, 0, 0},
+	{"randomscash", sha256_double_hash, 1, 0, 0},
 	{"renesis", renesis_hash, 1, 0, 0},
 	{"rinhash", rinhash_hash, 1, 0, 0},
 	{"scrypt", scrypt_hash, 0x10000, 0, 0},
@@ -450,6 +452,10 @@ int main(int argc, char **argv)
 	else if (!strcmp(g_current_algo->name,"etchash"))
 	{
 		is_etchash = true;
+	}
+	else if (!strcmp(g_current_algo->name,"randomscash"))
+	{
+		is_randomscash = true;
 	}
 
 //	struct rlimit rlim_files = {0x10000, 0x10000};

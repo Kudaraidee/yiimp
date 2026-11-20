@@ -182,6 +182,11 @@ function BackendCoinsUpdate()
         else if ($coin->algo == 'firopow' || $coin->symbol == 'KIIRO') {
             $template = $remote->getblocktemplate('{"mode":"template","rules":["segwit"]},' . json_encode((string) $coin->master_wallet));
         }
+        // Scash Core requires the segwit rule in GBT requests. The pool
+        // verifies RandomX itself; the node only needs to supply templates.
+        else if ($coin->algo == 'randomscash') {
+            $template = $remote->getblocktemplate('{"rules":["segwit"]}');
+        }
         // Change for segwit
 		else if ($coin->usemweb) {
 			$template = $remote->getblocktemplate('{"rules":["segwit","mweb"]}');

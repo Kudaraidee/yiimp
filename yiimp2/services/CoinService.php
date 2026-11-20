@@ -442,6 +442,10 @@ class CoinService
             $wallet = json_encode((string) $coin->master_wallet, JSON_UNESCAPED_SLASHES);
             return $remote->getblocktemplate('{"mode":"template","rules":["segwit"]},' . $wallet);
         }
+        // Scash Core requires the segwit rule in GBT requests.
+        if ($coin->algo === 'randomscash') {
+            return $remote->getblocktemplate('{"rules":["segwit"]}');
+        }
         if ($coin->usemweb) {
             return $remote->getblocktemplate('{"rules":["segwit","mweb"]}');
         }

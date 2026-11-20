@@ -79,6 +79,7 @@ extern bool is_phihash;
 extern bool is_meowpow;
 extern bool is_ethash;
 extern bool is_etchash;
+extern bool is_randomscash;
 
 extern int g_tcp_port;
 

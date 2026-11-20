@@ -28,6 +28,12 @@ struct YAAMP_JOB_VALUES
 	char hash_hex[1024];
 	char hash_be[1024];
 	unsigned char hash_bin[1024];
+
+	// Scash block hash (SHA256d of the full 112-byte header) while hash_*
+	// carries the RandomX commitment used for share difficulty.
+	char block_hash_hex[1024];
+	char block_hash_be[1024];
+	unsigned char block_hash_bin[1024];
 };
 
 struct YAAMP_JOB_TEMPLATE
@@ -96,6 +102,9 @@ struct YAAMP_JOB_TEMPLATE
 	uint256 header_hash;
 	uint256 header_seed;
 	//////////////////////////////////////////////////
+
+	// Scash RandomX epoch duration reported by getblocktemplate (seconds).
+	uint64_t rx_epoch_duration;
 
 	// Ethash / Etchash work from eth_getWork (0x-prefixed big endian hashes).
 	char eth_header[80];

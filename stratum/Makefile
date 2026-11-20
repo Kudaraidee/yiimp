@@ -1,13 +1,13 @@
 
 CC= gcc -no-pie 
 
-CFLAGS= -g -march=native -I./
+CFLAGS= -g -march=native -I./ -Irandomx/src
 SQLFLAGS= `mysql_config --cflags --libs`
 
 #CFLAGS=-c -O2 -I /usr/include/mysql
 #LDFLAGS=-O2 `mysql_config --libs`
 
-LDLIBS=iniparser/libiniparser.a algos/libalgos.a sha3/libhash.a -Isecp256k1/include secp256k1/.libs/libsecp256k1.a -lpthread -lgmp -lm -lstdc++ -lssl -lcrypto -lsodium
+LDLIBS=randomx/librandomx.a iniparser/libiniparser.a algos/libalgos.a sha3/libhash.a -Isecp256k1/include secp256k1/.libs/libsecp256k1.a -lpthread -lgmp -lm -lstdc++ -lssl -lcrypto -lsodium
 LDLIBS+=-lmysqlclient -lcurl
 
 SOURCES=stratum.cpp db.cpp coind.cpp coind_aux.cpp coind_template.cpp coind_submit.cpp util.cpp list.cpp uint256.cpp arith_uint256.cpp utilstrencodings.cpp \
@@ -20,25 +20,27 @@ SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/
 	phihash/lib/progpow.cpp phihash/hash.cpp \
 	meowpow/lib/progpow.cpp meowpow/hash.cpp
 SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/work.cpp
+SOURCES_RANDOMSCASH=randomscash/randomscash.cpp
 
 CFLAGS += -DHAVE_CURL
 SOURCES += rpc_curl.cpp
 #LDCURL = $(shell /usr/bin/pkg-config --static --libs libcurl)
 #LDFLAGS += $(LDCURL)
 
-OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o)
+OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o) $(SOURCES_RANDOMSCASH:.cpp=.o)
 OUTPUT=stratum
 
 CODEDIR1=algos
 CODEDIR2=sha3
 CODEDIR3=iniparser
 CODEDIR4=secp256k1
+CODEDIR5=randomx
 
 
-.PHONY: projectcode1 projectcode2 projectcode3 projectcode4
+.PHONY: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5
 
-all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(OUTPUT)
-buildonly: projectcode1 projectcode2 projectcode3 projectcode4 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(OUTPUT)
+all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(OUTPUT)
+buildonly: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(OUTPUT)
 
 gitsubmodules:
 	git submodule init && git submodule update
@@ -56,8 +58,16 @@ ifeq ($(wildcard $(CODEDIR4)/.libs/libsecp256k1.a), )
 	cd $(CODEDIR4) && chmod +x autogen.sh && ./autogen.sh && ./configure --enable-experimental --enable-module-ecdh --with-bignum=no --enable-endomorphism && $(MAKE)
 endif
 
+projectcode5:
+ifeq ($(wildcard $(CODEDIR5)/librandomx.a), )
+	mkdir -p $(CODEDIR5)/build
+	cd $(CODEDIR5)/build && cmake -DCMAKE_BUILD_TYPE=Release -DARCH=native -DCMAKE_CXX_FLAGS="-include cstdint" .. && $(MAKE)
+	cp $(CODEDIR5)/build/librandomx.a $(CODEDIR5)/librandomx.a
+endif
+
 $(SOURCES): stratum.h util.h
 $(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/work.h
+$(SOURCES_RANDOMSCASH): stratum.h randomscash/randomscash.h randomx/src/randomx.h
 
 $(OUTPUT): $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDLIBS) $(LDFLAGS) -o $@
@@ -92,6 +102,9 @@ clean:
 	rm -f kawpow/lib/ethash/*.o
 	rm -f firopow/*.o
 	rm -f firopow/lib/*.o
+	rm -f randomscash/*.o
+	rm -rf randomx/build
+	rm -f randomx/librandomx.a
 	rm -f ethash/*.o
 
 install: clean all

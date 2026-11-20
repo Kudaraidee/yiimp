@@ -5,6 +5,7 @@ stratum/blocknotify
 blocknotify/blocknotify
 blocknotify-dcr/blocknotify-dcr
 bin/stratum
+stratum/randomx/build/
 bin/blocknotify
 bin/blocknotify-dcr
 stratum/config/

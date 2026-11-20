@@ -279,6 +279,10 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		// Kiiro Core requires explicit segwit rule support in the GBT request.
 		sprintf(params, "[{\"mode\":\"template\",\"rules\":[\"segwit\"]},\"%s\"]", coind->wallet);
 	}
+	else if (is_randomscash) {
+		// Scash Core rejects template requests that do not advertise segwit.
+		strcpy(params, "[{\"rules\":[\"segwit\"]}]");
+	}
 	else if (is_kawpow || is_phihash || is_meowpow) {
 		sprintf(params, "[]");
 	}
@@ -395,6 +399,16 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 
 	const char *bits = json_get_string(json_result, "bits");
 	strcpy(templ->nbits, bits ? bits : "");
+
+	// Scash derives the RandomX key from ntime / rx_epoch_duration. Mainnet
+	// uses one week; regtest and other forks may report a shorter period.
+	templ->rx_epoch_duration = 604800;
+	if (is_randomscash) {
+		int rx_epoch_duration = json_get_int(json_result, "rx_epoch_duration");
+		if (rx_epoch_duration > 0)
+			templ->rx_epoch_duration = (uint64_t)rx_epoch_duration;
+	}
+
 	const char *prev = json_get_string(json_result, "previousblockhash");
 	strcpy(templ->prevhash_hex, prev ? prev : "");
 	const char *flags = json_get_string(json_coinbaseaux, "flags");
