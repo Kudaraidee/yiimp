@@ -32,13 +32,30 @@ $coins_subquery = (new \yii\db\Query())->select(['id'])->from('coins')->where(['
 if (!empty($r_algo)) {
     $coins_subquery->andWhere(['in', 'algo', $r_algo]);
 }
-$db_blocks = Blocks::find()
+$block_query = Blocks::find()
     ->where(['not in', 'category', ['stake', 'generated']])
     ->andWhere(['in', 'coin_id', $coins_subquery])
     ->with('coin')
     ->orderBy(['time' => SORT_DESC])
-    ->limit($count)
-    ->all();
+    ->limit($count);
+
+$db_blocks = $block_query->all();
+
+// The pool can mine several algos at once. If the currently selected algo has
+// no blocks yet, still show the most recent blocks from the other algos so the
+// "found blocks" panel is not misleadingly empty.
+if (empty($db_blocks) && $algo_header !== 'all') {
+    $all_coins = (new \yii\db\Query())->select(['id'])->from('coins')->where(['visible' => 1]);
+    $db_blocks = Blocks::find()
+        ->where(['not in', 'category', ['stake', 'generated']])
+        ->andWhere(['in', 'coin_id', $all_coins])
+        ->with('coin')
+        ->orderBy(['time' => SORT_DESC])
+        ->limit($count)
+        ->all();
+    $algo_header = 'all algos';
+    $title = "Last {$count} Blocks ({$algo_header})";
+}
 
 // ── Badge helpers ─────────────────────────────────────────────────────────────
 function statusBadge(string $category, int $confirmations, ?int $matureBlocks, ?int $blockTime, bool $isLegacy, bool $isTailwind): string
