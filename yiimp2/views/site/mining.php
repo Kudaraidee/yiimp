@@ -196,13 +196,49 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 </div>
 
 <style>
+/* ── Consistent card rhythm ────────────────────────────────────────────────── */
+#mining-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+#mining-cards > .row {
+    --bs-gutter-x: 1rem;
+    --bs-gutter-y: 0;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
+#mining-cards > .row > [class*="col-"] { margin-top: 0; }
+#mining-cards > .row:not(.mining-top-row) > [class*="col-"] + [class*="col-"] {
+    margin-top: 16px;
+}
+/* AJAX partials may end with whitespace text nodes; flex containers ignore them
+   so the gap between stacked cards stays exactly 16px. */
+#mining-cards #pool_current_results,
+#mining-cards #mining_results,
+#mining-cards #found_results,
+#mining-cards #miners_results {
+    display: flex;
+    flex-direction: column;
+}
+#mining-cards #pool_current_results > br,
+#mining-cards #mining_results > br,
+#mining-cards #found_results > br,
+#mining-cards #miners_results > br { display: none; }
+@media (max-width: 991.98px) {
+    /* Bootstrap stacks col-lg-6 here; keep the same 16px vertical rhythm. */
+    #mining-cards > .mining-top-row > [class*="col-"] + [class*="col-"] {
+        margin-top: 16px;
+    }
+}
+
 /* ── Shared mining card chrome ─────────────────────────────────────────────── */
 #mining-cards .main-left-box {
     border: 1px solid #d8e2ef !important;
     border-radius: 7px !important;
     box-shadow: 0 1px 2px rgba(20,40,80,.04);
     overflow: hidden;
-    margin-bottom: 1rem;
+    margin-bottom: 0;
 }
 #mining-cards .main-left-title {
     display: flex !important;
