@@ -138,13 +138,20 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
     <span>Network <b id="algo-summary-network"><?= Html::encode($activeItem['network_hash'] ?? '—') ?></b></span>
 </div>
 
-<div class="row gx-3 mt-2">
-    <div class="col-12 col-lg-7 mining-col">
+<div id="mining-cards">
+<div class="row gx-3 gy-3 mt-2 mining-top-row">
+    <div class="col-12 col-lg-6 mining-col">
         <?= $this->render('_mining_command', ['algoNav' => $algoNav]) ?>
     </div>
-    <div class="col-12 col-lg-5 mining-col">
+    <div class="col-12 col-lg-6 mining-col">
         <div class="main-left-box">
-            <div class="main-left-title">Last 24 Hours Estimate (<?= htmlspecialchars($graphLabel) ?>)</div>
+            <div class="main-left-title">
+                <span class="mn-head-main">
+                    <span>Last 24 Hours Estimate</span>
+                    <span class="mn-sub"><?= htmlspecialchars($graphLabel) ?></span>
+                </span>
+                <span class="mc-badge">24h</span>
+            </div>
             <div class="main-left-inner">
                 <div class="graph-wrap"><div id="graph_results_price" style="height:<?= $height ?>"></div></div>
             </div>
@@ -152,13 +159,19 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
     </div>
 </div>
 
-<div class="row gx-3">
+<div class="row gx-3 gy-3 mining-top-row">
     <div class="col-12 col-lg-6 mining-col" style="overflow-x:auto;">
         <div id="pool_current_results"></div>
     </div>
     <div class="col-12 col-lg-6 mining-col">
         <div class="main-left-box">
-            <div class="main-left-title">Last 24 Hours Hashrate (<?= htmlspecialchars($graphLabel) ?>)</div>
+            <div class="main-left-title">
+                <span class="mn-head-main">
+                    <span>Last 24 Hours Hashrate</span>
+                    <span class="mn-sub"><?= htmlspecialchars($graphLabel) ?></span>
+                </span>
+                <span class="mc-badge">24h</span>
+            </div>
             <div class="main-left-inner">
                 <div class="graph-wrap"><div id="pool_hashrate_results" style="height:<?= $height ?>"></div></div>
             </div>
@@ -180,6 +193,215 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
         <div id="miners_results" style="overflow-x:auto;"></div>
     </div>
 </div>
+</div>
+
+<style>
+/* ── Shared mining card chrome ─────────────────────────────────────────────── */
+#mining-cards .main-left-box {
+    border: 1px solid #d8e2ef !important;
+    border-radius: 7px !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+#mining-cards .main-left-title {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 34px;
+    padding: 9px 12px !important;
+    background: #f8fafc !important;
+    border-bottom: 1px solid #e8eef6;
+    color: #26385a;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    line-height: 1.3;
+}
+#mining-cards .mn-head-main,
+#mining-cards .bf-head-main {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+#mining-cards .mn-sub,
+#mining-cards .bf-sub {
+    font-size: 10px;
+    color: #8a94a6;
+    font-weight: 500;
+}
+#mining-cards .main-left-inner { padding: 0 !important; }
+#mining-cards .mc-gen { padding: 12px; }
+#mining-cards .graph-wrap { padding: 8px 12px 6px; }
+
+/* ── Top four cards: equal width and equal height ─────────────────────────── */
+#mining-cards .mining-top-row > .mining-col { display: flex; }
+#mining-cards .mining-top-row > .mining-col > #pool_current_results {
+    width: 100%;
+    display: flex;
+}
+#mining-cards .mining-top-row > .mining-col > .main-left-box,
+#mining-cards .mining-top-row > .mining-col > #pool_current_results > .main-left-box {
+    width: 100%;
+    min-height: 332px;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+}
+#mining-cards .mining-top-row .main-left-box > .main-left-inner {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+#mining-cards .mining-top-row .graph-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+#mining-cards .mining-top-row .graph-wrap > div { flex: 1 1 auto; }
+#pool_current_results .ps-foot { margin-top: auto; }
+#mining-cards .mining-new > .main-left-box {
+    border-color: #d8e2ef !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+}
+
+/* Table shell — identical across Pool Status, Mining, Blocks and Miners Version */
+#mining-cards #maintable1,
+#mining-cards #maintable2,
+#mining-cards #maintable3,
+#mining-cards #found-table {
+    width: 100% !important;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 11px;
+    color: #334155;
+}
+#mining-cards #maintable1 th,
+#mining-cards #maintable2 th,
+#mining-cards #maintable3 th,
+#mining-cards #found-table th {
+    padding: 7px 9px !important;
+    background: #fff !important;
+    border-bottom: 1px solid #e8eef6;
+    color: #8a94a6;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+#mining-cards #maintable1 td,
+#mining-cards #maintable2 td,
+#mining-cards #maintable3 td,
+#mining-cards #found-table td {
+    padding: 8px 9px !important;
+    border-bottom: 1px solid #eef2f7;
+    vertical-align: middle;
+}
+#mining-cards #maintable1 tbody tr:last-child td,
+#mining-cards #maintable2 tbody tr:last-child td,
+#mining-cards #maintable3 tbody tr:last-child td,
+#mining-cards #found-table tbody tr:last-child td { border-bottom: 0; }
+#mining-cards #maintable1 tbody tr:hover,
+#mining-cards #maintable2 tbody tr:hover,
+#mining-cards #maintable3 tbody tr:hover,
+#mining-cards #found-table tbody tr:hover { background: #f7faff; }
+#mining-cards #maintable1 th.num,
+#mining-cards #maintable1 td.num,
+#mining-cards #maintable2 th.num,
+#mining-cards #maintable2 td.num { text-align: right; }
+#mining-cards .tablesorter-header { cursor: pointer; }
+#mining-cards .tablesorter-header:hover { color: #2c5aa0; }
+
+/* Shared footers */
+#mining-cards .ps-foot,
+#mining-cards .mn-foot,
+#mining-cards .bf-foot,
+#mining-cards .mv-foot {
+    padding: 7px 12px !important;
+    background: #fcfdff !important;
+    border-top: 1px solid #eef2f7;
+    color: #98a3b5;
+    font-size: 9px !important;
+    line-height: 1.5;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+#mining-cards .ps-foot b,
+#mining-cards .mn-foot b,
+#mining-cards .bf-foot b,
+#mining-cards .mv-foot b { color: #7d8aa0; }
+
+/* Shared chips / status pills */
+#mining-cards .mc-badge,
+#mining-cards .mn-scope,
+#mining-cards .bf-chip,
+#mining-cards .mv-head .pill {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #eef4ff;
+    border: 1px solid #d7e5ff;
+    color: #2c5aa0;
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    white-space: nowrap;
+}
+#mining-cards .mv-head .pill.gray { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
+#mining-cards .bf-chip.confirmed { background: #e8f7ee; border-color: #ccebd8; color: #187d46; }
+#mining-cards .bf-chip.immature { background: #fff7e8; border-color: #ffe2b8; color: #a86400; }
+#mining-cards .bf-chip.orphan { background: #fdecec; border-color: #f6d2d2; color: #c0392b; }
+#mining-cards .mc-preset { font-size: 9px; padding: 3px 9px; }
+#mining-cards .mv-head .live { font-size: 9px; color: #5b6675; display: flex; align-items: center; gap: 6px; }
+#mining-cards .mv-head .live i {
+    width: 6px; height: 6px; border-radius: 50%; background: #2fae5a;
+    box-shadow: 0 0 0 3px rgba(47,174,90,.15);
+}
+
+/* Shared inline badges / coin typography */
+#mining-cards .tag,
+#mining-cards .mn-pay,
+#mining-cards .chip,
+#mining-cards .mn-algo {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: #eef4ff;
+    border: 1px solid #d7e5ff;
+    color: #2c5aa0;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    vertical-align: 1px;
+    margin-right: 4px;
+}
+#mining-cards .tag.manual,
+#mining-cards .mn-pay.manual { background: #fff7e8; border-color: #ffe2b8; color: #a86400; }
+#mining-cards .coin-ico,
+#mining-cards .mn-ico,
+#mining-cards .bf-ico,
+#mining-cards .vico {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+}
+#mining-cards .coin-name,
+#mining-cards .mn-link,
+#mining-cards .bf-link,
+#mining-cards .vname {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #26385a;
+}
+</style>
 
 <script>
 var global_algo = <?= json_encode($algo) ?>;

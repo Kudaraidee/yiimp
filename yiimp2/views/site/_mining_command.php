@@ -18,7 +18,13 @@ $jsonFlags  = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_A
 
 if ($isLegacy): ?>
     <div class="main-left-box">
-        <div class="main-left-title">Mining command generator</div>
+        <div class="main-left-title">
+            <span class="mn-head-main">
+                <span>Mining command generator</span>
+                <span class="mn-sub">presets · live command</span>
+            </span>
+            <span class="mc-badge">copy-ready</span>
+        </div>
         <div class="main-left-inner">
 <?php elseif (!$isTailwind): ?>
     <div class="card shadow-sm mb-3">

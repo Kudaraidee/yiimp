@@ -35,7 +35,10 @@ $selectedAlgo = ($defaultalgo && $defaultalgo !== 'all') ? $defaultalgo : null;
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo "<div class='main-left-box'><div class='main-left-title'>Pool Status</div><div class='main-left-inner'>";
+    echo "<div class='main-left-box'><div class='main-left-title'>"
+       . "<span class='mn-head-main'><span>Pool Status</span>"
+       . "<span class='mn-sub'>coin list</span></span>"
+       . "<span class='mn-scope'>follows Algorithm bar</span></div><div class='main-left-inner'>";
 } elseif (!$isTailwind) {
     echo '<div class="card shadow-sm mb-3"><div class="card-header py-2 small fw-semibold">'
        . '<i class="bi bi-bar-chart me-1"></i>Pool Status</div><div class="card-body p-0">';
@@ -340,7 +343,7 @@ echo '</tbody></table></div>';
 // ── Footer note + wrapper close ───────────────────────────────────────────────
 $note = '* mBTC/MH/day, per GH for sha &amp; blake';
 if ($isLegacy) {
-    echo '<p style="font-size:.8em;">&nbsp;' . $note . '</p>';
+    echo "<div class='ps-foot'><span>" . $note . "</span><span>live · 60s</span></div>";
     echo '</div></div><br>';
 } elseif (!$isTailwind) {
     echo '<div class="card-footer text-muted small py-1">' . $note . '</div>';

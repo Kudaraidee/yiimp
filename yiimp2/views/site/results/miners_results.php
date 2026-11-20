@@ -48,7 +48,10 @@ foreach ($versionData as $row) {
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo "<div class='main-left-box'><div class='main-left-title'>Miners Version</div><div class='main-left-inner'>";
+    echo "<div class='main-left-box'><div class='main-left-title'>"
+       . "<span class='mn-head-main'><span>Miners Version</span>"
+       . "<span class='mn-sub'>" . Html::encode($algoLabel) . "</span></span>"
+       . "<span class='mc-badge'>live</span></div><div class='main-left-inner'>";
 } elseif (!$isTailwind) {
     echo '<div class="card shadow-sm"><div class="card-header py-2"><strong class="small">Miners Version</strong></div>'
        . '<div class="card-body p-0">';
