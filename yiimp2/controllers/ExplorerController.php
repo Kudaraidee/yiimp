@@ -29,14 +29,16 @@ class ExplorerController extends BaseController
 		}
 
 		$request = Yii::$app->getRequest();
-		if (strlen($id) <= 10 && !$request->getQueryParam('id')) {
+		$hasIdParam = $request->getQueryParam('id') !== null;
+		if (strlen($id) <= 10) {
 			$coin = Coins::findOne(['symbol' => strtoupper($id)]);
 			if (!$coin && ctype_digit($id)) {
 				$coin = Coins::findOne((int) $id);
 			}
 
 			$isAdmin = !Yii::$app->user->isGuest && (Yii::$app->user->identity?->is_admin ?? false);
-			if ($coin && ($coin->visible || $isAdmin)) {
+			// Explicit ?id=N must still work with symbol routes: /explorer/LRS?id=7.
+			if ($coin && ($coin->visible || $isAdmin || $hasIdParam)) {
 				$query = $request->getQueryParams();
 				if ($request->getIsPost()) {
 					// Mirror the Yii1 controller: POST searches redirect through
@@ -45,7 +47,7 @@ class ExplorerController extends BaseController
 					$query[$key] = $coin->visible ? $coin->symbol : $coin->id;
 					$id = 'search';
 				} else {
-					// /explorer/KIIRO and /explorer/8 are aliases for /explorer?id=N
+					// Keep the symbol and id in sync, even on legacy URLs.
 					$query['id'] = $coin->id;
 					$id = $this->defaultAction;
 				}

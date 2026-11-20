@@ -19,7 +19,7 @@ $btn = fn(string $label, string $url, string $color = 'indigo') =>
 <div class="flex flex-wrap gap-1.5 mb-3">
     <?= $btn('Properties', '/admin/coinwallet_update?id=' . $coin->id) ?>
     <?php if ($info): ?>
-        <?= $btn('Explorer', '/explorer/' . $coin->getOfficialSymbol() . '?id=' . $coin->id) ?>
+        <?= $btn('Explorer', $coin->getExplorerUrl()) ?>
         <?= $btn('Peers',    '/admin/coinpeers?id='   . $coin->id) ?>
         <?php if (YIIMP_ADMIN_WEBCONSOLE): ?>
             <?= $btn('Console', '/admin/coinwallet-console?id=' . $coin->id) ?>

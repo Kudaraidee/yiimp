@@ -12,7 +12,7 @@ $btn = fn(string $label, string $url, string $variant = 'secondary') =>
 <div class="d-flex flex-wrap gap-1 mb-2">
     <?= $btn('Properties', '/admin/coinwallet_update?id=' . $coin->id, 'primary') ?>
     <?php if ($info): ?>
-        <?= $btn('Explorer', '/explorer/' . $coin->getOfficialSymbol() . '?id=' . $coin->id) ?>
+        <?= $btn('Explorer', $coin->getExplorerUrl()) ?>
         <?= $btn('Peers',    '/admin/coinpeers?id='   . $coin->id) ?>
         <?php if (YIIMP_ADMIN_WEBCONSOLE): ?>
             <?= $btn('Console', '/admin/coinwallet-console?id=' . $coin->id) ?>

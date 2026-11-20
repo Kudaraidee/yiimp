@@ -4,6 +4,7 @@ namespace app\models;
 
 use yii\db\ActiveRecord;
 use yii\bootstrap5\Html;
+use yii\helpers\Url;
 
 class Coins extends ActiveRecord
 {
@@ -48,6 +49,25 @@ class Coins extends ActiveRecord
 		return $this->getOfficialSymbol();
 	}
 
+	/**
+	 * Internal explorer URL. Visible coins use the clean /explorer/SYMBOL form;
+	 * the numeric id is only needed for hidden or numeric-symbol coins.
+	 */
+	public function getExplorerUrl($params=array())
+	{
+		if ($this->id == 6 && isset($params['txid'])) {
+			return 'https://blockchain.info/tx/'.$params['txid'];
+		}
+
+		$symbol = $this->getOfficialSymbol();
+		$route = ['/explorer/'.$symbol];
+		if (!$this->visible || is_numeric($symbol)) {
+			$route['id'] = $this->id;
+		}
+
+		return Url::to(array_merge($route, $params));
+	}
+
     /**
 	 * Link for txs
 	 * @param string $label link content
@@ -65,9 +85,9 @@ class Coins extends ActiveRecord
 		else if (YIIMP_PUBLIC_EXPLORER || $force || 
 				((!is_null(Yii::$app->user->identity)) && (Yii::$app->user->identity->is_admin))) {
 			
-			$urlParams = array_merge(['/explorer/'.$this->getOfficialSymbol(), 'id'=>$this->id], $params);
+			$url = $this->getExplorerUrl($params);
 
-			return Html::a($label, $urlParams, ['class' => 'profile-link']);
+			return Html::a($label, $url, ['class' => 'profile-link']);
 		}
 		return $label;
 	}
