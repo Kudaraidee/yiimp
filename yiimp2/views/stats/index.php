@@ -15,6 +15,18 @@ $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $height     = '240px';
 $au         = Html::encode($algoUnit);
 
+// Same algo scope control as /site/mining, built from the enabled/visible coins.
+$algoTabs   = [];
+foreach ($algos as $a => $count) {
+    $algoTabs[$a] = [
+        'label' => (string) $a,
+        'color' => Yii::$app->YiimpUtils->getAlgoColors($a),
+        'count' => (int) $count,
+    ];
+}
+$activeAlgo = array_key_exists($algo, $algoTabs) ? $algo : (array_key_first($algoTabs) ?? $algo);
+$activeColor = $algoTabs[$activeAlgo]['color'] ?? '#2c5aa0';
+
 $options = '';
 foreach ($algos as $a => $count) {
     $sel      = ($a === $algo) ? ' selected' : '';
@@ -47,26 +59,45 @@ $graphInits = [
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
 <style>
-/* ── Stats cards — mirrors /site/mining ──────────────────────────────────── */
-#stats-cards .stats-toolbar {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+/* ── Algo scope bar — identical to /site/mining ──────────────────────────── */
+.mining-algo-bar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
-    padding: 10px 14px; margin: 12px 0 10px;
+    padding: 12px 14px; margin: 12px 0 10px;
     box-shadow: 0 1px 2px rgba(20,40,80,.04);
 }
-#stats-cards .st-label {
+.mining-algo-label {
     font-size: 10px; font-weight: 700; letter-spacing: .12em;
     color: #8a94a6; text-transform: uppercase; white-space: nowrap;
 }
-#stats-cards .st-select {
-    padding: 6px 10px; border: 1px solid #d8e2ef; border-radius: 6px;
-    background: #fafbfc; color: #33405a; font: inherit; font-size: 11px; font-weight: 700;
+.mining-algo-tabs {
+    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+    flex: 1 1 420px;
 }
-#stats-cards .st-live {
-    margin-left: auto; display: flex; align-items: center; gap: 6px;
-    font-size: 11px; color: #5b6675; white-space: nowrap;
+.mining-algo-tab {
+    border: 1px solid #dfe5ec; background: #fafbfc; border-radius: 7px;
+    padding: 6px 11px; min-width: 96px; text-align: left; cursor: pointer;
+    font-family: inherit; line-height: 1.15; transition: .15s;
 }
-#stats-cards .st-live i {
+.mining-algo-tab:hover { border-color: var(--algo-color, #a9c4ea); background: #f7faff; }
+.mining-algo-tab b { display: block; font-size: 12px; color: #33405a; }
+.mining-algo-tab small { display: block; font-size: 10px; color: #8a94a6; margin-top: 2px; }
+.mining-algo-tab .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    margin-right: 5px; vertical-align: 1px; background: var(--algo-color, #888);
+}
+.mining-algo-tab.active {
+    border-color: var(--algo-color, #2c5aa0);
+    background: #eef4ff;
+    box-shadow: inset 0 0 0 1px var(--algo-color, #2c5aa0);
+}
+.mining-algo-tab.active b { color: #1f467f; }
+.mining-algo-tab.active small { color: #4f74ad; }
+.mining-algo-live {
+    margin-left: auto; white-space: nowrap; font-size: 11px; color: #5b6675;
+    display: flex; align-items: center; gap: 6px;
+}
+.mining-algo-live i {
     width: 7px; height: 7px; border-radius: 50%; background: #2fae5a;
     box-shadow: 0 0 0 3px rgba(47,174,90,.15);
 }
@@ -132,10 +163,19 @@ $graphInits = [
 </div>
 
 <div id="stats-cards">
-<div class="stats-toolbar">
-    <span class="st-label">Algorithm</span>
-    <select id="algo_select" class="st-select"><?= $options ?></select>
-    <span class="st-live"><i></i> live · 60s</span>
+<div class="mining-algo-bar" style="--algo-color: <?= Html::encode($activeColor) ?>">
+    <span class="mining-algo-label">Algorithm</span>
+    <div class="mining-algo-tabs" title="กดเพื่อเลือกอัลกอริทึม">
+        <?php foreach ($algoTabs as $key => $item): ?>
+            <?php $color = Html::encode($item['color']); ?>
+            <button type="button" class="mining-algo-tab <?= $key === $activeAlgo ? 'active' : '' ?>"
+                    style="--algo-color: <?= $color ?>" data-algo="<?= Html::encode($key) ?>">
+                <b><i class="dot"></i><?= Html::encode($item['label']) ?></b>
+                <small data-algo-sub><?= $item['count'] ?> coin<?= $item['count'] === 1 ? '' : 's' ?></small>
+            </button>
+        <?php endforeach ?>
+    </div>
+    <span class="mining-algo-live"><i></i> live · 60s</span>
 </div>
 
 <div class="row gx-3 mt-2">
@@ -295,6 +335,10 @@ $graphInits = [
 <script>
 $('#algo_select').change(function () {
     window.location.href = '/site/algo?algo=' + encodeURIComponent($('#algo_select').val()) + '&r=/stats';
+});
+
+$('#stats-cards .mining-algo-tab').on('click', function () {
+    window.location.href = '/site/algo?algo=' + encodeURIComponent($(this).data('algo')) + '&r=/stats';
 });
 
 function page_refresh() {
