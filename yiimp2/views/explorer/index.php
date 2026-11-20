@@ -33,9 +33,8 @@ foreach ($list as $coin) {
     $linkLabel   = !empty($coin->link_bitcointalk) ? 'forum' : 'site';
 
     $peersData[$coin->id] = [
-        'name'   => $coin->name,
-        'prefix' => $coin->rpcencoding === 'DCR' ? 'addpeer=' : 'addnode=',
-        'peers'  => $walletInfo['peers'] ?? [],
+        'name'  => $coin->name,
+        'lines' => $coin->getPeerAddresses(),
     ];
 
     $coinRows[] = compact('coin', 'difficulty', 'diffnote', 'nethash',
@@ -351,7 +350,7 @@ var _isTailwind = <?= $isTailwind ? 'true' : 'false' ?>;
 function showPeers(id) {
     var data    = _peersData[id];
     if (!data) return;
-    var lines   = data.peers.map(function(a) { return data.prefix + a; });
+    var lines   = (data.lines || []).slice();
     var content = document.getElementById('peers-content');
     var empty   = document.getElementById('peers-empty');
     var overlay = document.getElementById('peers-overlay');

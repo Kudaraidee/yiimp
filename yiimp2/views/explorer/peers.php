@@ -6,10 +6,7 @@ if (!$coin) return Yii::$app->controller->goBack();
 
 $this->title = 'Peers — ' . $coin->name;
 $isTailwind  = Yii::$app->LayoutManager->isTailwind();
-
-$prefix  = $coin->rpcencoding === 'DCR' ? 'addpeer=' : 'addnode=';
-$peers   = $coin->getWalletInfo()['peers'] ?? [];
-$addnode = array_map(fn($addr) => $prefix . $addr, $peers);
+$lines       = $coin->getPeerAddresses();
 ?>
 
 <?php if ($isTailwind): ?>
@@ -24,11 +21,11 @@ $addnode = array_map(fn($addr) => $prefix . $addr, $peers);
     <h1 class="font-semibold text-base mb-3">
         <?= Html::encode($coin->name) ?> Peers
     </h1>
-    <?php if (empty($addnode)): ?>
+    <?php if (empty($lines)): ?>
     <p class="text-gray-400 dark:text-gray-500">No peers available.</p>
     <?php else: ?>
     <pre class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
-                rounded-lg p-3 text-xs font-mono overflow-auto"><?= Html::encode(implode("\n", $addnode)) ?></pre>
+                rounded-lg p-3 text-xs font-mono overflow-auto"><?= Html::encode(implode("\n", $lines)) ?></pre>
     <?php endif ?>
 </body>
 </html>
@@ -37,6 +34,10 @@ $addnode = array_map(fn($addr) => $prefix . $addr, $peers);
 <div class="main-left-box">
 <div class="main-left-title"><?= Html::encode($this->title) ?></div>
 <div class="main-left-inner">
-<pre><?= Html::encode(implode("\n", $addnode)) ?></pre>
+<?php if (empty($lines)): ?>
+<p>No peers available.</p>
+<?php else: ?>
+<pre><?= Html::encode(implode("\n", $lines)) ?></pre>
+<?php endif ?>
 </div></div>
 <?php endif ?>

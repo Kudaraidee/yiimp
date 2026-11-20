@@ -5,6 +5,7 @@ namespace app\models;
 use yii\db\ActiveRecord;
 use yii\bootstrap5\Html;
 use yii\helpers\Url;
+use app\components\rpc\WalletRPC;
 
 class Coins extends ActiveRecord
 {
@@ -34,6 +35,70 @@ class Coins extends ActiveRecord
             return [];
         }
         return json_decode($this->specifications, true) ?: [];
+    }
+
+    /**
+     * Live peer/node lines for the block explorer. The wallet_info cache does
+     * not contain peers, so query the daemon directly like the legacy page did.
+     */
+    public function getPeerAddresses(): array
+    {
+        if (empty($this->rpchost)) {
+            return [];
+        }
+
+        $remote = new WalletRPC($this);
+        if ($remote->error !== null) {
+            return [];
+        }
+
+        if ($this->rpcencoding === 'GETH') {
+            // Geth usually disables admin_peers over the public RPC port; show
+            // the peer count and client string instead of an empty node list.
+            $lines = [];
+            $count = $remote->net_peerCount();
+            if (is_string($count) && preg_match('/^0x[0-9a-f]+$/i', $count)) {
+                $count = hexdec($count);
+            }
+            if ($count !== false && $count !== null) {
+                $lines[] = 'Peer count: ' . (int) $count;
+            }
+            $version = $remote->web3_clientVersion();
+            if (is_string($version) && $version !== '') {
+                $lines[] = 'Client: ' . $version;
+            }
+            return $lines;
+        }
+
+        $list = $remote->getpeerinfo();
+        if (!is_array($list)) {
+            return [];
+        }
+
+        $prefix = $this->rpcencoding === 'DCR' ? 'addpeer=' : 'addnode=';
+        $lines  = [];
+        foreach ($list as $peer) {
+            $addr = is_array($peer) ? (string) ($peer['addr'] ?? '') : (string) $peer;
+            if ($addr === '' || $this->isLocalPeerAddress($addr)) {
+                continue;
+            }
+            $lines[] = $prefix . $addr;
+        }
+
+        sort($lines, SORT_STRING);
+        return $lines;
+    }
+
+    private function isLocalPeerAddress(string $addr): bool
+    {
+        $host = preg_replace('/:\d+$/', '', $addr);
+        if ($host === '' || stripos($host, 'localhost') !== false || stripos($host, 'yiimp') !== false) {
+            return true;
+        }
+        return (bool) preg_match(
+            '/^(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|169\.254\.|\[::1\])/',
+            $host
+        );
     }
 
     public function getOfficialSymbol()
