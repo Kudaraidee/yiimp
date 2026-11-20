@@ -869,13 +869,17 @@ class SiteController extends BaseController
     // Pool tab: graph algo pool hashrate (json data)
 	public function actionGraph_hashrate_results()
 	{
-		return $this->renderPartialAlgoMemcached('results/graph_hashrate_results');
+		$algo  = (string) Yii::$app->session->get('yaamp-algo', 'all');
+		$algos = $algo === 'all' ? $this->activeMiningAlgos() : [$algo];
+		return $this->renderPartialAlgoMemcached('results/graph_hashrate_results', 15, ['algos' => $algos]);
 	}
 
     // Pool tab: graph algo estimate history (json data)
 	public function actionGraph_price_results()
 	{
-		return $this->renderPartialAlgoMemcached('results/graph_price_results');
+		$algo  = (string) Yii::$app->session->get('yaamp-algo', 'all');
+		$algos = $algo === 'all' ? $this->activeMiningAlgos() : [$algo];
+		return $this->renderPartialAlgoMemcached('results/graph_price_results', 15, ['algos' => $algos]);
 	}
 
    	public function actionWallet_results()
@@ -993,7 +997,7 @@ class SiteController extends BaseController
 		return $this->redirect(['/site/mining']);
 	}
 
-    protected function renderPartialAlgoMemcached($partial, $cachetime=15)
+    protected function renderPartialAlgoMemcached($partial, $cachetime=15, $params=[])
 	{
 		$algo = Yii::$app->session->get('yaamp-algo')?:'all';
 		$memcache = Yii::$app->cache;
@@ -1004,10 +1008,22 @@ class SiteController extends BaseController
 			return $html;
 		}
 
-		$html = $this->renderPartial($partial);
+		$html = $this->renderPartial($partial, $params);
 		$memcache->set($memkey, $html, $cachetime);
 
         return $html;
+	}
+
+	/** Algos backed by enabled + visible coins, matching the Algorithm bar. */
+	private function activeMiningAlgos(): array
+	{
+		$algos = [];
+		foreach (Yii::$app->YiimpUtils->get_algos(true) ?: [] as $algo) {
+			if (Coins::find()->where(['enable' => 1, 'visible' => 1, 'algo' => $algo])->exists()) {
+				$algos[] = $algo;
+			}
+		}
+		return $algos;
 	}
 
 }

@@ -27,7 +27,7 @@ $algoUnit   = match (true) {
     default                    => 'Mh',
 };
 
-$hasGraphs = ($algo !== 'all');
+$graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 
 ?>
 <style>
@@ -147,11 +147,10 @@ $hasGraphs = ($algo !== 'all');
     </div>
 </div>
 
-<?php if ($hasGraphs): ?>
 <div class="row gx-3">
     <div class="col-12 col-lg-6 mining-col">
         <div class="main-left-box">
-            <div class="main-left-title">Last 24 Hours Estimate (<?= htmlspecialchars($algo) ?>)</div>
+            <div class="main-left-title">Last 24 Hours Estimate (<?= htmlspecialchars($graphLabel) ?>)</div>
             <div class="main-left-inner">
                 <div class="graph-wrap"><div id="graph_results_price" style="height:<?= $height ?>"></div></div>
             </div>
@@ -159,14 +158,13 @@ $hasGraphs = ($algo !== 'all');
     </div>
     <div class="col-12 col-lg-6 mining-col">
         <div class="main-left-box">
-            <div class="main-left-title">Last 24 Hours Hashrate (<?= htmlspecialchars($algo) ?>)</div>
+            <div class="main-left-title">Last 24 Hours Hashrate (<?= htmlspecialchars($graphLabel) ?>)</div>
             <div class="main-left-inner">
                 <div class="graph-wrap"><div id="pool_hashrate_results" style="height:<?= $height ?>"></div></div>
             </div>
         </div>
     </div>
 </div>
-<?php endif; ?>
 
 <div class="row gx-3">
     <div class="col-12 col-lg-8 mining-col mining-new">
@@ -191,10 +189,8 @@ function page_refresh() {
     mining_refresh();
     found_refresh();
     miners_refresh();
-    if (global_algo !== 'all') {
-        main_refresh_price();
-        pool_hashrate_refresh();
-    }
+    main_refresh_price();
+    pool_hashrate_refresh();
 }
 
 function algo_summary_refresh() {

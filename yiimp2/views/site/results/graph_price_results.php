@@ -4,47 +4,71 @@
 /** @var string $name */
 /** @var string $message */
 /** @var Exception $exception */
+/** @var string[] $algos */
 
 use app\models\Hashrate;
 
-/* Graph shown in Pool tab, last 24h algo estimates */
+/* Graph shown in Pool tab, last 24h estimate (hashrate-weighted in All scope) */
 
 $percent = 16;
-$algo = Yii::$app->session->get('yaamp-algo');
+$algo    = (string) Yii::$app->session->get('yaamp-algo', 'all');
+$algos   = (!empty($algos) && is_array($algos)) ? $algos : [$algo];
+$isAll   = ($algo === 'all');
+$conv    = Yii::$app->ConversionUtils;
 
-$step = 15*60;
-$t = time() - 24*60*60;
-$t = intval($t / $step) * $step;
+$step  = 15 * 60;
+$end   = intval(time() / $step) * $step;
+$start = $end - 94 * $step; // 95 buckets
+
 $stats = Hashrate::find()
-			->where(['algo' => $algo])
-			->andWhere(['>=','time',$t])
-			->orderBy('time')
-			->all();
+    ->select(['time', 'price', 'hashrate'])
+    ->where(['algo' => $algos])
+    ->andWhere(['>=', 'time', $start])
+    ->orderBy('time')
+    ->all();
 
-$tfirst = empty($stats) ? $t : $stats[0]->time;
-$pfirst = empty($stats) ? 0.0 : (double) Yii::$app->ConversionUtils->altcoinvaluetoa($stats[0]->price);
-$averages = array();
+$sums    = [];
+$weights = [];
+foreach ($stats as $n) {
+    $ts = intval($n->time / $step) * $step;
+    if ($isAll) {
+        $hr = (float) $n->hashrate;
+        $sums[$ts]    = ($sums[$ts] ?? 0.0) + (float) $n->price * $hr;
+        $weights[$ts] = ($weights[$ts] ?? 0.0) + $hr;
+    } else {
+        $sums[$ts]    = (float) $n->price;
+        $weights[$ts] = 1.0;
+    }
+}
+ksort($sums);
 
-for($i = 0; $i < 95-count($stats); $i++) {
-	$d = date('Y-m-d H:i:s', $t);
-	$averages[] = array($d, $pfirst);
-	$t += $step;
-	if ($t >= $tfirst) break;
+$firstVal = 0.0;
+if ($sums) {
+    $firstTs  = array_key_first($sums);
+    $firstVal = $weights[$firstTs] > 0 ? $sums[$firstTs] / $weights[$firstTs] : 0.0;
 }
 
-foreach($stats as $n) {
-	$m = (double) Yii::$app->ConversionUtils->altcoinvaluetoa($n->price);
-	$d = date('Y-m-d H:i:s', $n->time);
-	$averages[] = array($d, $m);
+$last     = $sums ? max(array_keys($sums)) : $start;
+$averages = [];
+for ($ts = $start; $ts <= $last; $ts += $step) {
+    if (isset($sums[$ts]) && $weights[$ts] > 0) {
+        $value = $sums[$ts] / $weights[$ts];
+    } else {
+        $value = $firstVal;
+    }
+    $m = (float) $conv->altcoinvaluetoa($value);
+    $averages[] = [date('Y-m-d H:i:s', $ts), $m];
 }
 
-$avg2 = array();
+if (count($averages) < 2) {
+    $averages[] = $averages[0];
+}
+
+$avg2    = [];
 $average = $averages[0][1];
-foreach($averages as $n) {
-	$average = ($average*(100-$percent) + $n[1]*$percent) / 100;
-	$m = round($average, 5);
-
-	$avg2[] = array($n[0], $m);
+foreach ($averages as $n) {
+    $average = ($average * (100 - $percent) + $n[1] * $percent) / 100;
+    $avg2[]  = [$n[0], round($average, 5)];
 }
 
-echo '['.json_encode($averages).",\n".json_encode($avg2).']';
+echo '[' . json_encode($averages) . ",\n" . json_encode($avg2) . ']';
