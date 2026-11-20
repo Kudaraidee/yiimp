@@ -167,11 +167,11 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 </div>
 
 <div class="row gx-3">
-    <div class="col-12 col-lg-8 mining-col mining-new">
-        <div id="miners_results" style="overflow-x:auto;"></div>
-    </div>
-    <div class="col-12 col-lg-4 mining-col" style="overflow-x:auto;">
+    <div class="col-12 mining-col" style="overflow-x:auto;">
         <div id="found_results"></div>
+    </div>
+    <div class="col-12 mining-col mining-new">
+        <div id="miners_results" style="overflow-x:auto;"></div>
     </div>
 </div>
 
