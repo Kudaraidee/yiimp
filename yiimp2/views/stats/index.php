@@ -46,6 +46,84 @@ $graphInits = [
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Stats cards — mirrors /site/mining ──────────────────────────────────── */
+#stats-cards .stats-toolbar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
+    padding: 10px 14px; margin: 12px 0 10px;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+}
+#stats-cards .st-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .12em;
+    color: #8a94a6; text-transform: uppercase; white-space: nowrap;
+}
+#stats-cards .st-select {
+    padding: 6px 10px; border: 1px solid #d8e2ef; border-radius: 6px;
+    background: #fafbfc; color: #33405a; font: inherit; font-size: 11px; font-weight: 700;
+}
+#stats-cards .st-live {
+    margin-left: auto; display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #5b6675; white-space: nowrap;
+}
+#stats-cards .st-live i {
+    width: 7px; height: 7px; border-radius: 50%; background: #2fae5a;
+    box-shadow: 0 0 0 3px rgba(47,174,90,.15);
+}
+#stats-cards .main-left-box {
+    height: 100%; border: 1px solid #d8e2ef !important; border-radius: 7px !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04); overflow: hidden; margin-bottom: 1rem;
+}
+#stats-cards .main-left-title {
+    display: flex !important; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 34px; padding: 9px 12px !important;
+    background: #f8fafc !important; border-bottom: 1px solid #e8eef6;
+    color: #26385a; font-size: 13px !important; font-weight: 800 !important; line-height: 1.3;
+}
+#stats-cards .st-head-main { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; min-width: 0; }
+#stats-cards .st-title { font-size: 13px; font-weight: 800; color: #26385a; }
+#stats-cards .st-sub { font-size: 10px; color: #8a94a6; font-weight: 500; }
+#stats-cards .st-chip {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: #eef4ff; border: 1px solid #d7e5ff; color: #2c5aa0;
+    font-size: 9px; font-weight: 700; white-space: nowrap;
+}
+#stats-cards .main-left-inner { padding: 0 !important; }
+#stats-cards .st-summary {
+    display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 12px;
+    background: #fcfdff; border-bottom: 1px solid #eef2f7;
+    font-size: 10px; color: #8a94a6;
+}
+#stats-cards .st-summary b { color: #33405a; font-weight: 700; }
+#stats-cards .st-summary i {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #2fae5a; box-shadow: 0 0 0 3px rgba(47,174,90,.12); margin-right: 5px;
+}
+#stats-cards .st-metrics { width: 100%; border-collapse: collapse; font-size: 11px; color: #334155; }
+#stats-cards .st-metrics th {
+    padding: 7px 12px; text-align: left; font-size: 9px; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase; color: #8a94a6;
+    border-bottom: 1px solid #eef2f7; background: #fff;
+}
+#stats-cards .st-metrics td {
+    padding: 7px 12px; text-align: right; border-bottom: 1px solid #eef2f7;
+}
+#stats-cards .st-metrics tr:last-child th,
+#stats-cards .st-metrics tr:last-child td { border-bottom: 0; }
+#stats-cards .st-val {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; color: #2b3d5b;
+}
+#stats-cards .graph-wrap { padding: 8px 12px 6px; }
+#stats-cards .graph-wrap + .graph-wrap { border-top: 1px solid #f1f5f9; }
+#stats-cards .st-foot {
+    padding: 7px 12px; background: #fcfdff; border-top: 1px solid #eef2f7;
+    color: #98a3b5; font-size: 9px; line-height: 1.5;
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+@media(max-width:820px){ #stats-cards .st-sub { display: none; } }
+</style>
+
 <div id="resume_update_button"
      style="color:#444;background:#ffd;border:1px solid #eea;padding:10px;
             margin:15px 20px;cursor:pointer;display:none;"
@@ -53,29 +131,43 @@ $graphInits = [
     <b>Auto refresh is paused — click to resume</b>
 </div>
 
-<div align="right" style="margin-bottom:6px;">
-    Select Algo: <select id="algo_select"><?= $options ?></select>&nbsp;
+<div id="stats-cards">
+<div class="stats-toolbar">
+    <span class="st-label">Algorithm</span>
+    <select id="algo_select" class="st-select"><?= $options ?></select>
+    <span class="st-live"><i></i> live · 60s</span>
 </div>
 
-<div class="row gx-4">
+<div class="row gx-3 mt-2">
 <?php foreach ($periods as $p): ?>
     <div class="col-12 col-md-4">
         <div class="main-left-box">
-            <div class="main-left-title"><?= Html::encode($p['label']) ?></div>
+            <div class="main-left-title">
+                <span class="st-head-main"><span class="st-title"><?= Html::encode($p['label']) ?></span>
+                    <span class="st-sub">Network averages</span></span>
+                <span class="st-chip"><?= $au ?></span>
+            </div>
             <div class="main-left-inner">
-                <ul>
-                    <li>Average Hashrate: <b><?= Html::encode($p['stats']['hashrate']) ?>h/s</b></li>
-                    <li>BTC Value: <b><?= Html::encode($p['stats']['total']) ?></b></li>
-                    <li>BTC/<?= $au ?>/d: <b><?= Html::encode($p['stats']['btcPerMhd']) ?></b></li>
-                </ul>
+                <div class="st-summary">
+                    <span><i></i><b><?= Html::encode($p['stats']['hashrate']) ?>h/s</b> average</span>
+                    <span><?= Html::encode($p['stats']['total']) ?> BTC</span>
+                </div>
+                <table class="st-metrics"><tbody>
+                    <tr><th>Average Hashrate</th><td><span class="st-val"><?= Html::encode($p['stats']['hashrate']) ?>h/s</span></td></tr>
+                    <tr><th>BTC Value</th><td><span class="st-val"><?= Html::encode($p['stats']['total']) ?></span></td></tr>
+                    <tr><th>BTC/<?= $au ?>/d</th><td><span class="st-val"><?= Html::encode($p['stats']['btcPerMhd']) ?></span></td></tr>
+                </tbody></table>
                 <?php foreach ($p['graphs'] as $gid): ?>
-                <div id="graph_results_<?= $gid ?>"
-                     style="height:<?= $height ?>;<?= $gid !== $p['graphs'][0] ? 'margin-top:1rem;' : '' ?>"></div>
+                <div class="graph-wrap">
+                    <div id="graph_results_<?= $gid ?>" style="height:<?= $height ?>"></div>
+                </div>
                 <?php endforeach ?>
+                <div class="st-foot"><span>Hashrate · BTC/day · BTC/<?= $au ?>/day</span><span>Refresh 60s</span></div>
             </div>
         </div>
     </div>
 <?php endforeach ?>
+</div>
 </div>
 
 

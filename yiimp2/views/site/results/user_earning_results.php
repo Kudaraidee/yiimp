@@ -29,7 +29,20 @@ $coins  = $coinIds  ? Coins::find()->where(['id' => $coinIds])->indexBy('id')->a
 $blocks = $blockIds ? Blocks::find()->where(['id' => $blockIds])->indexBy('id')->all() : [];
 
 // ── Status badge helper ───────────────────────────────────────────────────────
-$statusBadge = function(int $status, ?Blocks $block, ?Coins $coin) use ($isTailwind, $conv): string {
+$statusBadge = function(int $status, ?Blocks $block, ?Coins $coin) use ($isTailwind, $isLegacy, $conv): string {
+    if ($isLegacy) {
+        $legacyMap = [
+            0  => ['amber', 'Immature'],
+            1  => ['green', YIIMP_ALLOW_EXCHANGE ? 'Exchange' : 'Confirmed'],
+            2  => ['', 'Cleared'],
+            -1 => ['red', 'Invalid'],
+        ];
+        [$cls, $label] = $legacyMap[$status] ?? ['', 'Unknown'];
+        if ($status === 0 && $block && $coin) {
+            $label = "Immature ({$block->confirmations}/{$coin->mature_blocks})";
+        }
+        return "<span class='wl-pill {$cls}'>" . Html::encode($label) . "</span>";
+    }
     if ($status === 0) {
         $eta = '';
         if ($coin && $block && $coin->block_time && $coin->mature_blocks) {
@@ -62,43 +75,61 @@ $statusBadge = function(int $status, ?Blocks $block, ?Coins $coin) use ($isTailw
 
 ?>
 
+<?php
+$displayEarnings = [];
+if ($isLegacy) {
+    foreach ($earnings as $e) {
+        $coin  = $coins[$e->coinid]    ?? null;
+        $block = $blocks[$e->blockid]  ?? null;
+        if (!$block) continue;
+        if (!$coin && !$showrental) continue;
+        $displayEarnings[] = [$e, $block, $coin];
+    }
+}
+?>
+
 <?php if ($isLegacy): ?>
 <!-- LEGACY ───────────────────────────────────────────────────────────────── -->
-<style>
-span.block { padding:2px;display:inline-block;text-align:center;min-width:75px;border-radius:3px; }
-span.block.invalid  { color:white;background:#d9534f; }
-span.block.immature { color:white;background:#f0ad4e; }
-span.block.exchange { color:white;background:#5cb85c; }
-span.block.cleared  { color:white;background:gray; }
-</style>
-<div class="main-left-box">
-<div class="main-left-title">Last <?= $count ?> Earnings: <?= Html::encode($user->username) ?></div>
+<div id="wallet-earnings-card" class="main-left-box">
+<div class="main-left-title">
+    <span class="wl-head-main">
+        <span class="wl-title">Last <?= $count ?> Earnings</span>
+        <span class="wl-sub"><?= Html::encode($user->username) ?> · newest first</span>
+    </span>
+    <span class="wl-chips">
+        <span class="wl-pill blue"><?= count($displayEarnings) ?> shown</span>
+        <span class="wl-pill">auto · 60s</span>
+    </span>
+</div>
 <div class="main-left-inner">
-<table class="dataGrid2">
+<div class="wl-summary">
+    <span><i></i><b><?= count($displayEarnings) ?> earnings</b> credited</span>
+    <span>Value in <b>mBTC</b></span>
+    <span>Refresh <b>60s</b></span>
+</div>
+<div style="overflow-x:auto">
+<table class="we-table">
 <thead><tr>
-    <td></td><th>Name</th><th align=right>Block</th><th align=right>Amount</th>
-    <th align=right>Percent</th><th align=right>mBTC</th><th align=right>Time</th><th align=right>Status</th>
+    <th style="width:25%">Coin</th><th style="width:13%">Height</th><th style="width:14%">Reward</th>
+    <th style="width:10%">Share</th><th style="width:13%">Value</th><th style="width:13%">Found</th><th style="width:12%">Status</th>
 </tr></thead>
 <tbody>
-<?php foreach ($earnings as $e):
-    $coin  = $coins[$e->coinid]    ?? null;
-    $block = $blocks[$e->blockid]  ?? null;
-    if (!$block) continue;
+<?php foreach ($displayEarnings as [$e, $block, $coin]):
     $d = $conv->datetoa2($e->create_time);
     if (!$coin):
-        if (!$showrental) continue;
         $reward  = $conv->bitcoinvaluetoa($e->amount);
         $value   = $conv->mbitcoinvaluetoa($e->amount * 1000);
         $percent = $block->amount ? $conv->percentvaluetoa($e->amount * 100 / $block->amount) : 0;
 ?>
-<tr class="ssrow">
-    <td width="18"><img width="16" src="/images/btc.png"></td>
-    <td><b>Rental</b><span style="font-size:.8em;"> (<?= Html::encode($block->algo) ?>)</span></td>
-    <td align="right" style="font-size:.8em;"><b><?= $reward ?> BTC</b></td>
-    <td align="right" style="font-size:.8em;"><?= $percent ?>%</td>
-    <td align="right" style="font-size:.8em;"><?= $value ?></td>
-    <td align="right" style="font-size:.8em;"><?= $d ?>&nbsp;ago</td>
-    <td align="right" style="font-size:.8em;"><span class="block cleared">Cleared</span></td>
+<tr>
+    <td><span class="wl-coin"><span class="wl-ico"><img src="/images/btc.png" alt=""></span>
+        <span class="wl-coin-main"><span class="wl-link">Rental</span><span class="wl-cap"><?= Html::encode($block->algo) ?></span></span></span></td>
+    <td><span class="wl-val">—</span></td>
+    <td><span class="wl-val"><?= Html::encode($reward) ?> BTC</span></td>
+    <td><span class="wl-val"><?= Html::encode($percent) ?>%</span></td>
+    <td><span class="wl-val"><?= Html::encode($value) ?></span></td>
+    <td><span class="wl-val"><?= Html::encode(strip_tags($d)) ?> ago</span></td>
+    <td><span class="wl-pill">Cleared</span></td>
 </tr>
 <?php continue; endif ?>
 <?php
@@ -106,22 +137,30 @@ span.block.cleared  { color:white;background:gray; }
     $reward  = $conv->altcoinvaluetoa($e->amount);
     $percent = $block->amount ? $conv->percentvaluetoa($e->amount * 100 / $block->amount) : 0;
     $value   = $conv->mbitcoinvaluetoa($e->amount * $e->price * 1000);
+    $initials = strtoupper(substr((string) $coin->symbol, 0, 3));
+    $img = !empty($coin->image)
+        ? "<img src='" . Html::encode($coin->image) . "' alt='' onerror=\"this.remove()\">"
+        : '';
     $blockUrl = $coin->createExplorerLink($coin->name, ['height' => $block->height]);
 ?>
-<tr class="ssrow">
-    <td width="18"><img width="16" src="<?= Html::encode($coin->image) ?>"></td>
-    <td><b><?= $blockUrl ?></b><span style="font-size:.8em;"> (<?= Html::encode($coin->algo) ?>)</span></td>
-    <td align="right" style="font-size:.8em;"><?= $height ?></td>
-    <td align="right" style="font-size:.8em;"><b><?= $reward ?> <?= Html::encode($coin->symbol_show) ?></b></td>
-    <td align="right" style="font-size:.8em;"><?= $percent ?>%</td>
-    <td align="right" style="font-size:.8em;"><?= $value ?></td>
-    <td align="right" style="font-size:.8em;"><?= $d ?>&nbsp;ago</td>
-    <td align="right" style="font-size:.8em;"><?= $statusBadge($e->status, $block, $coin) ?></td>
+<tr>
+    <td><span class="wl-coin"><span class="wl-ico"><?= Html::encode($initials) ?><?= $img ?></span>
+        <span class="wl-coin-main"><span class="wl-link"><?= $blockUrl ?></span><span class="wl-cap"><?= Html::encode($coin->algo) ?></span></span></span></td>
+    <td><span class="wl-val"><?= Html::encode($height) ?></span><span class="wl-cap">height</span></td>
+    <td><span class="wl-val"><?= Html::encode($reward) ?> <?= Html::encode($coin->symbol_show) ?></span></td>
+    <td><span class="wl-val"><?= Html::encode($percent) ?>%</span></td>
+    <td><span class="wl-val"><?= Html::encode($value) ?></span><span class="wl-cap">mBTC</span></td>
+    <td><span class="wl-val"><?= Html::encode(strip_tags($d)) ?> ago</span></td>
+    <td><?= $statusBadge($e->status, $block, $coin) ?></td>
 </tr>
-<?php endforeach ?>
+<?php endforeach; if (!$displayEarnings): ?>
+<tr><td colspan="7" class="wl-empty">No Earnings Found</td></tr>
+<?php endif ?>
 </tbody>
 </table>
-<br></div></div><br>
+</div>
+<div class="wl-foot"><span>Share is the portion of the block reward credited to this wallet</span><span>Refresh 60s</span></div>
+</div></div>
 
 
 <?php elseif (!$isTailwind): ?>

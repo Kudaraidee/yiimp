@@ -25,11 +25,23 @@ $coinIds  = array_values(array_unique(array_filter(array_map(fn($b) => $b->coin_
 $coins    = $coinIds ? Coins::find()->where(['id' => $coinIds])->indexBy('id')->all() : [];
 
 // ── Status badge helper ───────────────────────────────────────────────────────
-$statusBadge = function(string $category, int $confirmations = 0, ?Coins $coin = null) use ($isTailwind): string {
+$statusBadge = function(string $category, int $confirmations = 0, ?Coins $coin = null) use ($isTailwind, $isLegacy): string {
     $eta = '';
     if ($category === 'immature' && $coin && $coin->block_time && $coin->mature_blocks) {
         $t   = (int) ($coin->mature_blocks - $confirmations) * $coin->block_time;
         $eta = 'ETA: ' . sprintf('%dh %02dmn', $t / 3600, ($t / 60) % 60);
+    }
+    if ($isLegacy) {
+        $map = [
+            'orphan'    => ['red',   'Orphan'],
+            'immature'  => ['amber', 'Immature ' . $confirmations . '/' . ($coin->mature_blocks ?? '?')],
+            'generate'  => ['green', 'Confirmed'],
+            'stake'     => ['teal',  'Stake'],
+            'generated' => ['teal',  'Stake'],
+            'new'       => ['blue',  'New'],
+        ];
+        [$cls, $text] = $map[$category] ?? ['', ucfirst($category)];
+        return "<span class='wl-pill {$cls}' title=\"" . Html::encode($eta) . "\">" . Html::encode($text) . "</span>";
     }
     if ($isTailwind) {
         $map = [
@@ -50,58 +62,103 @@ $statusBadge = function(string $category, int $confirmations = 0, ?Coins $coin =
 
 ?>
 
+<?php
+$displayBlocks = [];
+$blockStats = ['confirmed' => 0, 'immature' => 0, 'orphan' => 0, 'new' => 0, 'stake' => 0];
+if ($isLegacy) {
+    foreach ($blocks as $b) {
+        $coin = $coins[$b->coin_id] ?? null;
+        if (!$coin) continue;
+        if (in_array($b->category, ['stake', 'generated'], true) && !$isAdmin) continue;
+        $displayBlocks[] = [$b, $coin];
+        $cat = (string) $b->category;
+        if ($cat === 'generate') $cat = 'confirmed';
+        if ($cat === 'generated') $cat = 'stake';
+        if (isset($blockStats[$cat])) $blockStats[$cat]++;
+    }
+}
+?>
+
 <?php if ($isLegacy): ?>
 <!-- LEGACY ───────────────────────────────────────────────────────────────── -->
-<style>
-span.solo   { padding:2px;display:inline-block;text-align:center;min-width:15px;border-radius:3px;color:white;background:#48D8D8; }
-span.shared { padding:2px;display:inline-block;text-align:center;min-width:15px;border-radius:3px;color:white;background:#87d547; }
-span.block  { padding:2px;display:inline-block;text-align:center;min-width:75px;border-radius:3px; }
-span.block.orphan   { color:white;background:#d9534f; }
-span.block.immature { color:white;background:#f0ad4e; }
-span.block.generate,span.block.confirmed { color:white;background:#5cb85c; }
-</style>
-<div class="main-left-box">
-<div class="main-left-title">Last <?= $count ?> Blocks found by <?= Html::encode($user->username) ?></div>
+<div id="wallet-blocks-card" class="main-left-box">
+<div class="main-left-title">
+    <span class="wl-head-main">
+        <span class="wl-title">Last <?= $count ?> Blocks</span>
+        <span class="wl-sub"><?= Html::encode($user->username) ?> · newest first</span>
+    </span>
+    <span class="wl-chips">
+        <span class="wl-pill blue"><?= count($displayBlocks) ?> shown</span>
+        <?php if ($blockStats['confirmed']): ?><span class="wl-pill green"><?= $blockStats['confirmed'] ?> confirmed</span><?php endif ?>
+        <?php if ($blockStats['immature']): ?><span class="wl-pill amber"><?= $blockStats['immature'] ?> immature</span><?php endif ?>
+        <?php if ($blockStats['orphan']): ?><span class="wl-pill red"><?= $blockStats['orphan'] ?> orphan</span><?php endif ?>
+        <span class="wl-pill">auto · 60s</span>
+    </span>
+</div>
 <div class="main-left-inner">
-<table class="dataGrid2">
+<div class="wl-summary">
+    <span><i></i><b><?= count($displayBlocks) ?> blocks</b> found</span>
+    <span>Scope <b><?= Html::encode($user->username) ?></b></span>
+    <span>Refresh <b>60s</b></span>
+</div>
+<div style="overflow-x:auto">
+<table id="wallet-blocks-table" class="wf-table">
+<?php Yii::$app->ViewUtils->JavascriptReady("
+    \$('#wallet-blocks-table').tablesorter({
+        tableClass: 'dataGrid2',
+        textExtraction: {
+            1: function(node){ return \$(node).attr('data') || \$(node).text(); },
+            2: function(node){ return \$(node).attr('data') || \$(node).text(); },
+            3: function(node){ return \$(node).attr('data') || \$(node).text(); },
+            4: function(node){ return \$(node).attr('data') || \$(node).text(); }
+        }
+    });
+    \$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');
+"); ?>
 <thead><tr>
-    <th style="max-width:18px"></th>
-    <th>Name</th><th>Block</th><th>Amount</th><th>Difficulty</th>
-    <th>Time</th><th>Effort</th><th>Type</th><th>Status</th>
+    <th style="width:25%">Coin</th><th style="width:12%">Reward</th><th style="width:13%">Height</th>
+    <th style="width:12%">Found</th><th style="width:16%">Effort</th><th style="width:10%">Type</th><th style="width:12%">Status</th>
 </tr></thead>
 <tbody>
-<?php foreach ($blocks as $b):
-    $coin = $coins[$b->coin_id] ?? null;
-    if (!$coin) continue;
-    if ($b->category === 'stake' && !$isAdmin) continue;
-    if ($b->category === 'generated' && !$isAdmin) continue;
-    $rowStyle = $b->category === 'immature' ? "style='background-color:#e0d3e8;'" : "class='ssrow'";
-    $flags = $b->segwit ? '&nbsp;<img src="/images/ui/segwit.png" height="8px" title="segwit">' : '';
+<?php foreach ($displayBlocks as [$b, $coin]):
+    $initials = strtoupper(substr((string) $coin->symbol, 0, 3));
+    $img = !empty($coin->image)
+        ? "<img src='" . Html::encode($coin->image) . "' alt='' onerror=\"this.remove()\">"
+        : '';
+    $coinName = Html::encode($coin->name);
+    $coinLink = $isAdmin
+        ? "<a class='wl-link' href='/site/coin?id=" . (int) $coin->id . "'>" . $coinName . "</a>"
+        : "<span class='wl-link'>" . $coinName . "</span>";
+    $segwit = $b->segwit ? "<span class='wl-cap' title='SegWit'>SegWit</span>" : '';
+
+    $effortValue = (float) $b->effort;
+    $effortClass = $effortValue > 150 ? 'high' : ($effortValue > 100 ? 'mid' : 'ok');
+    $effortWidth = $effortValue > 0 ? min(100, max(2, $effortValue)) : 0;
+    $effortBar = $effortWidth > 0
+        ? "<span class='wl-eff-bar'><i style='width:" . round($effortWidth, 1) . "%'></i></span>"
+        : '';
+    $effortText = $b->effort ? $b->effort . '%' : 'N/A';
 ?>
-<tr <?= $rowStyle ?>>
-    <td><img width="16" src="<?= Html::encode($coin->image) ?>"></td>
+<tr>
     <td>
-        <?php if ($isAdmin): ?>
-            <a href="/site/coin?id=<?= $coin->id ?>"><b><?= Html::encode($coin->name) ?></b></a>
-        <?php else: ?>
-            <b><?= Html::encode($coin->name) ?></b>
-        <?php endif ?>
-        &nbsp;(<?= Html::encode($coin->algo) ?>)<?= $flags ?>
+        <span class="wl-coin"><span class="wl-ico"><?= Html::encode($initials) ?><?= $img ?></span>
+        <span class="wl-coin-main"><?= $coinLink ?><?= $segwit ?><span class="wl-cap"><?= Html::encode($coin->algo) ?></span></span></span>
     </td>
-    <td><?= $coin->createExplorerLink($b->height, ['height' => $b->height]) ?></td>
-    <td><?= $b->amount ?></td>
-    <td><?= $conv->round_difficulty($b->difficulty) ?></td>
-    <td data="<?= $b->time ?>"><b><?= $conv->datetoa2($b->time) ?> ago</b></td>
-    <td><?= $b->effort ? $b->effort . '%' : 'N/A' ?></td>
-    <td><?php if ($b->solo == 1): ?><span class="solo" title="Solo">Solo</span>
-        <?php elseif ($b->solo == 0): ?><span class="shared" title="Shared">Shared</span>
-        <?php endif ?></td>
+    <td data="<?= (float) $b->amount ?>"><span class="wl-val"><?= Html::encode((string) $b->amount) ?> <?= Html::encode((string) $coin->symbol_show) ?></span><span class="wl-cap">reward</span></td>
+    <td data="<?= (int) $b->height ?>"><span class="wl-val"><?= $coin->createExplorerLink($b->height, ['height' => $b->height]) ?></span><span class="wl-cap">height</span></td>
+    <td data="<?= (int) $b->time ?>"><span class="wl-val"><?= Html::encode(strip_tags($conv->datetoa2($b->time))) ?> ago</span><span class="wl-cap">found</span></td>
+    <td data="<?= $effortValue ?>"><span class="wl-eff <?= $effortClass ?>"><?= $effortBar ?><span class="wl-eff-num"><?= Html::encode($effortText) ?></span></span></td>
+    <td><span class="wl-pill <?= $b->solo == 1 ? 'teal' : 'blue' ?>"><?= $b->solo == 1 ? 'Solo' : 'Shared' ?></span></td>
     <td><?= $statusBadge($b->category, (int) $b->confirmations, $coin) ?></td>
 </tr>
-<?php endforeach ?>
+<?php endforeach; if (!$displayBlocks): ?>
+<tr><td colspan="7" class="wl-empty">No Blocks Found</td></tr>
+<?php endif ?>
 </tbody>
 </table>
-<br></div></div><br>
+</div>
+<div class="wl-foot"><span>Effort compares share difficulty with network difficulty</span><span>Sorted by newest · auto refresh 60s</span></div>
+</div></div>
 
 
 <?php elseif (!$isTailwind): ?>

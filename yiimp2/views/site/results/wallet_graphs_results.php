@@ -54,14 +54,24 @@ if (empty($activeAlgos)) return;
 
 <?php if ($isLegacy): ?>
 <!-- LEGACY ───────────────────────────────────────────────────────────────── -->
-<div class="main-left-box">
-<div class="main-left-title">Last 24 Hours Hashrate: <?= Html::encode($user->username) ?></div>
-<div class="main-left-inner"><br>
+<div id="wallet-hashrate-card" class="main-left-box">
+<div class="main-left-title">
+    <span class="wl-head-main">
+        <span class="wl-title">Last 24h Hashrate</span>
+        <span class="wl-sub"><?= Html::encode($user->username) ?></span>
+    </span>
+    <span class="wl-chips"><span class="wl-pill blue"><?= count($activeAlgos) ?> algos</span><span class="wl-pill">auto · 60s</span></span>
+</div>
+<div class="main-left-inner">
+<div class="wl-summary"><span><i></i><b><?= count($activeAlgos) ?> algos</b> with recent shares</span><span>Window <b>24h</b></span></div>
 <?php foreach ($activeAlgos as $algo): ?>
-<input type="hidden" id="<?= Html::encode($algo) ?>" class="graph_algo">
-<div id="graph_results_<?= Html::encode($algo) ?>" style="height:240px;"></div><br>
+<div class="graph-wrap">
+    <input type="hidden" id="<?= Html::encode($algo) ?>" class="graph_algo">
+    <div id="graph_results_<?= Html::encode($algo) ?>" style="height:240px;"></div>
+</div>
 <?php endforeach ?>
-</div></div><br>
+<div class="wl-foot"><span>Raw / smoothed / rejected shares</span><span>Refresh 60s</span></div>
+</div></div>
 
 
 <?php elseif (!$isTailwind): ?>

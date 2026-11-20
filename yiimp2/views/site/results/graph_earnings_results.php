@@ -27,7 +27,7 @@ for($i = $t+$step, $j = 0; $i < time(); $i += $step)
 
 	if(isset($stats[$j]) && $i > $stats[$j]->time)
 	{
-		$m = Yii::$app->YiimpUtils->bitcoinvaluetoa($stats[$j]->balance);
+		$m = Yii::$app->ConversionUtils->bitcoinvaluetoa($stats[$j]->balance);
 		$j++;
 	}
 
@@ -45,7 +45,7 @@ for($i = $t+$step, $j = 0; $i < time(); $i += $step)
 
 	if(isset($stats[$j]) && $i > $stats[$j]->time)
 	{
-		$m = Yii::$app->YiimpUtils->bitcoinvaluetoa($stats[$j]->pending);
+		$m = Yii::$app->ConversionUtils->bitcoinvaluetoa($stats[$j]->pending);
 		$j++;
 	}
 

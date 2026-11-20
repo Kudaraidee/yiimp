@@ -100,38 +100,39 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 
 <?php if ($isLegacy): ?>
 <!-- LEGACY ───────────────────────────────────────────────────────────────── -->
-<div class="main-left-box">
-<div class="main-left-title">Wallet: <?= Html::encode($user->username) ?></div>
+<?php $coinInitials = strtoupper(substr((string) ($refcoin->symbol ?? 'BTC'), 0, 3)); ?>
+<div id="wallet-summary-card" class="main-left-box">
+<div class="main-left-title">
+    <span class="wl-head-main">
+        <span class="wl-ico"><?= Html::encode($coinInitials) ?><?php if (!empty($refcoin->image)): ?><img src="<?= Html::encode($refcoin->image) ?>" alt="" onerror="this.remove()"><?php endif ?></span>
+        <span class="wl-title">Wallet</span>
+        <span class="wl-sub"><?= Html::encode($user->username . ' · ' . $sym) ?></span>
+    </span>
+    <span class="wl-chips">
+        <?php if ($feesNotice): ?><span class="wl-pill amber"><?= Html::encode($feesNotice) ?></span><?php endif ?>
+        <?php if (!$showDetails): ?><label class="wl-pill blue" style="cursor:pointer;"><input type="checkbox" onclick="main_wallet_refresh_details()"> Details</label><?php endif ?>
+        <span class="wl-pill">auto · 60s</span>
+    </span>
+</div>
 <div class="main-left-inner">
 
-<?php if ($invalidMsg): ?>
-<div style="color:red;padding:10px;"><?= Html::encode($invalidMsg) ?></div>
-<?php endif ?>
-
-<?php if ($showDetails): ?>
-<?= $this->render('_wallet_earnings_detail', ['user' => $user, 'refcoin' => $refcoin]) ?>
-<?php else: ?>
-<tr><td colspan="6" align="right">
-    <label style="font-size:.8em;">
-        <input type="checkbox" onclick="main_wallet_refresh_details()"> Show Details
-    </label>
-</td></tr>
-<?php endif ?>
+<?php if ($invalidMsg): ?><div class="wl-notice"><?= Html::encode($invalidMsg) ?></div><?php endif ?>
+<?php if ($showDetails): ?><?= $this->render('_wallet_earnings_detail', ['user' => $user, 'refcoin' => $refcoin]) ?><?php endif ?>
 
 <table class="dataGrid2">
+<thead><tr><th class="wl-left">Item</th><th>Value</th></tr></thead>
 <tbody>
 <?php foreach ($summaryRows as $summaryRow):
     [$label, $val, $bold] = $summaryRow;
     $action = $summaryRow[3] ?? null;
 ?>
-<tr class="ssrow" style="border-top:1px solid #eee;">
-    <td><img width="16" src="<?= Html::encode($refcoin->image ?? '') ?>"></td>
-    <td colspan="4"><b><?= Html::encode($label) ?></b></td>
-    <td align="right" style="font-size:.9em;">
+<tr class="<?= $bold ? 'wl-total' : '' ?>">
+    <td class="wl-left"><b style="color:#33405a;font-size:11px;"><?= Html::encode($label) ?></b></td>
+    <td>
         <?php if ($action === 'tx'): ?>
-            <a href="javascript:main_wallet_tx()"><?= $bold ? "<b>{$val}</b>" : $val ?> <?= $sym ?></a>
+            <a class="wl-link" href="javascript:main_wallet_tx()"><span class="wl-val"><?= Html::encode($val . ' ' . $sym) ?></span></a>
         <?php else: ?>
-            <?= $bold ? "<b>{$val}</b>" : $val ?> <?= $sym ?>
+            <span class="wl-val" style="<?= $bold ? '' : 'color:#64748b;' ?>"><?= Html::encode($val . ' ' . $sym) ?></span>
         <?php endif ?>
     </td>
 </tr>
@@ -139,53 +140,65 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 </tbody>
 </table>
 
-<?php if ($feesNotice): ?>
-<p style="font-size:.8em;"><b><?= Html::encode($feesNotice) ?></b></p>
-<?php endif ?>
-<?php if ($refcoin && $refcoin->symbol === 'BTC' && $mining): ?>
-<p style="font-size:.8em;">* approximate from current exchange rates<br>
-** bitstamp <b><?= number_format($mining->usdbtc, 2, '.', ' ') ?></b> USD/BTC</p>
-<?php endif ?>
-<?php if ($payoutMinNote): ?><p style="font-size:.8em;"><b>Note:</b> <?= $payoutMinNote ?></p><?php endif ?>
+<div class="wl-foot">
+    <span>
+        <?php if ($refcoin && $refcoin->symbol === 'BTC' && $mining): ?>
+            Rate <b><?= number_format($mining->usdbtc, 2, '.', ' ') ?></b> USD/BTC
+        <?php else: ?>&nbsp;<?php endif ?>
+    </span>
+    <span><?= $payoutMinNote ? Html::encode($payoutMinNote) : 'Balances update every 60s' ?></span>
+</div>
+</div></div>
 
-</div></div><br>
-
-<div class="main-left-box">
-<div class="main-left-title">Last 24 Hours Payouts: <?= Html::encode($user->username) ?></div>
+<div id="wallet-payouts-card" class="main-left-box">
+<div class="main-left-title">
+    <span class="wl-head-main">
+        <span class="wl-title">Last 24h Payouts</span>
+        <span class="wl-sub"><?= Html::encode($user->username) ?></span>
+    </span>
+    <span class="wl-chips">
+        <span class="wl-pill blue"><?= count($payouts) ?> payouts</span>
+        <span class="wl-pill green"><?= Html::encode($conv->bitcoinvaluetoa($payout24h) . ' ' . $sym) ?></span>
+        <span class="wl-pill">24h</span>
+    </span>
+</div>
 <div class="main-left-inner">
 <table class="dataGrid2">
-<thead><tr>
-    <th align="right">Time</th><th align="right">Amount</th><th>Tx</th>
-</tr></thead>
+<thead><tr><th>Found</th><th>Amount</th><th class="wl-left">Transaction</th></tr></thead>
 <tbody>
 <?php foreach ($payouts as $p): ?>
-<tr class="ssrow">
-    <td align="right"><b><?= $conv->datetoa2($p->time) ?> ago</b></td>
-    <td align="right"><b><?= $conv->bitcoinvaluetoa($p->amount) ?></b></td>
-    <td style="font-family:monospace;"><?= $refcoin->createExplorerLink(substr($p->tx, 0, 36) . '...', ['txid' => $p->tx], [], true) ?></td>
+<tr>
+    <td><span class="wl-val"><?= Html::encode($conv->datetoa2($p->time)) ?> ago</span><span class="wl-cap">paid</span></td>
+    <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($p->amount)) ?></span><span class="wl-cap"><?= Html::encode($sym) ?></span></td>
+    <td class="wl-left"><span class="wl-val" style="font-size:10px;"><?= $refcoin->createExplorerLink(Html::encode(substr($p->tx, 0, 30)) . '…', ['txid' => $p->tx], [], true) ?></span></td>
 </tr>
-<?php endforeach ?>
-<tr class="ssrow">
-    <td align="right">Total:</td>
-    <td align="right"><b><?= $conv->bitcoinvaluetoa($payout24h) ?></b></td>
+<?php endforeach; if (!$payouts): ?>
+<tr><td colspan="3" class="wl-empty">No Payouts Found</td></tr>
+<?php endif ?>
+<tr class="wl-total">
+    <td><span class="wl-val">Total</span></td>
+    <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($payout24h)) ?></span><span class="wl-cap"><?= Html::encode($sym) ?></span></td>
     <td></td>
 </tr>
 </tbody>
 </table>
 <?php if (!empty($extraPayouts)): ?>
-<table class="dataGrid2">
-<tr class="ssrow" style="color:darkred;"><th colspan="3"><b>Extra payouts in last 24h</b></th></tr>
-<tr class="ssrow"><th align="right">Time</th><th align="right">Amount</th><th>Tx</th></tr>
+<table class="dataGrid2 wl-extra">
+<thead><tr><th>Found</th><th>Amount</th><th class="wl-left">Transaction</th></tr></thead>
+<tbody>
 <?php foreach ($extraPayouts as $p): ?>
-<tr class="ssrow"><td align="right"><b><?= $conv->datetoa2($p->time) ?> ago</b></td>
-<td align="right"><b><?= $conv->bitcoinvaluetoa($p->amount) ?></b></td>
-<td style="font-family:monospace;"><?= $refcoin->createExplorerLink(substr($p->tx, 0, 36) . '...', ['txid' => $p->tx], [], true) ?></td></tr>
+<tr>
+    <td><span class="wl-val"><?= Html::encode($conv->datetoa2($p->time)) ?> ago</span></td>
+    <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($p->amount)) ?></span></td>
+    <td class="wl-left"><span class="wl-val" style="font-size:10px;"><?= $refcoin->createExplorerLink(Html::encode(substr($p->tx, 0, 30)) . '…', ['txid' => $p->tx], [], true) ?></span></td>
+</tr>
 <?php endforeach ?>
-<tr class="ssrow" style="color:darkred;"><td align="right">Total:</td>
-<td align="right"><b><?= $conv->bitcoinvaluetoa($extraTotal) ?></b></td><td></td></tr>
+<tr class="wl-total"><td><span class="wl-val">Total extra</span></td><td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($extraTotal)) ?></span></td><td></td></tr>
+</tbody>
 </table>
 <?php endif ?>
-<br></div></div><br>
+<div class="wl-foot"><span>Extra payouts are re-sent transactions detected in the same window</span><span>Refresh 60s</span></div>
+</div></div>
 
 
 <?php elseif (!$isTailwind): ?>
