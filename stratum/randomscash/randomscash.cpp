@@ -1,6 +1,5 @@
 #include "stratum.h"
 
-#include <openssl/sha.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -57,8 +56,10 @@ static bool randomscash_prepare(uint32_t epoch, uint64_t epoch_duration)
 
 	unsigned char key_seed[32];
 	unsigned char epoch_key[32];
-	SHA256((const unsigned char *)seed_string, strlen(seed_string), key_seed);
-	SHA256(key_seed, sizeof(key_seed), epoch_key);
+	// Use the stratum's bundled SHA256 to avoid ABI conflicts with OpenSSL's
+	// SHA256 declarations pulled in by the generic algo headers.
+	sha256_hash(seed_string, (char *)key_seed, strlen(seed_string));
+	sha256_hash((const char *)key_seed, (char *)epoch_key, sizeof(key_seed));
 
 	const randomx_flags flags = randomscash_flags();
 	g_rx_cache = randomx_alloc_cache(flags);
