@@ -727,9 +727,13 @@ void *client_thread(void *p)
 			// eth_getWork and prepend it to the miner nonce on submit.
 			if (!client->extranonce1[0])
 			{
+				// job_assign() copies extranonce1_default over extranonce1 on
+				// every new job, so normalize both here. Claymore/GMiners need
+				// a 24-bit (6 hex) prefix; get_nonce_prefix() emits 4 hex.
 				get_nonce_prefix(client->extranonce1_default);
-				snprintf(client->extranonce1, sizeof(client->extranonce1),
+				snprintf(client->extranonce1_default, sizeof(client->extranonce1_default),
 					"%06x", (unsigned int) strtoul(client->extranonce1_default, NULL, 16) & 0xffffff);
+				strcpy(client->extranonce1, client->extranonce1_default);
 
 				// mining.subscribe normally records the starting prefix here.
 				// ethproxy has no subscribe, so seed it as well; otherwise the
