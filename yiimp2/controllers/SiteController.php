@@ -68,7 +68,10 @@ class SiteController extends BaseController
         if (!is_null($address))
             return $this->render('wallet');
         else
-            return $this->render('index', ['tlsPorts' => $this->buildTlsPortMap()]);
+            return $this->render('index', [
+                'tlsPorts' => $this->buildTlsPortMap(),
+                'algoNav'  => $this->buildMiningAlgoNav(),
+            ]);
     }
 
     /**

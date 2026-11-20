@@ -6,12 +6,13 @@ use app\models\Coins;
 $isTailwind = Yii::$app->LayoutManager->isTailwind();
 $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 
-$algo  = Yii::$app->session->get('yaamp-algo');
-$title = "Coin Information ({$algo})";
-
-$query = Coins::find()->where(['enable' => 1, 'visible' => 1, 'auto_ready' => 1]);
-if ($algo !== 'all') $query->andWhere(['algo' => $algo]);
-$list = $query->orderBy(['index_avg' => SORT_DESC])->all();
+// Show every coin that is ready to mine, across all algos — not just the
+// currently selected algo in the session.
+$title = 'Coins ready to mine';
+$list  = Coins::find()
+    ->where(['enable' => 1, 'visible' => 1, 'auto_ready' => 1])
+    ->orderBy(['algo' => SORT_ASC, 'index_avg' => SORT_DESC])
+    ->all();
 
 // ── Link definition: [field, image, label, lucide-icon] ───────────────────────
 $linkDefs = [

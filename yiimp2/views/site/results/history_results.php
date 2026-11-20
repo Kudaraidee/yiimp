@@ -9,17 +9,8 @@ $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $cache      = Yii::$app->cache;
 $cachetime  = 30;
 
-$algo = Yii::$app->session->get('yaamp-algo');
-if ($algo === 'all') return;
-
-$algoFactor = Yii::$app->YiimpUtils->algo_mBTC_factor($algo);
-$algoUnit   = match (true) {
-    $algoFactor == 0.001       => 'Kh',
-    $algoFactor == 1000        => 'Gh',
-    $algoFactor == 1000000     => 'Th',
-    $algoFactor == 1000000000  => 'Ph',
-    default                    => 'Mh',
-};
+// Block stats cover every coin that is ready to mine, across all algos.
+// The selected algo in the session no longer filters this card.
 
 $t1 = time() - 3600;
 $t2 = time() - 86400;
@@ -28,7 +19,7 @@ $t4 = time() - 30 * 86400;
 
 // ── Blocks grouped by coin (last 30 days) ─────────────────────────────────────
 $coins_subquery = (new \yii\db\Query())->select(['id'])->from('coins')
-    ->where(['visible' => 1, 'enable' => 1, 'algo' => $algo]);
+    ->where(['visible' => 1, 'enable' => 1, 'auto_ready' => 1]);
 
 $list = Blocks::find()
     ->where(['not in', 'category', ['orphan', 'stake', 'generated']])
@@ -43,7 +34,7 @@ $listCoinIds = array_values(array_filter(array_map(fn($b) => $b->coin_id, $list)
 $coinMap     = $listCoinIds ? Coins::find()->where(['id' => $listCoinIds])->indexBy('id')->all() : [];
 
 // ── Card open ─────────────────────────────────────────────────────────────────
-$title = "Block Stats ({$algo})";
+$title = 'Block Stats';
 if ($isLegacy) {
     echo "<div class='main-left-box'>";
     echo "<div class='main-left-title'>" . Html::encode($title) . "</div>";
@@ -98,10 +89,10 @@ foreach ($list as $item) {
 
     // Cached per-period block counts + BTC sums
     $periods = [
-        1 => ['key' => "history_item1-{$id}-{$algo}", 'after' => $t1, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b']],
-        2 => ['key' => "history_item2-{$id}-{$algo}", 'after' => $t2, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b']],
-        3 => ['key' => "history_item3-{$id}-{$algo}", 'after' => $t3, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b', 'MIN(time) as t']],
-        4 => ['key' => "history_item4-{$id}-{$algo}", 'after' => $t4, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b', 'MIN(time) as t']],
+        1 => ['key' => "history_item1-{$id}-all", 'after' => $t1, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b']],
+        2 => ['key' => "history_item2-{$id}-all", 'after' => $t2, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b']],
+        3 => ['key' => "history_item3-{$id}-all", 'after' => $t3, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b', 'MIN(time) as t']],
+        4 => ['key' => "history_item4-{$id}-all", 'after' => $t4, 'select' => ['COUNT(id) as a', 'SUM(amount*price) as b', 'MIN(time) as t']],
     ];
 
     $res = [];
@@ -110,7 +101,7 @@ foreach ($list as $item) {
         if ($res[$p] === false) {
             $res[$p] = (new \yii\db\Query())
                 ->select($cfg['select'])->from('blocks')
-                ->where(['coin_id' => $id, 'algo' => $algo])
+                ->where(['coin_id' => $id])
                 ->andWhere(['not in', 'category', ['orphan', 'stake', 'generated']])
                 ->andWhere(['>', 'time', $cfg['after']])
                 ->one();
@@ -126,22 +117,22 @@ foreach ($list as $item) {
     // Fallback to hashstats when blocks table is purged
     if ($res[3]['a'] == $res[2]['a'] || count($list) == 1) {
         if ($res[3]['t'] > ($t3 + 86400)) $res[3]['a'] = '-';
-        $ckey3 = "history_item3-{$id}-{$algo}-btc";
+        $ckey3 = "history_item3-all-btc";
         $val3  = $cache->get($ckey3);
         if ($val3 === false) {
             $val3 = (new \yii\db\Query())->select(['SUM(earnings) as b'])->from('hashstats')
-                ->where(['algo' => $algo])->andWhere(['>', 'time', $t3])->scalar();
+                ->where(['>', 'time', $t3])->scalar();
             $cache->set($ckey3, $val3, $cachetime);
         }
         $total3 = (float) $val3;
     }
     if ($res[4]['a'] == $res[3]['a'] || count($list) == 1) {
         $res[4]['a'] = '-';
-        $ckey4 = "history_item4-{$id}-{$algo}-btc";
+        $ckey4 = "history_item4-all-btc";
         $val4  = $cache->get($ckey4);
         if ($val4 === false) {
             $val4 = (new \yii\db\Query())->select(['SUM(earnings) as b'])->from('hashstats')
-                ->where(['algo' => $algo])->andWhere(['>', 'time', $t4])->scalar();
+                ->where(['>', 'time', $t4])->scalar();
             $cache->set($ckey4, $val4, $cachetime);
         }
         $total4 = (float) $val4;
@@ -190,7 +181,7 @@ foreach ($list as $item) {
 $others = (new \yii\db\Query())
     ->select(['id', 'image', 'symbol', 'name'])
     ->from('coins')
-    ->where(['installed' => 1, 'enable' => 1, 'auto_ready' => 1, 'algo' => $algo])
+    ->where(['installed' => 1, 'enable' => 1, 'auto_ready' => 1])
     ->orderBy(['symbol' => SORT_ASC])
     ->all();
 
@@ -220,17 +211,17 @@ foreach ($others as $item) {
 
 // ── Hashrate & profitability calculations ─────────────────────────────────────
 $hrPeriods = [
-    1 => ['key' => "history_hashrate1-{$algo}", 'after' => $t1],
-    2 => ['key' => "history_hashrate2-{$algo}", 'after' => $t2],
-    3 => ['key' => "history_hashrate3-{$algo}", 'after' => $t3],
-    4 => ['key' => "history_hashrate4-{$algo}", 'after' => $t4],
+    1 => ['key' => 'history_hashrate1-all', 'after' => $t1],
+    2 => ['key' => 'history_hashrate2-all', 'after' => $t2],
+    3 => ['key' => 'history_hashrate3-all', 'after' => $t3],
+    4 => ['key' => 'history_hashrate4-all', 'after' => $t4],
 ];
 $hr = [];
 foreach ($hrPeriods as $p => $cfg) {
     $hr[$p] = $cache->get($cfg['key']);
     if ($hr[$p] === false) {
         $hr[$p] = (new \yii\db\Query())->select(['AVG(hashrate)'])->from('hashrate')
-            ->where(['algo' => $algo])->andWhere(['>', 'time', $cfg['after']])->scalar();
+            ->where(['>', 'time', $cfg['after']])->scalar();
         $cache->set($cfg['key'], $hr[$p], $cachetime);
     }
     $hr[$p] = max((float) $hr[$p], 1);
@@ -270,13 +261,13 @@ if ($isLegacy) {
         echo '<td align="right" style="font-size:.9em;">' . $hrFmt[$p] . '</td>';
     echo '</tr>';
     echo '<tr class="ssrow" style="border-top:2px solid #eee;">';
-    echo '<td width="18px"></td><td colspan="2"><b>mBTC/' . $algoUnit . '/d</b></td>';
+    echo '<td width="18px"></td><td colspan="2"><b>Est. mBTC/day</b></td>';
     foreach ([1, 2, 3, 4] as $p)
         echo '<td align="right" style="font-size:.9em;">' . $btcday[$p] . '</td>';
     echo '</tr>';
     echo '</tbody></table></div></div><br>';
 } elseif (!$isTailwind) {
-    foreach ([['BTC Value', $totFmt, 'text-warning'], ['Avg Hashrate', $hrFmt, ''], ['mBTC/' . $algoUnit . '/d', $btcday, 'text-success fw-bold']] as [$label, $values, $cls]) {
+    foreach ([['BTC Value', $totFmt, 'text-warning'], ['Avg Hashrate', $hrFmt, ''], ['Est. mBTC/day', $btcday, 'text-success fw-bold']] as [$label, $values, $cls]) {
         echo '<tr class="table-secondary">';
         echo '<td></td><td class="small fw-bold" colspan="2">' . Html::encode($label) . '</td>';
         foreach ([1, 2, 3, 4] as $p)
@@ -288,7 +279,7 @@ if ($isLegacy) {
     $summaryRows = [
         ['BTC Value',             $totFmt,  'text-amber-600 dark:text-amber-400'],
         ['Avg Hashrate',          $hrFmt,   'text-gray-500 dark:text-gray-400'],
-        ['mBTC/' . $algoUnit . '/d', $btcday, 'text-indigo-600 dark:text-indigo-400 font-bold'],
+        ['Est. mBTC/day', $btcday, 'text-indigo-600 dark:text-indigo-400 font-bold'],
     ];
     foreach ($summaryRows as [$label, $values, $cls]) {
         echo '<tr class="bg-gray-50/80 dark:bg-gray-700/30 border-t-2 border-gray-200 dark:border-gray-600">';
