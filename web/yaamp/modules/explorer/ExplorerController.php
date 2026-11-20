@@ -8,6 +8,14 @@ class ExplorerController extends CommonController
 
 	/////////////////////////////////////////////////
 
+	// gethexparam() rejects the 0x prefix used by Ethereum block/tx hashes.
+	private function explorerHexParam($name)
+	{
+		$v = getparam($name, '');
+		if (is_string($v) && preg_match('/^0x[0-9a-fA-F]+$/', $v)) return $v;
+		return gethexparam($name);
+	}
+
 	public function run($actionID)
 	{
 		// Forward the url /explorer/BTC to the BTC block explorer
@@ -71,12 +79,13 @@ class ExplorerController extends CommonController
 			$remote = new WalletRPC($coin);
 			$hash = $remote->getblockhash(intval($height));
 		} else {
-			$hash = gethexparam('hash');
+			$hash = $this->explorerHexParam('hash');
 		}
 
-		$txid = gethexparam('txid');
-		$q = gethexparam('q');
-		if (strlen($q) >= 32 && ctype_xdigit($q)) {
+		$txid = $this->explorerHexParam('txid');
+		$q = $this->explorerHexParam('q');
+		$qhex = preg_replace('/^0x/', '', $q);
+		if (strlen($qhex) >= 32 && ctype_xdigit($qhex)) {
 			$remote = new WalletRPC($coin);
 			$block = $remote->getblock($q);
 			if ($block) {

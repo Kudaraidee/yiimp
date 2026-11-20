@@ -14,7 +14,9 @@ if (empty($json)) {
 	$tm = 0;
 
 	$remote = new WalletRPC($coin);
-	for($i = $coin->block_height; $i > max(0, $coin->block_height-500); $i--)
+	// Ethereum RPC has no batched block calls; keep the graph responsive.
+	$graphBlocks = ($coin->rpcencoding == 'GETH') ? 40 : 500;
+	for($i = $coin->block_height; $i > max(0, $coin->block_height-$graphBlocks); $i--)
 	{
 		$hash = $remote->getblockhash($i);
 		if(!$hash) continue;

@@ -13,6 +13,14 @@ class ExplorerController extends BaseController
 {
 	public $defaultAction='index';
 
+	// gethexparam() rejects the 0x prefix used by Ethereum block/tx hashes.
+	private function explorerHexParam(string $name): string
+	{
+		$v = Yii::$app->YiimpUtils->getparam($name, '');
+		if (is_string($v) && preg_match('/^0x[0-9a-fA-F]+$/', $v)) return $v;
+		return (string) Yii::$app->YiimpUtils->gethexparam($name);
+	}
+
 	// Explorer search forms are read-only legacy POST forms without CSRF tokens.
 	public $enableCsrfValidation = false;
 
@@ -101,12 +109,13 @@ class ExplorerController extends BaseController
 			$remote = new WalletRPC($coin);
 			$hash = $remote->getblockhash(intval($height));
 		} else {
-			$hash = Yii::$app->YiimpUtils->gethexparam('hash');
+			$hash = $this->explorerHexParam('hash');
 		}
 
-		$txid = Yii::$app->YiimpUtils->gethexparam('txid');
-		$q = Yii::$app->YiimpUtils->gethexparam('q');
-		if ($coin && strlen($q) >= 32 && ctype_xdigit($q)) {
+		$txid = $this->explorerHexParam('txid');
+		$q = $this->explorerHexParam('q');
+		$qhex = preg_replace('/^0x/', '', $q);
+		if ($coin && strlen($qhex) >= 32 && ctype_xdigit($qhex)) {
 			$remote = new WalletRPC($coin);
 			$block = $remote->getblock($q);
 			if ($block) {

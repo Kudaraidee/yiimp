@@ -15,6 +15,7 @@ class WalletRPC {
 	protected $coin;
 	protected $info;
 	protected $height = 0;
+	protected $ethHead = null;
 
 	// Information and debugging
 	public $error;
@@ -51,6 +52,61 @@ class WalletRPC {
 			$user = $userOrCoin;
 			$this->rpc = new Bitcoin($user, $pw, $host, $port, $url);
 		}
+	}
+
+	/**
+	 * Ethereum RPC returns its own field names. Map them onto the Bitcoin-like
+	 * shape expected by the explorer views while keeping the original keys, so
+	 * backend callers that already use Ethereum fields are unaffected.
+	 */
+	protected function ethExplorerBlock($block)
+	{
+		if (!is_object($block) && !is_array($block)) return false;
+
+		$result = is_object($block) ? (array) $block : $block;
+		$number = (int) $this->rpc->decode_hex((string) arraySafeVal($block, 'number', '0x0'));
+		if (!isset($this->ethHead)) $this->ethHead = $this->rpc->eth_blockNumber();
+		$head = $this->ethHead;
+
+		$result['height'] = $number;
+		$result['confirmations'] = is_numeric($head) ? max(0, ((int)$head) - $number + 1) : 0;
+		$result['time'] = (int) $this->rpc->decode_hex((string) arraySafeVal($block, 'timestamp', '0x0'));
+		$result['difficulty'] = $this->rpc->decode_hex((string) arraySafeVal($block, 'difficulty', '0x0'));
+		$result['version'] = (int) $this->rpc->decode_hex((string) arraySafeVal($block, 'version', '0x0'));
+		$result['size'] = (int) $this->rpc->decode_hex((string) arraySafeVal($block, 'size', '0x0'));
+		$result['bits'] = arraySafeVal($block, 'bits', '');
+		$result['merkleroot'] = arraySafeVal($block, 'transactionsRoot', '');
+		$result['previousblockhash'] = arraySafeVal($block, 'parentHash', '');
+
+		$txhashes = array();
+		$rawtxs = arraySafeVal($block, 'transactions', array());
+		if (is_array($rawtxs)) foreach ($rawtxs as $tx) {
+			$hash = (is_object($tx) || is_array($tx)) ? arraySafeVal($tx, 'hash') : $tx;
+			if (!empty($hash)) $txhashes[] = $hash;
+		}
+		$result['tx'] = $txhashes;
+
+		return $result;
+	}
+
+	protected function ethExplorerTx($tx)
+	{
+		if (!is_object($tx) && !is_array($tx)) return false;
+
+		$result = is_object($tx) ? (array) $tx : $tx;
+		$value = (double) $this->rpc->decode_hex((string) arraySafeVal($tx, 'value', '0x0')) / 1e18;
+		$to = arraySafeVal($tx, 'to', '');
+		if (empty($to)) $to = arraySafeVal($tx, 'contractAddress', '');
+
+		$result['txid'] = arraySafeVal($tx, 'hash', '');
+		$result['hex'] = arraySafeVal($tx, 'hex', '');
+		$result['vout'] = array(array(
+			'value' => $value,
+			'scriptPubKey' => array('addresses' => array($to)),
+		));
+		$result['vin'] = array(array('addr' => arraySafeVal($tx, 'from', '')));
+
+		return $result;
 	}
 
 	function __call($method, $params)
@@ -125,20 +181,23 @@ class WalletRPC {
 				return $info;
 			case 'getblock':
 				$hash = arraySafeVal($params,0);
-				$block = $this->rpc->eth_getBlockByHash($hash);
+				$block = $this->rpc->eth_getBlockByHash($hash, true);
 				$this->error = $this->rpc->error;
-				return $block;
+				return $this->ethExplorerBlock($block);
 			case 'getblockhash':
 				$n = arraySafeVal($params,0);
-				$block = $this->rpc->eth_getBlockByNumber($n);
+				// eth_getBlockByNumber requires a hex quantity, not a decimal height.
+				if (is_numeric($n)) $n = '0x'.dechex((int)$n);
+				$block = $this->rpc->eth_getBlockByNumber($n, false);
 				$this->error = $this->rpc->error;
-				return $block->hash;
+				if (!$block) return false;
+				return arraySafeVal($block, 'hash');
 			case 'gettransaction':
 			case 'getrawtransaction':
 				$txid = arraySafeVal($params,0,'');
 				$tx = $this->rpc->eth_getTransactionByHash($txid);
 				$this->error = $this->rpc->error;
-				return $tx;
+				return $this->ethExplorerTx($tx);
 			case 'getwork':
 				return false; //$this->rpc->eth_getWork(); auto enable miner!
 			// todo...

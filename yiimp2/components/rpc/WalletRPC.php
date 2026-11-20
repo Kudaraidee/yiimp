@@ -38,6 +38,7 @@ class WalletRPC
     private ?array  $accounts = null;
     private ?array  $info     = null;
     private mixed   $height   = 0;
+    private mixed   $ethHead  = null;
 
     /** Monero: full coin model (needed for master_wallet in getblocktemplate) */
     private mixed $coin = null;
@@ -111,6 +112,85 @@ class WalletRPC
             // Backward-compat: direct user/password/host/port
             $this->rpc = new cBitcoinRPC($userOrCoin, $pw, $host, $port, $url);
         }
+    }
+
+    /**
+     * Map an Ethereum block to the Bitcoin-like shape used by the explorer
+     * views. Original keys are preserved so backend callers are unaffected.
+     */
+    private function ethExplorerBlock(mixed $block): array|false
+    {
+        if (!is_object($block) && !is_array($block)) {
+            return false;
+        }
+
+        /** @var EthereumRPC $eth */
+        $eth = $this->rpc;
+        $get = static function (mixed $src, string $key, mixed $default = null): mixed {
+            return is_object($src) ? ($src->$key ?? $default) : (is_array($src) ? ($src[$key] ?? $default) : $default);
+        };
+
+        $number = (int) $eth->decodeHex((string) ($get($block, 'number', '0x0')));
+        if (!isset($this->ethHead)) {
+            $this->ethHead = $eth->eth_blockNumber();
+        }
+        $head = $this->ethHead;
+        $result = is_object($block) ? (array) $block : $block;
+
+        $result['height'] = $number;
+        $result['confirmations'] = is_numeric($head) ? max(0, ((int) $head) - $number + 1) : 0;
+        $result['time'] = (int) $eth->decodeHex((string) ($get($block, 'timestamp', '0x0')));
+        $result['difficulty'] = $eth->decodeHex((string) ($get($block, 'difficulty', '0x0')));
+        $result['version'] = (int) $eth->decodeHex((string) ($get($block, 'version', '0x0')));
+        $result['size'] = (int) $eth->decodeHex((string) ($get($block, 'size', '0x0')));
+        $result['bits'] = $get($block, 'bits', '');
+        $result['merkleroot'] = $get($block, 'transactionsRoot', '');
+        $result['previousblockhash'] = $get($block, 'parentHash', '');
+
+        $txhashes = [];
+        $rawtxs = $get($block, 'transactions', []);
+        if (is_array($rawtxs)) {
+            foreach ($rawtxs as $tx) {
+                $hash = (is_object($tx) || is_array($tx)) ? $get($tx, 'hash') : $tx;
+                if (!empty($hash)) {
+                    $txhashes[] = $hash;
+                }
+            }
+        }
+        $result['tx'] = $txhashes;
+
+        return $result;
+    }
+
+    /** Map an Ethereum transaction to the Bitcoin-like shape used by explorer views. */
+    private function ethExplorerTx(mixed $tx): array|false
+    {
+        if (!is_object($tx) && !is_array($tx)) {
+            return false;
+        }
+
+        /** @var EthereumRPC $eth */
+        $eth = $this->rpc;
+        $get = static function (mixed $src, string $key, mixed $default = null): mixed {
+            return is_object($src) ? ($src->$key ?? $default) : (is_array($src) ? ($src[$key] ?? $default) : $default);
+        };
+
+        $value = (float) $eth->decodeHex((string) ($get($tx, 'value', '0x0'))) / 1e18;
+        $to = $get($tx, 'to', '');
+        if (empty($to)) {
+            $to = $get($tx, 'contractAddress', '');
+        }
+
+        $result = is_object($tx) ? (array) $tx : $tx;
+        $result['txid'] = $get($tx, 'hash', '');
+        $result['hex'] = $get($tx, 'hex', '');
+        $result['vout'] = [[
+            'value' => $value,
+            'scriptPubKey' => ['addresses' => [$to]],
+        ]];
+        $result['vin'] = [['addr' => $get($tx, 'from', '')]];
+
+        return $result;
     }
 
     // -------------------------------------------------------------------------
@@ -200,23 +280,30 @@ class WalletRPC
                     return $info;
 
                 case 'getblock':
-                    $hash        = $params[0] ?? null;
-                    $block       = $eth->eth_getBlockByHash($hash);
+                    $hash        = (string) ($params[0] ?? '');
+                    $block       = $eth->eth_getBlockByHash($hash, true);
                     $this->error = $eth->getError();
-                    return $block;
+                    return $this->ethExplorerBlock($block);
 
                 case 'getblockhash':
                     $n           = $params[0] ?? null;
-                    $block       = $eth->eth_getBlockByNumber($n);
+                    // eth_getBlockByNumber requires a hex quantity, not a decimal height.
+                    if (is_numeric($n)) {
+                        $n = '0x' . dechex((int) $n);
+                    }
+                    $block       = $eth->eth_getBlockByNumber($n, false);
                     $this->error = $eth->getError();
-                    return $block->hash ?? null;
+                    if (!$block) {
+                        return false;
+                    }
+                    return is_object($block) ? ($block->hash ?? null) : ($block['hash'] ?? null);
 
                 case 'gettransaction':
                 case 'getrawtransaction':
-                    $txid        = $params[0] ?? '';
+                    $txid        = (string) ($params[0] ?? '');
                     $tx          = $eth->eth_getTransactionByHash($txid);
                     $this->error = $eth->getError();
-                    return $tx;
+                    return $this->ethExplorerTx($tx);
 
                 case 'getwork':
                     return false;

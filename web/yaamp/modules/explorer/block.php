@@ -6,7 +6,8 @@ $this->pageTitle = $coin->name." block explorer";
 
 $txid = getparam('txid');
 $q = getparam('q');
-if (!empty($q) && ctype_xdigit($q)) $txid = $q;
+$qhex = preg_replace('/^0x/', '', $q); // Ethereum hashes are 0x-prefixed
+if (!empty($qhex) && ctype_xdigit($qhex)) $txid = $q;
 elseif (empty($txid)) $txid = 'txid not set'; // prevent highlight
 
 echo <<<END
@@ -217,6 +218,8 @@ foreach($block['tx'] as $txhash)
 	foreach($tx['vin'] as $vin) {
 		if(isset($vin['coinbase']))
 			echo "Generation";
+		if(isset($vin['addr']))
+			echo '<span class="monospace">'.$vin['addr'].'</span>'; // Ethereum sender
 		if(isset($vin['txinwitness']))
 			$segwit = true;
 	}

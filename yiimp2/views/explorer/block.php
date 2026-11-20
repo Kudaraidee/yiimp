@@ -12,7 +12,8 @@ $conv        = Yii::$app->ConversionUtils;
 
 $txid = Yii::$app->getRequest()->getQueryParam('txid');
 $q    = Yii::$app->getRequest()->getQueryParam('q');
-if (!empty($q) && ctype_xdigit($q)) $txid = $q;
+$qhex = preg_replace('/^0x/', '', (string) $q); // Ethereum hashes are 0x-prefixed
+if (!empty($qhex) && ctype_xdigit($qhex)) $txid = $q;
 elseif (empty($txid)) $txid = 'txid not set';
 
 $actionUrl = $coin->visible ? '/explorer/' . $coin->symbol : '/explorer/search?id=' . $coin->id;
@@ -474,6 +475,7 @@ foreach ($block['tx'] as $txhash) {
     $segwit = false;
     foreach ($tx['vin'] as $vin) {
         if (isset($vin['coinbase'])) echo 'Generation';
+        if (isset($vin['addr'])) echo $spanAddr(Html::encode($vin['addr'])); // Ethereum sender
         if (isset($vin['txinwitness'])) $segwit = true;
     }
     if ($segwit) echo '&nbsp;<img src="/images/ui/segwit.png" height="8px" title="segwit"/>';

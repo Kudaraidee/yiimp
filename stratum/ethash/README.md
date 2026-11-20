@@ -66,6 +66,12 @@ printf 'delete yaamp_algo_list\r\ndelete yaamp_visible_algos\r\ndelete yaamp_unv
 
 ฝั่งเว็บไม่มี hardcoded algo allow-list — dropdown algo อ่านจากตาราง `algos` เลยหลังจาก migration ด้านบน algo ใหม่จะปรากฏเอง
 
+### Block explorer สำหรับเหรียญ GETH
+
+`WalletRPC` (ทั้ง legacy `web/` และ `yiimp2/`) แปลงผลลัพธ์ `eth_getBlockBy*` / `eth_getTransactionByHash` ให้เป็นโครงสร้างแบบ Bitcoin ที่หน้า explorer ใช้ (`height`, `time`, `tx`, `difficulty`, `confirmations`, `txid`, `vout` …) โดยยังเก็บ field เดิมของ Ethereum ไว้ด้วย → หน้า `/explorer/<SYMBOL>` ของเหรียญ `GETH` เช่น LRS แสดงบล็อกได้โดยไม่ต้องตั้ง `no_explorer=1`
+
+รองรับการค้นหาทั้ง `?height=`, `?hash=0x...` และ `?q=0x...` (มี prefix `0x` ด้วย) หน้า difficulty graph จะจำกัดระยะเป็น 40 บล็อกสำหรับเหรียญ GETH เพราะ RPC ไม่มี batch call
+
 ถ้าตลาดที่ใช้เป็นสกุล quote อื่น (เช่น `LRS/USDT` บน nonkyc) ให้เก็บ `markets.price` เป็นราคาในสกุลนั้นตามข้อมูล exchange ฝั่ง backend จะดึงอัตรา `USDT/BTC` (หรือ `USDC/BTC`) เก็บในตาราง `settings` เป็น `usdt_btc` / `usdc_btc` แล้วแปลงเป็น `coins.price` ให้เอง ทั้งหน้าเว็บและ yiimp2 จะแสดงราคาตลาดเป็น BTC จากอัตราเดียวกันนี้
 
 ## 5. ไฟล์ config stratum
