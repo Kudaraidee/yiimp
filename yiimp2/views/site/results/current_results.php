@@ -144,10 +144,11 @@ echo <<<'CSS'
     line-height: 13px;
     vertical-align: 1px;
     margin-right: 4px;
-    background: #e6f6ed;
-    color: #187d46;
+    background: #eef4ff;
+    color: #2c5aa0;
+    border: 1px solid #d7e5ff;
 }
-#maintable1 .tag.manual { background: #f1f3f6; color: #8a94a6; }
+#maintable1 .tag.manual { background: #fff7e8; color: #a86400; border-color: #ffe2b8; }
 #maintable1 .algo {
     display: inline-block;
     padding: 2px 6px;
@@ -272,8 +273,8 @@ foreach ($algos as $item) {
         echo "<div class='coin-name'>{$name}<span class='coin-sym'>{$symEnc}</span></div>";
         echo '<div class="coin-sub">';
         echo $coin->auto_exchange
-            ? '<span class="tag">AUTO</span>'
-            : '<span class="tag manual">MANUAL</span>';
+            ? '<span class="tag" title="Auto exchange enabled">⇄ AUTO-EX</span>'
+            : '<span class="tag manual" title="Auto exchange disabled — payout in mined coin">⊘ MANUAL</span>';
         echo 'Min ' . Html::encode((string) $min_payout) . ' ' . $symEnc;
         echo ' · Fee ' . Html::encode((string) $fees) . '%/' . Html::encode((string) $fees_solo) . '%';
         echo '</div></div></div></td>';
