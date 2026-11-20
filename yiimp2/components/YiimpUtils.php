@@ -906,9 +906,21 @@ class YiimpUtils extends Component
 		return $user;
 	}
 
+	public function getparam($p, $default = '')
+	{
+		// Legacy getparam() reads $_REQUEST; Yii2 splits GET and POST.
+		$request = Yii::$app->getRequest();
+		$value = $request->getBodyParam($p, NULL);
+		if ($value === NULL) {
+			$value = $request->getQueryParam($p, NULL);
+		}
+		return $value === NULL ? $default : $value;
+	}
+
 	public function gethexparam($p,$default='')
 	{
-		$str = Yii::$app->getRequest()->getQueryParam($p, NULL);
+		// Legacy gethexparam() reads $_REQUEST, so accept POST search forms too.
+		$str = $this->getparam($p, NULL);
 		$hex = (is_string($str) && ctype_xdigit($str)) ? $str : $default;
 		return $hex;
 	}

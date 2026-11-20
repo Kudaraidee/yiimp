@@ -13,6 +13,9 @@ class ExplorerController extends BaseController
 {
 	public $defaultAction='index';
 
+	// Explorer search forms are read-only legacy POST forms without CSRF tokens.
+	public $enableCsrfValidation = false;
+
 	/////////////////////////////////////////////////
 	// dynamic reroute action on coin symbol
 	public function createAction($id)
@@ -25,11 +28,28 @@ class ExplorerController extends BaseController
 			return Yii::createObject($actionMap[$id], [$id, $this]);
 		}
 
-		if (strlen($id) <= 10) {
-			$coin = Coins::findOne(['symbol' => $id]);
-			
-			if ($coin && ($coin->visible)) {
-				$id = $this->defaultAction;
+		$request = Yii::$app->getRequest();
+		if (strlen($id) <= 10 && !$request->getQueryParam('id')) {
+			$coin = Coins::findOne(['symbol' => strtoupper($id)]);
+			if (!$coin && ctype_digit($id)) {
+				$coin = Coins::findOne((int) $id);
+			}
+
+			$isAdmin = !Yii::$app->user->isGuest && (Yii::$app->user->identity?->is_admin ?? false);
+			if ($coin && ($coin->visible || $isAdmin)) {
+				$query = $request->getQueryParams();
+				if ($request->getIsPost()) {
+					// Mirror the Yii1 controller: POST searches redirect through
+					// actionSearch() so the coin is retained in the URL.
+					$key = $coin->visible ? 'SYM' : 'id';
+					$query[$key] = $coin->visible ? $coin->symbol : $coin->id;
+					$id = 'search';
+				} else {
+					// /explorer/KIIRO and /explorer/8 are aliases for /explorer?id=N
+					$query['id'] = $coin->id;
+					$id = $this->defaultAction;
+				}
+				$request->setQueryParams($query);
 			}
 		}
 		if (preg_match('/^(?:[a-z0-9_]+-)*[a-z0-9_]+$/', $id)) {
@@ -123,20 +143,20 @@ class ExplorerController extends BaseController
 	// redirect POST request with url cleanup...
 	public function actionSearch()
 	{
-		$request = Yii::$app->getRequest();
-		$height = (int) $request->getQueryParam('height');
-		$txid = Yii::$app->YiimpUtils->gethexparam('txid');
-		$hash = Yii::$app->YiimpUtils->gethexparam('hash');
-		$q = Yii::$app->YiimpUtils->gethexparam('q');
+		$utils = Yii::$app->YiimpUtils;
+		$height = (int) $utils->getparam('height');
+		$txid = $utils->gethexparam('txid');
+		$hash = $utils->gethexparam('hash');
+		$q = $utils->gethexparam('q');
 		$url = '/'; // defaults to home on invalid search
-		$sym = $request->getQueryParam('SYM');
+		$sym = $utils->getparam('SYM', NULL);
 		if ($sym !== null) {
 			// only for visible coins
 			$sym = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $sym);
 			if ($sym !== '') $url = "/explorer/{$sym}?";
-		} else if ($request->getQueryParam('id') !== null) {
+		} else if ($utils->getparam('id', NULL) !== NULL) {
 			// only for hidden coins
-			$url = '/explorer/'.(int) $request->getQueryParam('id').'?';
+			$url = '/explorer/'.(int) $utils->getparam('id').'?';
 		}
 		if (!empty($height)) $url .= "&height=$height";
 		if (!empty($txid)) $url .= "&txid=$txid";
