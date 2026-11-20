@@ -2,6 +2,7 @@
 
 namespace app\models;
 
+use Yii;
 use yii\db\ActiveRecord;
 use yii\bootstrap5\Html;
 use yii\helpers\Url;
@@ -35,6 +36,120 @@ class Coins extends ActiveRecord
             return [];
         }
         return json_decode($this->specifications, true) ?: [];
+    }
+
+    /**
+     * Network hashrate read directly from the coin daemon, cached for 60s.
+     *
+     * Bitcoin-like nodes expose getnetworkhashps / getmininginfo. Geth has no
+     * equivalent RPC, so derive it from the latest block difficulty divided by
+     * the timestamp gap to the previous block.
+     *
+     * Returns null when RPC is unavailable or the daemon cannot report a value.
+     */
+    public function getRpcNetworkHashrate(int $ttl = 60): ?float
+    {
+        if (empty($this->rpchost)) {
+            return null;
+        }
+
+        $cacheKey = "yiimp-explorer-rpc-nethash-{$this->id}";
+        $cached   = Yii::$app->cache->get($cacheKey);
+        if ($cached !== false && $cached !== null && (float) $cached > 0) {
+            return (float) $cached;
+        }
+
+        $remote = new WalletRPC($this);
+        if ($remote->error !== null) {
+            return null;
+        }
+
+        $rate = null;
+
+        if ($this->rpcencoding === 'GETH') {
+            $rate = $this->gethNetworkHashrate($remote);
+        } else {
+            $raw = $remote->getnetworkhashps([120, -1]);
+            $rate = is_array($raw)
+                ? (float) ($raw[$this->algo] ?? 0)
+                : (float) $raw;
+
+            if ($rate <= 0) {
+                $info = $remote->getmininginfo();
+                if (is_array($info)) {
+                    if (isset($info['networkhashps'])) {
+                        $raw = $info['networkhashps'];
+                        $rate = is_array($raw)
+                            ? (float) ($raw[$this->algo] ?? 0)
+                            : (float) $raw;
+                    } elseif (isset($info['networkhps'])) {
+                        $rate = (float) $info['networkhps'];
+                    } elseif (isset($info['netmhashps'])) {
+                        $rate = (float) $info['netmhashps'] * 1e6;
+                    }
+                }
+            }
+        }
+
+        if ($rate > 0) {
+            Yii::$app->cache->set($cacheKey, $rate, $ttl);
+            return (float) $rate;
+        }
+
+        return null;
+    }
+
+    private function gethNetworkHashrate(WalletRPC $remote): ?float
+    {
+        $latest = $remote->eth_getBlockByNumber('latest', false);
+        if (!is_object($latest) && !is_array($latest)) {
+            return null;
+        }
+
+        $field = static function ($block, string $key): mixed {
+            if (is_object($block)) return $block->$key ?? null;
+            return is_array($block) ? ($block[$key] ?? null) : null;
+        };
+
+        $height = $this->rpcHexToNumber($field($latest, 'number'));
+        if ($height <= 0) {
+            return null;
+        }
+
+        // A single block gap is very noisy. Match getnetworkhashps' 120-block
+        // window so the Geth estimate is stable across lucky/unlucky blocks.
+        $blocks   = min(120, (int) $height);
+        $previous = $remote->eth_getBlockByNumber('0x' . dechex((int) $height - $blocks), false);
+        if (!is_object($previous) && !is_array($previous)) {
+            return null;
+        }
+
+        $difficulty = $this->rpcHexToNumber($field($latest, 'difficulty'));
+        $gap        = $this->rpcHexToNumber($field($latest, 'timestamp'))
+                    - $this->rpcHexToNumber($field($previous, 'timestamp'));
+
+        if ($difficulty <= 0 || $gap <= 0) {
+            return null;
+        }
+
+        return $difficulty / ($gap / $blocks);
+    }
+
+    private function rpcHexToNumber(mixed $value): float
+    {
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        $value = (string) $value;
+        if (str_starts_with($value, '0x')) {
+            $value = substr($value, 2);
+        }
+        if ($value !== '' && preg_match('/^[0-9a-f]+$/i', $value)) {
+            return (float) hexdec($value);
+        }
+
+        return 0.0;
     }
 
     /**

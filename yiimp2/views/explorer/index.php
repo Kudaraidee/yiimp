@@ -20,12 +20,15 @@ foreach ($list as $coin) {
 
     $coin->version = $conv->formatWalletVersion($coin);
 
-    $walletInfo = $coin->getWalletInfo();
-    $networkHash = $walletInfo['networkhashps'] ?? ($walletInfo['networkhps'] ?? null);
+    $walletInfo  = $coin->getWalletInfo();
+    $networkHash = $coin->getRpcNetworkHashrate();
 
-    // The wallet_info cache is often empty on this stack, but the backend keeps
-    // coins.network_hash up to date. Fall back to the same estimate used there
-    // so the explorer column is never blank because of a missing cache key.
+    // Fall back to the cached wallet info, then the backend-maintained DB value,
+    // and finally the same estimate used by the backend. The explorer column
+    // stays filled even when the daemon cannot be reached from the web tier.
+    if (!$networkHash) {
+        $networkHash = $walletInfo['networkhashps'] ?? ($walletInfo['networkhps'] ?? null);
+    }
     if (!$networkHash) $networkHash = $coin->network_hash;
     if (!$networkHash && $coin->difficulty) {
         $networkHash = $util->coin_nethash($coin);
