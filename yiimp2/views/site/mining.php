@@ -88,10 +88,6 @@ $hasGraphs = ($algo !== 'all');
 .mining-algo-summary .sep { color: #ccd4e0; }
 
 /* ── Merged Miners Version card ──────────────────────────────────────────── */
-.mining-new-label {
-    font-size: 10px; font-weight: 700; letter-spacing: .06em;
-    color: #2c5aa0; margin: 0 0 5px 2px;
-}
 .mining-new > .main-left-box {
     border-color: #b9d4ff !important;
     box-shadow: 0 0 0 2px rgba(70,130,220,.08);
@@ -174,7 +170,6 @@ $hasGraphs = ($algo !== 'all');
 
 <div class="row gx-3">
     <div class="col-12 col-lg-8 mining-col mining-new">
-        <div class="mining-new-label">MINERS VERSION</div>
         <div id="miners_results" style="overflow-x:auto;"></div>
     </div>
     <div class="col-12 col-lg-4 mining-col" style="overflow-x:auto;">
