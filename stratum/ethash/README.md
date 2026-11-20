@@ -235,8 +235,8 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 
 - `mining.subscribe` มี 2 รูปแบบตาม miner:
   - **NiceHash / ethminer / PhoenixMiner / lolMiner ฯลฯ** → `[["mining.notify","<sessionId>","EthereumStratum/1.0.0"],"<extranonce1>"]` ตาม spec NiceHash (ไม่มี extranonce2; job แรกจะส่งหลัง `mining.authorize`)
-  - **Rigel** → `{"mining_notify":[{"method":"mining.set_difficulty","params":{"difficulty":16}},{"method":"mining.notify","params":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":true}}],"extranonce":"..."}`
-    (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce` โดย `mining_notify` แต่ละตัวเป็น object ที่มี `method` กับ `params` ไม่ใช่ array; ถ้าตอบเป็น array แบบดั้งเดิมหรือใช้ `params` เป็น array Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage`)
+  - **Rigel** → `{"mining_notify":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":"true"},"extranonce":"..."}`
+    (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce` โดย `mining_notify` เป็น object เดียวที่มีฟิลด์ `job_id`, `seed_hash`, `header_hash`, `_clean_jobs` เป็น **string ทั้งหมด** — ไม่ใช่ array ของคำสั่งและ `_clean_jobs` ไม่ใช่ boolean; ถ้าตอบผิดรูปแบบ Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage` แต่ยังขุดต่อได้จาก notification ที่ส่งตามหลังมา)
 - `mining.extranonce.subscribe` → ตอบ `true` (รองรับตาม extension ของ NiceHash; pool ไม่เปลี่ยน extranonce กลาง session)
 - `mining.set_difficulty` → difficulty แบบ `2^224 / target` (raw = difficulty × 2^32) เป็น **JSON number** (เช่น `[0.1]`); การส่งเป็น string `["0.1"]` ทำให้ Rigel reject notification แล้ว reconnect
 - `mining.notify` → `[jobId, seedHash, headerHash, true]`; ตาม spec NiceHash pool จะตัด `0x` ออกจาก seed/header ส่วน Rigel ได้รูปแบบเดิมที่มี `0x`

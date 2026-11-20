@@ -158,13 +158,16 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		else
 		{
 			// Rigel's EthereumStratum decoder maps the subscribe result into a
-			// struct with named fields: mining_notify and extranonce. Each
-			// mining_notify entry is an adjacently tagged command object with
-			// "method" and "params"; the usual [method, value] pairs and the
-			// classic three-element subscribe array do not deserialize there.
+			// struct with exactly two fields: mining_notify and extranonce.
+			// mining_notify is a single MiningNotifyParams object whose four
+			// fields (job_id, seed_hash, header_hash, _clean_jobs) are all
+			// strings. It is not a list of command objects, and _clean_jobs is
+			// not a JSON boolean; either mismatch makes the whole message fail
+			// the untagged ServerMessage parse. Difficulty is delivered later
+			// by the standalone mining.set_difficulty notification.
 			//
 			// Seed the miner with the current job so it can start hashing before
-			// the first standalone mining.notify. Difficulty is a JSON number.
+			// the first standalone mining.notify.
 			YAAMP_JOB *job = job_get_last_for_ethash(client);
 			const char *seed = "0x0000000000000000000000000000000000000000000000000000000000000000";
 			const char *header = seed;
@@ -179,12 +182,10 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 			}
 
 			client_send_result(client,
-				"{\"mining_notify\":["
-				"{\"method\":\"mining.set_difficulty\",\"params\":{\"difficulty\":%.3g}},"
-				"{\"method\":\"mining.notify\",\"params\":{\"job_id\":\"%x\","
-				"\"seed_hash\":\"%s\",\"header_hash\":\"%s\",\"_clean_jobs\":true}}"
-				"],\"extranonce\":\"%s\"}",
-				client->difficulty_actual, jobid, seed, header, client->extranonce1);
+				"{\"mining_notify\":{\"job_id\":\"%x\",\"seed_hash\":\"%s\","
+				"\"header_hash\":\"%s\",\"_clean_jobs\":\"true\"},"
+				"\"extranonce\":\"%s\"}",
+				jobid, seed, header, client->extranonce1);
 		}
 	}
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
