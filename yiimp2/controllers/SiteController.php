@@ -126,8 +126,10 @@ class SiteController extends BaseController
         $totalPoolHash = 0.0;
 
         foreach ($util->get_algos(true) ?: [] as $algo) {
+            // Bar membership follows the coin flags (enable + visible).
+            // auto_ready is about auto-exchange and must not hide an algo here.
             $coins = Coins::find()
-                ->where(['enable' => 1, 'visible' => 1, 'auto_ready' => 1, 'algo' => $algo])
+                ->where(['enable' => 1, 'visible' => 1, 'algo' => $algo])
                 ->all();
             if (!$coins) continue;
 
