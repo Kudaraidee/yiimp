@@ -10,6 +10,8 @@
 
 use yii\helpers\Html;
 
+$this->registerJsFile('@web/js/auto_refresh.js', ['depends' => [yii\web\JqueryAsset::className()]]);
+
 $isTailwind = Yii::$app->LayoutManager->isTailwind();
 $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $height     = '240px';
@@ -35,9 +37,9 @@ foreach ($algos as $a => $count) {
 
 // Three period columns — same structure, different graph IDs
 $periods = [
-    ['label' => 'Last 48 Hours', 'stats' => $stats1, 'graphs' => [1, 2, 3]],
-    ['label' => 'Last 7 Days',   'stats' => $stats2, 'graphs' => [4, 5, 6]],
-    ['label' => 'Last 30 Days',  'stats' => $stats3, 'graphs' => [7, 8, 9]],
+    ['id' => 1, 'label' => 'Last 48 Hours', 'stats' => $stats1, 'graphs' => [1, 2, 3]],
+    ['id' => 2, 'label' => 'Last 7 Days',   'stats' => $stats2, 'graphs' => [4, 5, 6]],
+    ['id' => 3, 'label' => 'Last 30 Days',  'stats' => $stats3, 'graphs' => [7, 8, 9]],
 ];
 
 $graphInits = [
@@ -181,7 +183,7 @@ $graphInits = [
 <div class="row gx-3 mt-2">
 <?php foreach ($periods as $p): ?>
     <div class="col-12 col-md-4">
-        <div class="main-left-box">
+        <div class="main-left-box" data-period="<?= (int) $p['id'] ?>">
             <div class="main-left-title">
                 <span class="st-head-main"><span class="st-title"><?= Html::encode($p['label']) ?></span>
                     <span class="st-sub">Network averages</span></span>
@@ -189,13 +191,13 @@ $graphInits = [
             </div>
             <div class="main-left-inner">
                 <div class="st-summary">
-                    <span><i></i><b><?= Html::encode($p['stats']['hashrate']) ?>h/s</b> average</span>
-                    <span><?= Html::encode($p['stats']['total']) ?> BTC</span>
+                    <span><i></i><b data-stat="hashrate"><?= Html::encode($p['stats']['hashrate']) ?></b>h/s average</span>
+                    <span><span data-stat="total"><?= Html::encode($p['stats']['total']) ?></span> BTC</span>
                 </div>
                 <table class="st-metrics"><tbody>
-                    <tr><th>Average Hashrate</th><td><span class="st-val"><?= Html::encode($p['stats']['hashrate']) ?>h/s</span></td></tr>
-                    <tr><th>BTC Value</th><td><span class="st-val"><?= Html::encode($p['stats']['total']) ?></span></td></tr>
-                    <tr><th>BTC/<?= $au ?>/d</th><td><span class="st-val"><?= Html::encode($p['stats']['btcPerMhd']) ?></span></td></tr>
+                    <tr><th>Average Hashrate</th><td><span class="st-val" data-stat="hashrate"><?= Html::encode($p['stats']['hashrate']) ?></span>h/s</td></tr>
+                    <tr><th>BTC Value</th><td><span class="st-val" data-stat="total"><?= Html::encode($p['stats']['total']) ?></span></td></tr>
+                    <tr><th>BTC/<?= $au ?>/d</th><td><span class="st-val" data-stat="btcPerMhd"><?= Html::encode($p['stats']['btcPerMhd']) ?></span></td></tr>
                 </tbody></table>
                 <?php foreach ($p['graphs'] as $gid): ?>
                 <div class="graph-wrap">
@@ -233,7 +235,7 @@ $graphInits = [
 <div class="row gx-3">
 <?php foreach ($periods as $p): ?>
     <div class="col-12 col-md-4 mb-3">
-        <div class="card shadow-sm h-100">
+        <div class="card shadow-sm h-100" data-period="<?= (int) $p['id'] ?>">
             <div class="card-header py-2 d-flex align-items-center gap-2">
                 <strong class="small"><?= Html::encode($p['label']) ?></strong>
                 <span class="badge bg-light text-dark border font-monospace ms-1"><?= $au ?></span>
@@ -242,15 +244,15 @@ $graphInits = [
                 <ul class="list-unstyled small mb-3">
                     <li class="text-muted mb-1">
                         Hashrate
-                        <strong class="text-dark ms-1"><?= Html::encode($p['stats']['hashrate']) ?>h/s</strong>
+                        <strong class="text-dark ms-1" data-stat="hashrate"><?= Html::encode($p['stats']['hashrate']) ?></strong>h/s
                     </li>
                     <li class="text-muted mb-1">
                         BTC Value
-                        <strong class="text-dark ms-1 font-monospace"><?= Html::encode($p['stats']['total']) ?></strong>
+                        <strong class="text-dark ms-1 font-monospace" data-stat="total"><?= Html::encode($p['stats']['total']) ?></strong>
                     </li>
                     <li class="text-muted">
                         BTC/<?= $au ?>/d
-                        <strong class="text-dark ms-1 font-monospace"><?= Html::encode($p['stats']['btcPerMhd']) ?></strong>
+                        <strong class="text-dark ms-1 font-monospace" data-stat="btcPerMhd"><?= Html::encode($p['stats']['btcPerMhd']) ?></strong>
                     </li>
                 </ul>
                 <?php foreach ($p['graphs'] as $gid): ?>
@@ -292,7 +294,8 @@ $graphInits = [
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 <?php foreach ($periods as $p): ?>
     <div class="rounded-xl border border-gray-200 dark:border-gray-700
-                bg-white dark:bg-gray-800 shadow-sm overflow-hidden flex flex-col">
+                bg-white dark:bg-gray-800 shadow-sm overflow-hidden flex flex-col"
+         data-period="<?= (int) $p['id'] ?>">
 
         <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
                     flex items-center gap-2">
@@ -309,15 +312,15 @@ $graphInits = [
             <dl class="grid grid-cols-2 gap-x-3 gap-y-1 text-xs mb-4">
                 <dt class="text-gray-400 dark:text-gray-500">Hashrate</dt>
                 <dd class="text-right font-mono font-semibold text-gray-800 dark:text-gray-200">
-                    <?= Html::encode($p['stats']['hashrate']) ?>h/s
+                    <span data-stat="hashrate"><?= Html::encode($p['stats']['hashrate']) ?></span>h/s
                 </dd>
                 <dt class="text-gray-400 dark:text-gray-500">BTC Value</dt>
                 <dd class="text-right font-mono text-gray-700 dark:text-gray-300">
-                    <?= Html::encode($p['stats']['total']) ?>
+                    <span data-stat="total"><?= Html::encode($p['stats']['total']) ?></span>
                 </dd>
                 <dt class="text-gray-400 dark:text-gray-500">BTC/<?= $au ?>/d</dt>
                 <dd class="text-right font-mono text-gray-700 dark:text-gray-300">
-                    <?= Html::encode($p['stats']['btcPerMhd']) ?>
+                    <span data-stat="btcPerMhd"><?= Html::encode($p['stats']['btcPerMhd']) ?></span>
                 </dd>
             </dl>
 
@@ -341,6 +344,22 @@ $('#stats-cards .mining-algo-tab').on('click', function () {
     window.location.href = '/site/algo?algo=' + encodeURIComponent($(this).data('algo')) + '&r=/stats';
 });
 
+function stats_summary_refresh() {
+    $.get('/stats/summary', '', function (d) {
+        if (!d) return;
+        Object.keys(d).forEach(function (period) {
+            var card = document.querySelector('[data-period="' + period + '"]');
+            if (!card) return;
+            ['hashrate', 'total', 'btcPerMhd'].forEach(function (key) {
+                if (d[period][key] === undefined) return;
+                card.querySelectorAll('[data-stat="' + key + '"]').forEach(function (el) {
+                    el.textContent = d[period][key];
+                });
+            });
+        });
+    });
+}
+
 function page_refresh() {
     for (var i = 1; i <= 9; i++) {
         (function (n) {
@@ -349,6 +368,7 @@ function page_refresh() {
             });
         })(i);
     }
+    stats_summary_refresh();
 }
 
 <?php foreach ($graphInits as $n => $body): ?>
