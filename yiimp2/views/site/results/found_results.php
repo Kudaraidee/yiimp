@@ -70,6 +70,7 @@ $latestAgo = !empty($db_blocks)
     ? strip_tags(Yii::$app->ConversionUtils->datetoa2($db_blocks[0]->time)) . ' ago'
     : '—';
 $scopeText = ($algo_header === 'any algo') ? 'all algos' : $algo_header;
+$renderedRows = 0;
 
 // ── Badge helpers ─────────────────────────────────────────────────────────────
 function statusBadge(string $category, int $confirmations, ?int $matureBlocks, ?int $blockTime, bool $isLegacy, bool $isTailwind): string
@@ -247,7 +248,6 @@ CSS;
     echo "<thead><tr><th style=\"width:30%\">Coin</th><th style=\"width:12%\">Reward</th><th style=\"width:13%\">Height</th>"
        . "<th style=\"width:13%\">Found</th><th style=\"width:14%\">Effort</th><th style=\"width:9%\">Type</th><th style=\"width:9%\">Status</th></tr></thead>";
     echo "<tbody>";
-    $renderedRows = 0;
 } elseif (!$isTailwind) {
     echo '<div class="card shadow-sm mb-3">';
     echo '<div class="card-header py-2 d-flex align-items-center gap-2">';
@@ -281,15 +281,17 @@ CSS;
 
 // ── Rows ──────────────────────────────────────────────────────────────────────
 foreach ($db_blocks as $db_block) {
+    // Rental rows can be hidden by settings; do not count them as rendered.
+    if (!$db_block->coin_id && !$showrental) continue;
+    $renderedRows++;
+
     $d = Yii::$app->ConversionUtils->datetoa2($db_block->time);
 
     // Rental row (no coin)
     if (!$db_block->coin_id) {
-        if (!$showrental) continue;
         $reward = Yii::$app->ConversionUtils->bitcoinvaluetoa($db_block->amount);
 
         if ($isLegacy) {
-            $renderedRows++;
             echo '<tr>';
             echo "<td><div class='bf-coin'><span class='bf-ico'><img src='/images/btc.png' alt=''></span><span class='bf-coin-main'>";
             echo "<span class='bf-link'>Rental</span><span class='bf-meta'>" . Html::encode($db_block->algo) . "</span>";
@@ -341,7 +343,6 @@ foreach ($db_blocks as $db_block) {
     $typeBadge = typeBadge($db_block->solo, $isLegacy, $isTailwind);
 
     if ($isLegacy) {
-        $renderedRows++;
         $initials = strtoupper(substr((string) $coin->symbol, 0, 3));
         $icoClass = str_contains((string) $db_block->algo, 'firo') ? 'bf-ico firo' : 'bf-ico';
         $img = !empty($coin->image)
@@ -410,15 +411,21 @@ foreach ($db_blocks as $db_block) {
 // ── Card close ────────────────────────────────────────────────────────────────
 if ($isLegacy) {
     if (!$renderedRows) {
-        echo "<tr><td colspan='7' class='bf-empty'>No blocks found yet for this selection.</td></tr>";
+        echo "<tr><td colspan='7' class='bf-empty'>No Blocks Found</td></tr>";
     }
     echo '</tbody></table></div>';
     echo "<div class='bf-foot'><span>Effort compares share difficulty with network difficulty</span>"
        . "<span>Sorted by discovery time · auto refresh 60s</span></div>";
     echo '</div></div><br>';
 } elseif (!$isTailwind) {
+    if (!$renderedRows) {
+        echo '<tr><td colspan="9" class="text-center py-4 text-muted">No Blocks Found</td></tr>';
+    }
     echo '</tbody></table></div></div></div>';
 } else {
+    if (!$renderedRows) {
+        echo '<tr><td colspan="9" class="px-3 py-4 text-center text-gray-400 dark:text-gray-500">No Blocks Found</td></tr>';
+    }
     echo '</tbody></table></div></div>';
     Yii::$app->ViewUtils->JavascriptReady("
         if (typeof lucide !== 'undefined') lucide.createIcons();
