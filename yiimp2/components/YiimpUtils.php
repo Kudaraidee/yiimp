@@ -215,6 +215,26 @@ class YiimpUtils extends Component
 		return $default;
 	}
 
+	/**
+	 * Convert an amount denominated in $coin (or BTC when $coin is null) to
+	 * USDT using the cached usdt_btc quote. Returns null when no rate exists.
+	 * Display-only helper: it never creates payouts or moves funds.
+	 */
+	public function usdtValue($amount, $coin = null)
+	{
+		$usdtBtc = $this->quoteBtcPrice('USDT', 0);
+		if ($usdtBtc <= 0) return null;
+
+		$btcPrice = 1.0;
+		if ($coin) {
+			$btcPrice = (float) ($coin->price ?? 0);
+			if ($btcPrice <= 0 && strtoupper((string) ($coin->symbol ?? '')) === 'BTC') $btcPrice = 1.0;
+		}
+		if ($btcPrice <= 0) return null;
+
+		return (float) $amount * $btcPrice / $usdtBtc;
+	}
+
 	public function marketBtcPrice($market, $field = 'price')
 	{
 		$value = (float) (isset($market->$field) ? $market->$field : 0);

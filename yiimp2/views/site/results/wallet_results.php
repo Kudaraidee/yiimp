@@ -86,15 +86,35 @@ $payoutMinNote = $refcoin && $refcoin->payout_min
 
 // ── Summary rows for the balance table ───────────────────────────────────────
 $summaryRows = [
-    ['Pending (immature)',  $conv->bitcoinvaluetoa($unconfirmed_raw), false],
-    ['Pending (confirmed)', $conv->bitcoinvaluetoa($confirmed_raw),   false],
-    ['Balance',             $conv->bitcoinvaluetoa($balance),          true],
-    ['Total Unpaid',        $conv->bitcoinvaluetoa($total_unpaid),     true],
-    ['Total Paid',          $conv->bitcoinvaluetoa($total_paid_raw),   true,  'tx'],
-    ['Total Earned',        $conv->bitcoinvaluetoa($total_earned),     true],
+    ['Pending (immature)',  $conv->bitcoinvaluetoa($unconfirmed_raw), false, null,  $unconfirmed_raw],
+    ['Pending (confirmed)', $conv->bitcoinvaluetoa($confirmed_raw),   false, null,  $confirmed_raw],
+    ['Balance',             $conv->bitcoinvaluetoa($balance),          true,  null,  $balance],
+    ['Total Unpaid',        $conv->bitcoinvaluetoa($total_unpaid),     true,  null,  $total_unpaid],
+    ['Total Paid',          $conv->bitcoinvaluetoa($total_paid_raw),   true,  'tx',  $total_paid_raw],
+    ['Total Earned',        $conv->bitcoinvaluetoa($total_earned),     true,  null,  $total_earned],
 ];
 
 $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
+
+// ── USDT display value (display only — no USDT payouts) ──────────────────────
+$usdtBtc       = (float) $util->quoteBtcPrice('USDT', 0);
+$usdtUsd       = ($usdtBtc > 0 && $mining && (float) $mining->usdbtc > 0)
+    ? $usdtBtc * (float) $mining->usdbtc
+    : null;
+$toUsdt        = function ($amount) use ($util, $refcoin) {
+    return $util->usdtValue($amount, $refcoin);
+};
+$payout24hUsdt = $toUsdt($payout24h);
+
+// Small balances would otherwise render as 0.00 USDT; keep up to 6
+// decimals for sub-cent values and trim trailing zeros.
+$fmtUsdt = function ($v) {
+    if ($v === null) return null;
+    if ($v > 0 && $v < 0.01) {
+        return rtrim(rtrim(number_format($v, 6, '.', ','), '0'), '.');
+    }
+    return number_format($v, 2, '.', ',');
+};
 
 ?>
 
@@ -125,6 +145,8 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 <?php foreach ($summaryRows as $summaryRow):
     [$label, $val, $bold] = $summaryRow;
     $action = $summaryRow[3] ?? null;
+    $raw    = $summaryRow[4] ?? null;
+    $usdt   = ($raw !== null && (float) $raw > 0) ? $toUsdt($raw) : null;
 ?>
 <tr class="<?= $bold ? 'wl-total' : '' ?>">
     <td class="wl-left"><b style="color:#33405a;font-size:11px;"><?= Html::encode($label) ?></b></td>
@@ -134,6 +156,9 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
         <?php else: ?>
             <span class="wl-val" style="<?= $bold ? '' : 'color:#64748b;' ?>"><?= Html::encode($val . ' ' . $sym) ?></span>
         <?php endif ?>
+        <?php if ($usdt !== null): ?>
+            <span class="wl-cap">≈ <?= Html::encode($fmtUsdt($usdt)) ?> USDT</span>
+        <?php endif ?>
     </td>
 </tr>
 <?php endforeach ?>
@@ -142,7 +167,9 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 
 <div class="wl-foot">
     <span>
-        <?php if ($refcoin && $refcoin->symbol === 'BTC' && $mining): ?>
+        <?php if ($usdtUsd !== null): ?>
+            1 USDT ≈ <b><?= number_format($usdtUsd, 4, '.', ' ') ?></b> USD
+        <?php elseif ($refcoin && $refcoin->symbol === 'BTC' && $mining): ?>
             Rate <b><?= number_format($mining->usdbtc, 2, '.', ' ') ?></b> USD/BTC
         <?php else: ?>&nbsp;<?php endif ?>
     </span>
@@ -159,6 +186,7 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
     <span class="wl-chips">
         <span class="wl-pill blue"><?= count($payouts) ?> payouts</span>
         <span class="wl-pill green"><?= Html::encode($conv->bitcoinvaluetoa($payout24h) . ' ' . $sym) ?></span>
+        <?php if ($payout24hUsdt !== null && $payout24h > 0): ?><span class="wl-pill teal">≈ <?= Html::encode($fmtUsdt($payout24hUsdt)) ?> USDT</span><?php endif ?>
         <span class="wl-pill">24h</span>
     </span>
 </div>
@@ -177,7 +205,7 @@ $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 <?php endif ?>
 <tr class="wl-total">
     <td><span class="wl-val">Total</span></td>
-    <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($payout24h)) ?></span><span class="wl-cap"><?= Html::encode($sym) ?></span></td>
+    <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($payout24h)) ?></span><span class="wl-cap"><?= Html::encode($sym) ?></span><?php if ($payout24hUsdt !== null && $payout24h > 0): ?><span class="wl-cap">≈ <?= Html::encode($fmtUsdt($payout24hUsdt)) ?> USDT</span><?php endif ?></td>
     <td></td>
 </tr>
 </tbody>
