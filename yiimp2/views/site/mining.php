@@ -47,6 +47,12 @@ $hasGraphs = ($algo !== 'all');
     font-size: 10px; font-weight: 700; letter-spacing: .12em;
     color: #8a94a6; text-transform: uppercase; white-space: nowrap;
 }
+.mining-algo-select {
+    border: 1px solid #d8e2ef; border-radius: 7px; background: #fff;
+    color: #33405a; font-family: inherit; font-size: 12px; font-weight: 600;
+    padding: 6px 9px; min-width: 116px; cursor: pointer;
+}
+.mining-algo-select:focus { outline: 2px solid rgba(70,130,220,.25); border-color: #2c5aa0; }
 .mining-algo-tabs {
     display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
     flex: 1 1 420px;
@@ -106,7 +112,16 @@ $hasGraphs = ($algo !== 'all');
 </div>
 
 <div class="mining-algo-bar" style="--algo-color: <?= Html::encode($activeItem['color'] ?? '#2c5aa0') ?>">
-    <span class="mining-algo-label">Scope</span>
+    <span class="mining-algo-label">Algorithm</span>
+    <select class="mining-algo-select" id="algo_select"
+            title="เลือกอัลกอริทึม"
+            onchange="select_algo(this.value)">
+        <?php foreach ($algoItems as $key => $item): ?>
+            <option value="<?= Html::encode($key) ?>" <?= $key === $activeAlgo ? 'selected' : '' ?>>
+                <?= Html::encode($item['label'] ?? $key) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
     <div class="mining-algo-tabs">
         <?php foreach ($algoItems as $key => $item): ?>
             <?php $color = Html::encode($item['color'] ?? '#888888'); ?>
@@ -208,6 +223,7 @@ function algo_summary_refresh() {
         var item = d.items[d.active] || d.items.all;
         if (!item) return;
 
+        $('#algo_select').val(d.active);
         $('#algo-summary-algo').text(item.label || d.active);
         $('#algo-summary-port').text(item.port ? item.port : '—');
         $('#algo-summary-workers').text(item.workers || 0);
