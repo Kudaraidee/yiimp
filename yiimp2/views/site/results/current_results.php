@@ -188,12 +188,10 @@ $sortConfig = "{tableClass:'dataGrid2',textExtraction:{"
     . "5:function(node){return \$(node).attr('data')||\$(node).text()}"
     . "}}";
 
-if ($isLegacy) {
-    Yii::$app->ViewUtils->showTableSorter('maintable1', $sortConfig);
-} else {
-    Yii::$app->ViewUtils->JavascriptReady("\$('#maintable1').tablesorter(" . $sortConfig . ");"
-        . "\$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');");
-}
+// The view already emits its own <table>, so register the sorter with JS only.
+// showTableSorter() outputs an extra opening <table> that breaks the wrapper DOM.
+Yii::$app->ViewUtils->JavascriptReady("\$('#maintable1').tablesorter(" . $sortConfig . ");"
+    . "\$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');");
 
 // ── Table open + header ───────────────────────────────────────────────────────
 echo '<div class="" style="overflow-x:auto;">';

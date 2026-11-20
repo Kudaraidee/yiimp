@@ -250,12 +250,10 @@ if ($isAdmin) {
     $extract .= ",{$rejectIdx}:function(n){return \$(n).attr('data')||\$(n).text()}";
 }
 $sortCfg = "{tableClass:'dataGrid2',textExtraction:{{$extract}}}";
-if ($isLegacy) {
-    Yii::$app->ViewUtils->showTableSorter('maintable2', $sortCfg);
-} else {
-    Yii::$app->ViewUtils->JavascriptReady("\$('#maintable2').tablesorter(" . $sortCfg . ");"
-        . "\$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');");
-}
+// The view already emits its own <table>, so register the sorter with JS only.
+// showTableSorter() outputs an extra opening <table> that breaks the wrapper DOM.
+Yii::$app->ViewUtils->JavascriptReady("\$('#maintable2').tablesorter(" . $sortCfg . ");"
+    . "\$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');");
 
 // ── Header strip ──────────────────────────────────────────────────────────────
 echo '<div class="mv-head">';
