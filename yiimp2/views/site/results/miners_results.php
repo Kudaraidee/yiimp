@@ -48,7 +48,7 @@ foreach ($versionData as $row) {
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo "<div class='main-left-box'><div class='main-left-title'>"
+    echo "<div class='main-left-box mv-card'><div class='main-left-title'>"
        . "<span class='mn-head-main'><span>Miners Version</span>"
        . "<span class='mn-sub'>" . Html::encode($algoLabel) . "</span></span>"
        . "<span class='mc-badge'>live</span></div><div class='main-left-inner'>";
@@ -220,6 +220,16 @@ echo <<<'CSS'
     gap: 8px;
 }
 .mv-foot b { color: #7d8aa0; }
+@media(max-width:720px){
+    .mv-card > .main-left-title { flex-wrap: wrap; align-items: flex-start; }
+    .mv-card > .main-left-title .mn-head-main { flex: 1 1 100%; }
+    .mv-card > .main-left-title .mc-badge { flex: 0 0 auto; margin-left: auto; }
+    .mv-card .main-left-inner > div { min-width: 0; }
+    #maintable2.mv-table { table-layout: auto; min-width: 760px; }
+    .mv-head { padding: 8px 10px; }
+    .mv-head .hash-total { margin-left: 0; }
+    .mv-foot { flex-wrap: wrap; }
+}
 </style>
 CSS;
 
