@@ -33,7 +33,7 @@ if (!empty($r_algo)) {
     $coins_subquery->andWhere(['in', 'algo', $r_algo]);
 }
 $db_blocks = Blocks::find()
-    ->where(['in', 'category', ['stake', 'generated']])
+    ->where(['not in', 'category', ['stake', 'generated']])
     ->andWhere(['in', 'coin_id', $coins_subquery])
     ->with('coin')
     ->orderBy(['time' => SORT_DESC])
