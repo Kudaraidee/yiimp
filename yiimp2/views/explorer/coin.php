@@ -63,51 +63,134 @@ $this->registerJs("
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
 <style>
-table.dataGrid2 { margin-top:0; }
-span.monospace { font-family:monospace; }
-.page .footer { width:auto; }
+/* ── Per-coin block explorer — mirrors /site/mining ─────────────────────────── */
+#coin-explorer .main-left-box {
+    border: 1px solid #d8e2ef !important; border-radius: 7px !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04); overflow: hidden;
+}
+#coin-explorer .main-left-title {
+    display: flex !important; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 34px; padding: 9px 12px !important;
+    background: #f8fafc !important; border-bottom: 1px solid #e8eef6;
+    color: #26385a; font-size: 13px !important; font-weight: 800 !important; line-height: 1.3;
+}
+#coin-explorer .ce-head { display:flex; align-items:center; gap:8px; min-width:0; }
+#coin-explorer .ce-coin-ico {
+    flex:0 0 26px; height:26px; border-radius:6px; overflow:hidden; display:grid; place-items:center;
+    color:#fff; font-size:7px; font-weight:800; background:linear-gradient(135deg,#4f79c8,#2c5aa0);
+}
+#coin-explorer .ce-coin-ico img { width:100%; height:100%; object-fit:contain; background:#fff; }
+#coin-explorer .ce-title { font-size:13px; font-weight:800; color:#26385a; }
+#coin-explorer .ce-sub { font-size:10px; color:#8a94a6; font-weight:500; }
+#coin-explorer .ce-pill {
+    display:inline-block; border-radius:999px; padding:2px 7px;
+    font-size:9px; font-weight:700; line-height:14px; white-space:nowrap;
+    background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; text-decoration:none;
+}
+#coin-explorer .ce-pill.blue { background:#eef4ff; color:#2c5aa0; border-color:#d7e5ff; }
+#coin-explorer .ce-pill.green { background:#e8f7ee; color:#187d46; border-color:#ccebd8; }
+#coin-explorer .ce-pill.red { background:#fdecec; color:#c0392b; border-color:#f6d2d2; }
+#coin-explorer .main-left-inner { padding:0 !important; }
+#coin-explorer #coin-blocks {
+    width:100% !important; border-collapse:collapse; table-layout:fixed;
+    font-size:11px; color:#334155;
+}
+#coin-explorer #coin-blocks th {
+    background:#fff !important; padding:7px 9px !important; text-align:right;
+    font-size:9px !important; font-weight:700 !important; letter-spacing:.05em;
+    text-transform:uppercase; color:#8a94a6; border-bottom:1px solid #e8eef6; white-space:nowrap;
+}
+#coin-explorer #coin-blocks .ce-left { text-align:left !important; }
+#coin-explorer #coin-blocks td {
+    padding:8px 9px !important; border-bottom:1px solid #eef2f7;
+    text-align:right; vertical-align:middle;
+}
+#coin-explorer #coin-blocks tbody tr:last-child td { border-bottom:0; }
+#coin-explorer #coin-blocks tbody tr:hover { background:#f7faff; }
+#coin-explorer .ce-age { font-size:10px; color:#475569; font-weight:700; white-space:nowrap; }
+#coin-explorer #coin-blocks .profile-link { color:#2c5aa0; font-weight:700; text-decoration:none; }
+#coin-explorer #coin-blocks .profile-link:hover { text-decoration:underline; }
+#coin-explorer .ce-val { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; font-size:11px; font-weight:700; color:#2b3d5b; white-space:nowrap; }
+#coin-explorer .ce-cap { display:block; font-size:9px; color:#98a3b5; margin-top:1px; }
+#coin-explorer .ce-hash { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:10px; color:#64748b; text-decoration:none; }
+#coin-explorer .ce-hash a { color:inherit; text-decoration:none; }
+#coin-explorer .ce-hash a:hover { color:#2c5aa0; }
+#coin-explorer .ce-type {
+    display:inline-block; border-radius:999px; padding:2px 7px;
+    font-size:9px; font-weight:700; line-height:14px; white-space:nowrap;
+    background:#eef4ff; color:#2c5aa0; border:1px solid #d7e5ff;
+}
+#coin-explorer .ce-type.pos { background:#e8f7ee; color:#187d46; border-color:#ccebd8; }
+#coin-explorer .ce-type.aux { background:#f3e8ff; color:#7e22ce; border-color:#e9d5ff; }
+#coin-explorer .ce-foot {
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    padding:8px 12px; background:#fcfdff; border-top:1px solid #eef2f7;
+}
+#coin-explorer #pager { display:flex; gap:6px; align-items:center; }
+#coin-explorer #pager a { font-size:10px; color:#2c5aa0; text-decoration:none; }
+#coin-explorer #pager a:hover { text-decoration:underline; }
+#coin-explorer #form form { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+#coin-explorer .main-text-input {
+    border:1px solid #d8e2ef; border-radius:7px; padding:4px 8px;
+    font-size:10px; color:#334155; background:#fff; outline:none;
+}
+#coin-explorer .main-text-input:focus { border-color:#2c5aa0; }
+#coin-explorer .main-submit-button {
+    border:1px solid #2c5aa0; border-radius:7px; padding:4px 10px;
+    font-size:10px; font-weight:700; color:#fff; background:#2c5aa0; cursor:pointer;
+}
+#coin-explorer #diff_graph { height:220px; padding:8px 12px 12px; border-top:1px solid #eef2f7; background:#fcfdff; }
+@media(max-width:820px){ #coin-explorer #coin-blocks { table-layout:auto; } }
 </style>
-<br/>
+<div id="coin-explorer">
 <div class="main-left-box">
-<div class="main-left-title"><?= Html::encode($coin->name) ?> Explorer</div>
-<div class="main-left-inner" style="padding-left:8px;padding-right:8px;">
-<table class="dataGrid2">
+<div class="main-left-title">
+    <span class="ce-head">
+        <span class="ce-coin-ico"><?php if (!empty($coin->image)): ?><img src="<?= Html::encode($coin->image) ?>" alt="" onerror="this.remove()"><?php endif ?></span>
+        <span class="ce-title"><?= Html::encode($coin->name) ?> Explorer</span>
+        <span class="ce-sub">recent blocks · height <?= Html::encode((string)$coin->block_height) ?></span>
+    </span>
+    <span class="ce-pill blue"><?= Html::encode($coin->symbol) ?></span>
+</div>
+<div class="main-left-inner">
+<div style="overflow-x:auto">
+<table id="coin-blocks">
 <thead><tr>
-    <th>Age</th><th>Height</th><th>Difficulty</th><th>Type</th>
-    <?= $multiAlgos ? '<th>Algo</th>' : '' ?>
-    <th>Tx</th><th>Conf</th><th>Blockhash</th>
+    <th class="ce-left" style="width:11%">Age</th><th style="width:10%">Height</th><th style="width:15%">Difficulty</th><th class="ce-left" style="width:8%">Type</th>
+    <?= $multiAlgos ? '<th class="ce-left" style="width:8%">Algo</th>' : '' ?>
+    <th style="width:7%">Tx</th><th style="width:8%">Conf</th><th class="ce-left" style="width:43%">Blockhash</th>
 </tr></thead><tbody>
-<?php foreach ($blockRows as $b): ?>
-<tr class="ssrow">
-    <td><?= $b['d'] ?></td>
+<?php foreach ($blockRows as $b):
+    $typeClass = $b['type'] === 'PoS' ? 'pos' : ($b['type'] === 'Aux' ? 'aux' : '');
+?>
+<tr>
+    <td class="ce-left"><span class="ce-age"><?= $b['d'] ?></span></td>
     <td><?= $coin->createExplorerLink($b['i'], ['height' => $b['i']]) ?></td>
-    <td><?= $b['diff'] ?></td>
-    <td><?= Html::encode($b['type']) ?></td>
-    <?php if ($multiAlgos): ?><td><?= Html::encode($b['algo']) ?></td><?php endif ?>
-    <td><?= (int)$b['tx'] ?></td>
-    <td><?= Html::encode((string)$b['confirms']) ?></td>
-    <td style="overflow-x:hidden;max-width:800px;">
-        <span class="monospace"><?= $coin->createExplorerLink($b['hash'], ['hash' => $b['hash']]) ?></span>
-    </td>
+    <td><span class="ce-val"><?= Html::encode((string)$b['diff']) ?></span></td>
+    <td class="ce-left"><?php if ($b['type'] !== ''): ?><span class="ce-type <?= $typeClass ?>"><?= Html::encode($b['type']) ?></span><?php else: ?><span class="ce-cap">—</span><?php endif ?></td>
+    <?php if ($multiAlgos): ?><td class="ce-left"><span class="ce-pill blue"><?= Html::encode($b['algo']) ?></span></td><?php endif ?>
+    <td><span class="ce-val"><?= (int)$b['tx'] ?></span></td>
+    <td><span class="ce-pill green"><?= Html::encode((string)$b['confirms']) ?></span></td>
+    <td class="ce-left"><span class="ce-hash"><?= $coin->createExplorerLink($b['hash'], ['hash' => $b['hash']]) ?></span></td>
 </tr>
 <?php endforeach ?>
 </tbody></table>
-
-<div id="pager" style="float:right;width:200px;text-align:right;margin-right:16px;margin-top:8px;">
-    <?= $pagerPrev ?>&nbsp;<?= $pagerNow ?>&nbsp;<?= $pagerNext ?>
 </div>
-<div id="form" style="width:660px;height:50px;overflow:hidden;">
-<form action="<?= Html::encode($actionUrl) ?>" method="POST" style="padding-top:4px;width:650px;">
-    <input type="text" name="height" class="main-text-input" placeholder="Height" style="width:80px;">
-    <input type="text" name="txid"   class="main-text-input" placeholder="Transaction hash" style="width:450px;margin:4px;">
-    <input type="submit" value="Search" class="main-submit-button">
-</form>
+<div class="ce-foot">
+    <div id="pager"><?= $pagerPrev ?>&nbsp;<?= $pagerNow ?>&nbsp;<?= $pagerNext ?></div>
+    <div id="form">
+    <form action="<?= Html::encode($actionUrl) ?>" method="POST">
+        <input type="text" name="height" class="main-text-input" placeholder="Height" style="width:80px;">
+        <input type="text" name="txid"   class="main-text-input" placeholder="Transaction hash" style="width:260px;">
+        <input type="submit" value="Search" class="main-submit-button">
+    </form>
+    </div>
 </div>
-
 <?php if ($showGraph): ?>
-<div id="diff_graph" style="margin-right:8px;margin-top:-16px;height:220px;"></div>
+<div id="diff_graph"></div>
 <?php endif ?>
 </div></div>
+</div>
 
 
 <?php elseif (!$isTailwind): ?>

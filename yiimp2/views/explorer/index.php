@@ -48,41 +48,129 @@ foreach ($list as $coin) {
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<style>a.low { color:red; font-weight:bold; }</style>
-<br/>
+<style>
+/* ── Explorer table — mirrors /site/mining ──────────────────────────────────── */
+#explorer-cards .main-left-box {
+    border: 1px solid #d8e2ef !important;
+    border-radius: 7px !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+    overflow: hidden;
+}
+#explorer-cards .main-left-title {
+    display: flex !important; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 34px; padding: 9px 12px !important;
+    background: #f8fafc !important; border-bottom: 1px solid #e8eef6;
+    color: #26385a; font-size: 13px !important; font-weight: 800 !important; line-height: 1.3;
+}
+#explorer-cards .ex-head-main { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; min-width: 0; }
+#explorer-cards .ex-title { font-size: 13px; font-weight: 800; color: #26385a; }
+#explorer-cards .ex-sub { font-size: 10px; color: #8a94a6; font-weight: 500; }
+#explorer-cards .ex-chips { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+#explorer-cards .ex-pill {
+    display: inline-block; border-radius: 999px; padding: 2px 7px;
+    font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap;
+    background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; text-decoration: none;
+}
+#explorer-cards .ex-pill.blue { background: #eef4ff; color: #2c5aa0; border-color: #d7e5ff; }
+#explorer-cards .ex-pill.green { background: #e8f7ee; color: #187d46; border-color: #ccebd8; }
+#explorer-cards .ex-pill.red { background: #fdecec; color: #c0392b; border-color: #f6d2d2; }
+#explorer-cards .main-left-inner { padding: 0 !important; }
+#explorer-cards #maintable {
+    width: 100% !important; border-collapse: collapse; table-layout: fixed;
+    font-size: 11px; color: #334155;
+}
+#explorer-cards #maintable th {
+    background: #fff !important; padding: 7px 9px !important; text-align: right;
+    font-size: 9px !important; font-weight: 700 !important; letter-spacing: .05em;
+    text-transform: uppercase; color: #8a94a6; border-bottom: 1px solid #e8eef6; white-space: nowrap;
+}
+#explorer-cards #maintable th:nth-child(1),
+#explorer-cards #maintable td:nth-child(1),
+#explorer-cards #maintable th:nth-child(2),
+#explorer-cards #maintable td:nth-child(2) { text-align: left; }
+#explorer-cards #maintable td {
+    padding: 8px 9px !important; border-bottom: 1px solid #eef2f7;
+    text-align: right; vertical-align: middle;
+}
+#explorer-cards #maintable tbody tr:last-child td { border-bottom: 0; }
+#explorer-cards #maintable tbody tr:hover { background: #f7faff; }
+#explorer-cards .tablesorter-header { cursor: pointer; }
+#explorer-cards .tablesorter-header:hover { color: #2c5aa0; }
+#explorer-cards .ex-coin { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#explorer-cards .ex-ico {
+    position: relative; flex: 0 0 26px; height: 26px; border-radius: 6px; overflow: hidden;
+    display: grid; place-items: center; color: #fff; font-size: 7px; font-weight: 800;
+    background: linear-gradient(135deg, #4f79c8, #2c5aa0);
+}
+#explorer-cards .ex-ico img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+#explorer-cards .ex-coin-main { min-width: 0; }
+#explorer-cards .ex-link { font-size: 11px; font-weight: 700; color: #26385a; text-decoration: none; }
+#explorer-cards .ex-link:hover { color: #2c5aa0; }
+#explorer-cards #maintable .profile-link { color: #26385a; font-size: 11px; font-weight: 700; text-decoration: none; }
+#explorer-cards #maintable .profile-link:hover { color: #2c5aa0; text-decoration: underline; }
+#explorer-cards .ex-meta { display: block; font-size: 9px; color: #98a3b5; margin-top: 2px; white-space: nowrap; }
+#explorer-cards .ex-val {
+    display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; color: #2b3d5b; white-space: nowrap;
+}
+#explorer-cards .ex-cap { display: block; font-size: 9px; color: #98a3b5; margin-top: 1px; white-space: nowrap; }
+#explorer-cards .ex-foot {
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 7px 12px; background: #fcfdff; border-top: 1px solid #eef2f7;
+    color: #98a3b5; font-size: 9px; line-height: 1.5;
+}
+@media(max-width:820px){
+    #explorer-cards #maintable { table-layout: auto; }
+    #explorer-cards .ex-chips { display: none; }
+}
+</style>
+
+<div id="explorer-cards">
 <div class="main-left-box">
-<div class="main-left-title">Block Explorer</div>
+<div class="main-left-title">
+    <span class="ex-head-main"><span class="ex-title">Block Explorer</span>
+        <span class="ex-sub">Coin nodes · chain data</span></span>
+    <span class="ex-chips"><span class="ex-pill blue"><?= count($coinRows) ?> coins</span><span class="ex-pill">sortable</span></span>
+</div>
 <div class="main-left-inner">
-<?php Yii::$app->ViewUtils->showTableSorter('maintable', "{
-    tableClass: 'dataGrid2',
-    textExtraction: {
-        6: function(node,table,n){ return \$(node).attr('data'); },
-        8: function(node,table,n){ return \$(node).attr('data'); }
-    }
-}"); ?>
+<div style="overflow-x:auto">
+<?php Yii::$app->ViewUtils->showTableSorter('maintable'); ?>
 <thead><tr>
-    <th width="30" data-sorter=""></th>
-    <th>Name</th><th>Symbol</th><th>Algo</th><th>Version</th><th>Height</th>
-    <th>Difficulty</th><th>Connections</th><th>Network Hash</th><th data-sorter=""></th>
+    <th data-sorter="false" style="width:28px"></th>
+    <th style="width:22%">Coin</th><th style="width:9%">Algo</th><th style="width:10%">Version</th>
+    <th style="width:10%">Height</th><th style="width:13%">Difficulty</th><th style="width:8%">Peers</th>
+    <th style="width:16%">Network Hash</th><th style="width:8%" data-sorter="false">Link</th>
 </tr></thead><tbody>
 <?php foreach ($coinRows as $r):
-    $coin = $r['coin']; ?>
-<tr class="ssrow">
-    <td><img src="<?= $coin->image ?>" width="18"></td>
-    <td><b><?= $coin->createExplorerLink($coin->name) ?></b></td>
-    <td><b><?= Html::encode($coin->symbol) ?></b></td>
-    <td><?= Html::encode($coin->algo) ?></td>
-    <td><?= Html::encode($coin->version) ?></td>
-    <td><?= Html::encode($coin->block_height) ?></td>
-    <td data="<?= $coin->difficulty ?>"><?= $r['difficulty'] ?><?= $r['diffnote'] ?></td>
-    <td><?= Html::a($coin->connections, $r['peersUrl'], ['class' => $r['cnxClass']]) ?></td>
-    <td data="<?= $coin->network_hash ?>"><?= $r['nethash'] ?></td>
-    <td><?php if ($r['link']): ?><?= Html::a($r['linkLabel'], $r['link'], ['target' => '_blank']) ?><?php endif ?></td>
+    $coin     = $r['coin'];
+    $initials = strtoupper(substr((string) $coin->symbol, 0, 3));
+    $img      = !empty($coin->image)
+        ? "<img src='" . Html::encode($coin->image) . "' alt='' onerror=\"this.remove()\">"
+        : '';
+    $lowPeers = (int) $coin->connections <= 3;
+?>
+<tr>
+    <td><img src="<?= Html::encode($coin->image) ?>" width="18" style="object-fit:contain"></td>
+    <td>
+        <span class="ex-coin"><span class="ex-ico"><?= Html::encode($initials) ?><?= $img ?></span>
+        <span class="ex-coin-main"><?= $coin->createExplorerLink(Html::encode($coin->name), [], ['class' => 'ex-link']) ?>
+        <span class="ex-meta"><?= Html::encode($coin->symbol) ?></span></span></span>
+    </td>
+    <td><span class="ex-pill blue"><?= Html::encode($coin->algo) ?></span></td>
+    <td><span class="ex-val"><?= $coin->version !== '' ? Html::encode($coin->version) : '—' ?></span></td>
+    <td><span class="ex-val"><?= Html::encode((string) $coin->block_height) ?></span><span class="ex-cap">height</span></td>
+    <td data="<?= Html::encode((string) $coin->difficulty) ?>"><span class="ex-val"><?= Html::encode($r['difficulty'] . $r['diffnote']) ?></span><span class="ex-cap">difficulty</span></td>
+    <td><?= Html::a(Html::encode((string) $coin->connections), $r['peersUrl'], [
+        'class' => 'ex-pill ' . ($lowPeers ? 'red' : 'green'), 'title' => 'View peers']) ?></td>
+    <td data="<?= Html::encode((string) $coin->network_hash) ?>"><span class="ex-val"><?= Html::encode($r['nethash'] ?: '—') ?></span><span class="ex-cap">network</span></td>
+    <td><?php if ($r['link']): ?><?= Html::a(Html::encode($r['linkLabel']), $r['link'], ['class' => 'ex-link', 'target' => '_blank']) ?><?php else: ?><span class="ex-cap">—</span><?php endif ?></td>
 </tr>
 <?php endforeach ?>
 </tbody></table>
-<p style="font-size:.8em;">&nbsp;* Unified difficulty (may differ from wallet)<br/></p>
+</div>
+<div class="ex-foot"><span>* Unified difficulty (may differ from wallet value)</span><span>Column headers are sortable</span></div>
 </div></div>
+</div>
 
 
 <?php elseif (!$isTailwind): ?>
