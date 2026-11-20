@@ -44,89 +44,249 @@ foreach ($blocks as $block) {
     ];
 }
 
+$blockStats = ['confirmed' => 0, 'immature' => 0, 'orphan' => 0, 'new' => 0, 'stake' => 0];
+foreach ($rows as $statRow) {
+    $cat = (string) $statRow['block']->category;
+    if ($cat === 'generate') $cat = 'confirmed';
+    if ($cat === 'generated') $cat = 'stake';
+    if (isset($blockStats[$cat])) $blockStats[$cat]++;
+}
+
+$coinInitials = strtoupper(substr((string) $coin->symbol, 0, 3));
+
 ?>
 
 <?php if ($isLegacy): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
+<?php
+echo <<<'CSS'
 <style>
-span.block { padding:2px 5px; display:inline-block; text-align:center; min-width:15px; border-radius:3px; color:#fff; }
-span.block.orphan   { background:#d9534f; }
-span.block.immature { background:#f0ad4e; }
-span.block.generate { background:#5cb85c; }
-span.block.new      { background:#ad4ef0; }
-span.block.stake    { background:#5bc0de; }
-span.solo-badge     { padding:1px 5px; border-radius:3px; background:#4BB2C5; color:#fff; font-size:.8em; margin-right:4px; }
+#block-card {
+    border: 1px solid #d8e2ef !important;
+    border-radius: 7px !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+    overflow: hidden;
+}
+#block-card > .main-left-title {
+    display: flex !important; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 34px; padding: 9px 12px !important;
+    background: #f8fafc !important; border-bottom: 1px solid #e8eef6;
+    color: #26385a; font-size: 13px !important; font-weight: 800 !important; line-height: 1.3;
+}
+#block-card .bk-head-main { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; min-width: 0; }
+#block-card .bk-title { font-size: 13px; font-weight: 800; color: #26385a; letter-spacing: .01em; }
+#block-card .bk-sub { font-size: 10px; color: #8a94a6; font-weight: 500; }
+#block-card .bk-ico {
+    position: relative; flex: 0 0 26px; height: 26px; border-radius: 6px; overflow: hidden;
+    display: grid; place-items: center; color: #fff; font-size: 7px; font-weight: 800;
+    background: linear-gradient(135deg, #4f79c8, #2c5aa0);
+}
+#block-card .bk-ico img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+#block-card .bk-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+#block-card .bk-chip {
+    border-radius: 999px; padding: 2px 7px; font-size: 9px; font-weight: 700; white-space: nowrap;
+    background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;
+}
+#block-card .bk-chip.confirmed { background: #e8f7ee; color: #187d46; border-color: #ccebd8; }
+#block-card .bk-chip.immature { background: #fff7e8; color: #a86400; border-color: #ffe2b8; }
+#block-card .bk-chip.orphan { background: #fdecec; color: #c0392b; border-color: #f6d2d2; }
+#block-card .main-left-inner { padding: 0; }
+#block-card .bk-summary {
+    display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 12px;
+    background: #fcfdff; border-bottom: 1px solid #eef2f7;
+    font-size: 10px; color: #8a94a6;
+}
+#block-card .bk-summary b { color: #33405a; font-weight: 700; }
+#block-card .bk-summary i {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #2fae5a; box-shadow: 0 0 0 3px rgba(47,174,90,.12); margin-right: 5px;
+}
+#maintable.bk-table {
+    width: 100% !important; border-collapse: collapse; table-layout: fixed;
+    font-size: 11px; color: #334155;
+}
+#maintable.bk-table th {
+    background: #fff; padding: 7px 9px; text-align: right;
+    font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: #8a94a6; border-bottom: 1px solid #e8eef6; white-space: nowrap;
+}
+#maintable.bk-table th:first-child, #maintable.bk-table td:first-child { text-align: left; }
+#maintable.bk-table th.tablesorter-header { cursor: pointer; }
+#maintable.bk-table th.tablesorter-header:hover { color: #2c5aa0; }
+#maintable.bk-table td {
+    padding: 8px 9px; border-bottom: 1px solid #eef2f7;
+    text-align: right; vertical-align: middle;
+}
+#maintable.bk-table tbody tr:last-child td { border-bottom: 0; }
+#maintable.bk-table tbody tr:hover { background: #f7faff; }
+#block-card .bk-val {
+    display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700;
+    color: #2b3d5b; white-space: nowrap;
+}
+#block-card .bk-cap { display: block; font-size: 9px; color: #98a3b5; margin-top: 1px; white-space: nowrap; }
+#block-card .bk-link { font-size: 11px; font-weight: 700; color: #26385a; text-decoration: none; }
+#block-card .bk-link:hover { color: #2c5aa0; }
+#block-card .bk-eff { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+#block-card .bk-eff-bar { width: 46px; height: 5px; border-radius: 999px; background: #edf1f6; overflow: hidden; }
+#block-card .bk-eff-bar i { display: block; height: 100%; border-radius: 999px; background: #2fae5a; }
+#block-card .bk-eff.mid .bk-eff-bar i { background: #e0a020; }
+#block-card .bk-eff.high .bk-eff-bar i { background: #d9534f; }
+#block-card .bk-eff-num { font-size: 10px; font-weight: 700; color: #475569; min-width: 42px; text-align: right; }
+#block-card .bk-eff.mid .bk-eff-num { color: #a86400; }
+#block-card .bk-eff.high .bk-eff-num { color: #c0392b; }
+#block-card .bk-type, #block-card .bk-status, #block-card .bk-segwit {
+    display: inline-block; border-radius: 999px; padding: 2px 7px;
+    font-size: 9px; font-weight: 700; line-height: 14px; white-space: nowrap;
+}
+#block-card .bk-type.shared { background: #eef4ff; color: #2c5aa0; border: 1px solid #d7e5ff; }
+#block-card .bk-type.solo { background: #e6fbfb; color: #0f766e; border: 1px solid #c7f0ee; }
+#block-card .bk-status.confirmed { background: #e8f7ee; color: #187d46; border: 1px solid #ccebd8; }
+#block-card .bk-status.immature { background: #fff7e8; color: #a86400; border: 1px solid #ffe2b8; }
+#block-card .bk-status.orphan { background: #fdecec; color: #c0392b; border: 1px solid #f6d2d2; }
+#block-card .bk-status.new { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+#block-card .bk-status.stake { background: #e6fbfb; color: #0f766e; border: 1px solid #c7f0ee; }
+#block-card .bk-status.unknown { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+#block-card .bk-segwit { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; margin-left: 4px; }
+#block-card .bk-finder { display: block; font-size: 9px; color: #8a94a6; margin-top: 2px; white-space: nowrap; }
+#block-card .bk-foot {
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 7px 12px; background: #fcfdff; border-top: 1px solid #eef2f7;
+    font-size: 9px; color: #98a3b5;
+}
+#block-card .bk-empty { text-align: center !important; padding: 22px 10px !important; color: #98a3b5; font-size: 11px; }
+@media(max-width:820px){
+    #maintable.bk-table { table-layout: auto; }
+    #block-card .bk-chips { display: none; }
+}
 </style>
-
-<?php Yii::$app->ViewUtils->showTableSorter('maintable', "{
-    tableClass: 'dataGrid',
-    widgets: ['zebra','filter'],
-    widgetOptions: { filter_columnFilters:false, filter_ignoreCase:true }
-}") ?>
-<thead><tr>
-    <th width="20"></th>
-    <th>Name</th>
-    <th data-sorter="numeric">Time</th>
-    <th data-sorter="numeric">Height</th>
-    <th data-sorter="currency">Amount</th>
-    <th>Type</th>
-    <th data-sorter="numeric">Effort</th>
-    <th>Status</th>
-    <th data-sorter="numeric">Difficulty</th>
-    <th data-sorter="numeric">Share Diff</th>
-    <th>Finder</th>
-    <th data-sorter="false">Blockhash</th>
-</tr></thead>
-<tbody>
-<?php foreach ($rows as $r):
-    $block = $r['block'];
-    $rowStyle = $block->category === 'immature' ? " style='background:#e0d3e8;'" : '';
+CSS;
 ?>
-<tr class="ssrow"<?= $rowStyle ?>>
-    <td><?php if ($coin->image): ?><img width="16" src="<?= Html::encode($coin->image) ?>"><?php endif ?></td>
-    <td>
-        <?php if ($isAdmin): ?>
-            <?= Html::a('<b>' . Html::encode($coin->name) . '</b>', ['/admin/coinwallet', 'id' => $coin->id]) ?>
+<div id='block-card' class='main-left-box'>
+    <div class='main-left-title'>
+        <span class='bk-head-main'>
+            <span class='bk-ico'><?= Html::encode($coinInitials) ?><?php if ($coin->image): ?><img src="<?= Html::encode($coin->image) ?>" alt="" onerror="this.remove()"><?php endif ?></span>
+            <span class='bk-title'>Blocks</span>
+            <span class='bk-sub'><?= Html::encode($coin->name . ' (' . $coin->symbol . ') · ' . $coin->algo) ?></span>
+        </span>
+        <span class='bk-chips'>
+            <span class='bk-chip'><?= count($rows) ?> blocks</span>
+            <?php if ($blockStats['confirmed']): ?><span class='bk-chip confirmed'><?= $blockStats['confirmed'] ?> confirmed</span><?php endif ?>
+            <?php if ($blockStats['immature']): ?><span class='bk-chip immature'><?= $blockStats['immature'] ?> immature</span><?php endif ?>
+            <?php if ($blockStats['orphan']): ?><span class='bk-chip orphan'><?= $blockStats['orphan'] ?> orphan</span><?php endif ?>
+            <span class='bk-chip'>auto · 60s</span>
+        </span>
+    </div>
+    <div class='main-left-inner'>
+        <div class='bk-summary'>
+            <span><i></i><b><?= count($rows) ?> blocks</b> shown</span>
+            <span>Algo <b><?= Html::encode($coin->algo) ?></b></span>
+            <span>Reward unit <b><?= Html::encode($coin->symbol) ?></b></span>
+            <span>Refresh <b>60s</b></span>
+        </div>
+        <div style='overflow-x:auto'>
+        <table id='maintable' class='bk-table'>
+        <?php Yii::$app->ViewUtils->JavascriptReady("
+            \$('#maintable').tablesorter({
+                tableClass: 'dataGrid2',
+                textExtraction: {
+                    0: function(node){ return \$(node).attr('data') || \$(node).text(); },
+                    1: function(node){ return \$(node).attr('data') || \$(node).text(); },
+                    2: function(node){ return \$(node).attr('data') || \$(node).text(); },
+                    3: function(node){ return \$(node).attr('data') || \$(node).text(); },
+                    4: function(node){ return \$(node).attr('data') || \$(node).text(); }
+                }
+            });
+            \$('.tablesorter-header').not('.sorter-false').css('cursor','pointer');
+        "); ?>
+        <thead><tr>
+            <th style="width:12%">Found</th>
+            <th style="width:22%">Height</th>
+            <th style="width:11%">Reward</th>
+            <th style="width:14%">Effort</th>
+            <th style="width:16%">Difficulty</th>
+            <th data-sorter="false" style="width:15%">Finder / Type</th>
+            <th data-sorter="false" style="width:10%">Status</th>
+        </tr></thead>
+        <tbody>
+        <?php if (empty($rows)): ?>
+            <tr><td colspan="7" class="bk-empty">No Blocks Found</td></tr>
         <?php else: ?>
-            <b><?= Html::encode($coin->name) ?></b>
-        <?php endif ?>
-        &nbsp;(<?= Html::encode($coin->symbol) ?>)
-        <?php if ($r['segwit']): ?>&nbsp;<img src="/images/ui/segwit.png" height="8" title="SegWit"><?php endif ?>
-    </td>
-    <td data="<?= $block->time ?>"><b><?= $conv->datetoa2($block->time) ?> ago</b></td>
-    <td><?= $coin->createExplorerLink($block->height, ['height' => $block->height]) ?></td>
-    <td><?= Html::encode($block->amount) ?></td>
-    <td><?= $r['solo'] ? '<span class="solo-badge" title="Solo miner">solo</span>' : '' ?></td>
-    <td><?= $block->effort ? Html::encode($block->effort) . '%' : 'N/A' ?></td>
-    <td>
-        <?php if ($block->category === 'orphan'): ?>
-            <span class="block orphan">Orphan</span>
-        <?php elseif ($block->category === 'immature'): ?>
-            <span class="block immature"<?= $r['maturityEta'] ? ' title="ETA: ' . Html::encode($r['maturityEta']) . '"' : '' ?>>
-                Immature (<?= $block->confirmations ?>/<?= $coin->mature_blocks ?>)
-            </span>
-        <?php elseif ($block->category === 'generate'): ?>
-            <span class="block generate">Confirmed</span>
-        <?php elseif ($block->category === 'stake'): ?>
-            <span class="block stake">Stake (<?= $block->confirmations ?>)</span>
-        <?php elseif ($block->category === 'generated'): ?>
-            <span class="block stake">Stake</span>
-        <?php elseif ($block->category === 'new'): ?>
-            <span class="block new">New</span>
-        <?php endif ?>
-    </td>
-    <td><?= Html::encode($r['diffBlock']) ?></td>
-    <td><?= Html::encode($r['diffUser']) ?></td>
-    <td><?= Html::encode($r['finder']) ?></td>
-    <td style="font-size:.8em;font-family:monospace;">
-        <?= $coin->createExplorerLink($block->blockhash, ['hash' => $block->blockhash]) ?>
-    </td>
-</tr>
-<?php endforeach ?>
-</tbody></table>
+            <?php foreach ($rows as $r):
+                $block  = $r['block'];
+                $hash   = (string) $block->blockhash;
+                $hashShort = strlen($hash) > 18 ? substr($hash, 0, 10) . '…' . substr($hash, -6) : $hash;
+                $heightLink = $coin->createExplorerLink($block->height, ['height' => $block->height]);
+                $hashLink   = $coin->createExplorerLink($hashShort, ['hash' => $block->blockhash]);
 
+                $effortValue = (float) $block->effort;
+                $effortClass = $effortValue > 150 ? 'high' : ($effortValue > 100 ? 'mid' : 'ok');
+                $effortWidth = $effortValue > 0 ? min(100, max(2, $effortValue)) : 0;
+                $effortBar = $effortWidth > 0
+                    ? "<span class='bk-eff-bar'><i style='width:" . round($effortWidth, 1) . "%'></i></span>"
+                    : '';
+                $effortText = $block->effort ? $block->effort . '%' : 'N/A';
+
+                $statusMap = [
+                    'orphan'    => ['Orphan', 'orphan'],
+                    'immature'  => ['Immature ' . $block->confirmations . '/' . $coin->mature_blocks, 'immature'],
+                    'generate'  => ['Confirmed', 'confirmed'],
+                    'stake'     => ['Stake', 'stake'],
+                    'generated' => ['Stake', 'stake'],
+                    'new'       => ['New', 'new'],
+                ];
+                $statusInfo = $statusMap[$block->category] ?? [Html::encode((string) $block->category), 'unknown'];
+                $statusTitle = ($block->category === 'immature' && $r['maturityEta'])
+                    ? ' title="ETA: ' . Html::encode($r['maturityEta']) . '"'
+                    : '';
+
+                $typeLabel = $r['solo'] ? 'Solo' : 'Shared';
+                $typeClass = $r['solo'] ? 'solo' : 'shared';
+                $finder    = $r['finder'] !== '' ? $r['finder'] : '—';
+                $segwit    = $r['segwit'] ? "<span class='bk-segwit' title='Block signalled SegWit'>SegWit</span>" : '';
+            ?>
+            <tr>
+                <td data="<?= (int) $block->time ?>">
+                    <span class='bk-val'><?= Html::encode(strip_tags($conv->datetoa2($block->time))) ?> ago</span>
+                    <span class='bk-cap'>found</span>
+                </td>
+                <td data="<?= (int) $block->height ?>">
+                    <span class='bk-val'><?= $heightLink ?></span>
+                    <span class='bk-cap'><?= $hashLink ?></span>
+                </td>
+                <td data="<?= (float) $block->amount ?>">
+                    <span class='bk-val'><?= Html::encode($block->amount) ?> <?= Html::encode($coin->symbol) ?></span>
+                    <span class='bk-cap'>reward</span>
+                </td>
+                <td data="<?= $effortValue ?>">
+                    <span class='bk-eff <?= $effortClass ?>' title="Effort vs expected difficulty"><?= $effortBar ?>
+                        <span class='bk-eff-num'><?= Html::encode($effortText) ?></span></span>
+                </td>
+                <td data="<?= (float) $block->difficulty ?>">
+                    <span class='bk-val'><?= Html::encode($r['diffBlock']) ?></span>
+                    <span class='bk-cap'>share diff <?= Html::encode($r['diffUser']) ?></span>
+                </td>
+                <td>
+                    <span class='bk-type <?= $typeClass ?>'><?= $typeLabel ?></span><?= $segwit ?>
+                    <span class='bk-finder'><?= Html::encode($finder) ?></span>
+                </td>
+                <td>
+                    <span class='bk-status <?= $statusInfo[1] ?>'<?= $statusTitle ?>><?= Html::encode($statusInfo[0]) ?></span>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        <?php endif; ?>
+        </tbody>
+        </table>
+        </div>
+        <div class='bk-foot'>
+            <span>Effort compares share difficulty with network difficulty</span>
+            <span>Sorted by newest · auto refresh 60s</span>
+        </div>
+    </div>
+</div>
 
 <?php elseif (!$isTailwind): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
