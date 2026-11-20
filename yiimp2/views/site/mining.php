@@ -139,8 +139,8 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 </div>
 
 <div class="row gx-3 mt-2">
-    <div class="col-12 col-lg-7 mining-col" style="overflow-x:auto;">
-        <div id="pool_current_results"></div>
+    <div class="col-12 col-lg-7 mining-col">
+        <?= $this->render('_mining_command', ['algoNav' => $algoNav]) ?>
     </div>
     <div class="col-12 col-lg-5 mining-col">
         <div class="main-left-box">
@@ -168,16 +168,16 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 
 <div class="row gx-3">
     <div class="col-12 mining-col" style="overflow-x:auto;">
-        <div id="found_results"></div>
+        <div id="pool_current_results"></div>
     </div>
-    <div class="col-12 mining-col mining-new">
-        <div id="miners_results" style="overflow-x:auto;"></div>
+    <div class="col-12 mining-col" style="overflow-x:auto;">
+        <div id="found_results"></div>
     </div>
 </div>
 
 <div class="row gx-3">
-    <div class="col-12 mining-col">
-        <?= $this->render('_mining_command', ['algoNav' => $algoNav]) ?>
+    <div class="col-12 mining-col mining-new">
+        <div id="miners_results" style="overflow-x:auto;"></div>
     </div>
 </div>
 
