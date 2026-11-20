@@ -116,7 +116,11 @@ if ($isLegacy) {
     font-size: 9px; color: #98a3b5;
 }
 @media(max-width:720px){
-    #maintable3.mn-table { table-layout: auto; }
+    #mining-card > .main-left-title { flex-wrap: wrap; align-items: flex-start; }
+    #mining-card .mn-head-main { flex: 1 1 100%; }
+    #mining-card .mn-scope { flex: 0 0 auto; margin-left: auto; }
+    #mining-card .main-left-inner > div { min-width: 0; }
+    #maintable3.mn-table { table-layout: auto; min-width: 720px; }
     #mining-card .mn-summary { gap: 10px; }
 }
 </style>
