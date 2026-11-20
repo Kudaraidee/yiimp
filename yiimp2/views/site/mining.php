@@ -139,22 +139,22 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 </div>
 
 <div class="row gx-3 mt-2">
-    <div class="col-12 col-lg-7 mining-col">
-        <div id="mining_results" style="overflow-x:auto;"></div>
-    </div>
-    <div class="col-12 col-lg-5 mining-col" style="overflow-x:auto;">
+    <div class="col-12 col-lg-7 mining-col" style="overflow-x:auto;">
         <div id="pool_current_results"></div>
     </div>
-</div>
-
-<div class="row gx-3">
-    <div class="col-12 col-lg-6 mining-col">
+    <div class="col-12 col-lg-5 mining-col">
         <div class="main-left-box">
             <div class="main-left-title">Last 24 Hours Estimate (<?= htmlspecialchars($graphLabel) ?>)</div>
             <div class="main-left-inner">
                 <div class="graph-wrap"><div id="graph_results_price" style="height:<?= $height ?>"></div></div>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="row gx-3">
+    <div class="col-12 col-lg-6 mining-col">
+        <div id="mining_results" style="overflow-x:auto;"></div>
     </div>
     <div class="col-12 col-lg-6 mining-col">
         <div class="main-left-box">
