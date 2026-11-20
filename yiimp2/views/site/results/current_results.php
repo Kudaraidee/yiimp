@@ -35,6 +35,41 @@ $showestimates = false;
 // ── Table open ─────────────────────────────────────────────────────────────────
 if ($isLegacy) {
     echo "<div class='main-left-box'><div class='main-left-title'>Pool Status</div><div class='main-left-inner'>";
+    echo <<<'CSS'
+<style>
+/* Legacy Pool Status table: keep all 10 columns inside the narrow left panel. */
+#maintable1,
+#maintable1 th,
+#maintable1 td { box-sizing: border-box; }
+#maintable1 {
+    table-layout: fixed;
+    width: 100% !important;
+    font-size: 10px !important;
+    line-height: 1.2;
+}
+#maintable1 th,
+#maintable1 td {
+    padding: 2px 2px !important;
+    margin: 0 !important;
+    vertical-align: top;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+#maintable1 th { font-size: 9px !important; font-weight: 600; }
+#maintable1 img { vertical-align: middle; }
+#maintable1 th:nth-child(1), #maintable1 td:nth-child(1) { width: 18%; }
+#maintable1 th:nth-child(2), #maintable1 td:nth-child(2) { width: 7%; }
+#maintable1 th:nth-child(3), #maintable1 td:nth-child(3) { width: 10%; }
+#maintable1 th:nth-child(4), #maintable1 td:nth-child(4) { width: 6%; }
+#maintable1 th:nth-child(5), #maintable1 td:nth-child(5) { width: 6%; }
+#maintable1 th:nth-child(6), #maintable1 td:nth-child(6) { width: 8%; }
+#maintable1 th:nth-child(7), #maintable1 td:nth-child(7) { width: 19%; }
+#maintable1 th:nth-child(8), #maintable1 td:nth-child(8) { width: 12%; }
+#maintable1 th:nth-child(9), #maintable1 td:nth-child(9) { width: 6%; }
+#maintable1 th:nth-child(10), #maintable1 td:nth-child(10) { width: 8%; }
+</style>
+CSS;
     Yii::$app->ViewUtils->showTableSorter('maintable1', "{
         tableClass: 'dataGrid2',
         textExtraction: {
@@ -157,7 +192,7 @@ foreach ($algos as $item) {
         $bg = $isSelected ? "style='cursor:pointer;background-color:#d9d9d9;'" : "style='cursor:pointer' class='ssrow'";
         echo "<tr {$bg} onclick='javascript:select_algo(\"{$algo}\")'>";
         echo "<td style='font-size:110%;background-color:#f2f2f2;'><b>{$algo}</b></td>";
-        for ($i = 0; $i < 8; $i++) echo "<td align='center' style='font-size:.8em;background-color:#f2f2f2;'></td>";
+        for ($i = 0; $i < 7; $i++) echo "<td align='center' style='font-size:.8em;background-color:#f2f2f2;'></td>";
         echo $isBest
             ? "<td class='estimate' align='center' style='font-size:.8em;background-color:#f2f2f2;' title='normalized {$norm_fmt}'><b>{$price_fmt}</b></td>"
             : "<td class='estimate' align='center' style='font-size:.8em;background-color:#f2f2f2;' title='normalized {$norm_fmt}'>{$price_fmt}</td>";
@@ -167,7 +202,7 @@ foreach ($algos as $item) {
         $rowCls = $isSelected ? 'table-secondary fw-bold' : 'table-light';
         echo "<tr class='{$rowCls}' style='cursor:pointer;' onclick='select_algo(\"{$algo}\")'>";
         echo "<td class='small fw-bold'>" . Html::encode($algo) . "</td>";
-        for ($i = 0; $i < 8; $i++) echo "<td></td>";
+        for ($i = 0; $i < 7; $i++) echo "<td></td>";
         echo "<td class='text-center small" . ($isBest ? " fw-bold" : "") . "' title='normalized {$norm_fmt}'>{$price_fmt}</td>";
         echo "<td class='text-center small font-monospace" . ($isBest ? " fw-bold" : "") . "' data='{$btcmhday1}'>" . ($isBest ? "{$btcmhday1}*" : $btcmhday1) . "</td>";
         echo '</tr>';
@@ -177,7 +212,7 @@ foreach ($algos as $item) {
             : 'bg-gray-50 dark:bg-gray-700/30 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10';
         echo "<tr class='{$rowCls} cursor-pointer transition-colors' onclick='select_algo(\"{$algo}\")'>";
         echo "<td class='px-2 py-2 font-bold " . ($isSelected ? "text-indigo-700 dark:text-indigo-300" : "text-gray-800 dark:text-gray-100") . "'>" . Html::encode($algo) . "</td>";
-        for ($i = 0; $i < 8; $i++) echo "<td></td>";
+        for ($i = 0; $i < 7; $i++) echo "<td></td>";
         echo "<td class='px-2 py-2 text-center font-mono" . ($isBest ? " font-bold text-green-600 dark:text-green-400" : " text-gray-500 dark:text-gray-400") . "' title='normalized {$norm_fmt}'>{$price_fmt}</td>";
         echo "<td class='px-2 py-2 text-center font-mono tabular-nums" . ($isBest ? " font-bold text-green-600 dark:text-green-400" : " text-gray-500 dark:text-gray-400") . "' data='{$btcmhday1}'>" . ($isBest ? "{$btcmhday1}*" : $btcmhday1) . "</td>";
         echo '</tr>';
