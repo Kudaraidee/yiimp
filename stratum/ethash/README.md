@@ -177,9 +177,11 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 ```bash
 ./miner --proto proxy --server pool.example.com --port 3639 \
   --user WALLET.WORKER --pass c=LRS,mc=LRS --cuda 1
-./miner --server stratum+tcp://pool.example.com:3639 \
+./miner --proto stratum --server stratum+tcp://pool.example.com:3639 \
   --user WALLET.WORKER --pass c=LRS,mc=LRS --cuda 1
 ```
+
+> GMiner 3.43 ไม่ได้เลือก NiceHash ethstratum จาก scheme ใน `--server` เสมอไป ถ้าต้องการ path `mining.subscribe`/`mining.notify` ให้ระบุ `--proto stratum` ด้วย; ถ้าไม่ระบุ `--proto` มักยังตกลงมาเป็น ethproxy (`eth_submitLogin`/`eth_getWork`)
 
 ตัวอย่าง T-Rex แบบ NiceHash `stratum2` (ใช้ protocol เดียวกับ NiceHash/MiningPoolHub):
 
@@ -207,7 +209,7 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 >
 > ใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` กับ T-Rex ก็ได้ เพราะทั้งหมดตกลงมาเป็น ethproxy ฝั่ง pool รองรับหมดแล้ว ส่วน `stratum2+tcp://` / `stratum2+ssl://` จะตกลงมาเป็น NiceHash ethstratum (รองรับแล้วเช่นกัน)
 >
-> GMiner 3.43 ก็ใช้กฎเดียวกัน: `--server host` (ไม่มี scheme) → ethproxy ต้องได้ result 4 ฟิลด์ตามข้างบน, ส่วน `--server stratum+tcp://host` → NiceHash EthereumStratum/1.0.0 (subscribe array, `mining.set_difficulty`, `mining.notify`)
+> GMiner 3.43 ใช้ `--proto` เป็นตัวตัดสินหลัก: `--proto proxy` หรือไม่ระบุ proto → ethproxy ต้องได้ result 4 ฟิลด์ตามข้างบน, ส่วน `--proto stratum` → NiceHash EthereumStratum/1.0.0 (subscribe array, `mining.set_difficulty`, `mining.notify`) แม้จะใส่ scheme `stratum+tcp://` ใน `--server` ก็ตาม
 
 ### Vardiff สำหรับ Ethash/Etchash
 
