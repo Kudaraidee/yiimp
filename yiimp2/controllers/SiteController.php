@@ -718,22 +718,6 @@ class SiteController extends BaseController
 			$totalWorkers    += (int) (clone $wQuery)->count();
 			$totalExtranonce += (int) (clone $wQuery)->andWhere(['subscribe' => 1])->count();
 
-			$totalHashrate += (float) $cache->getOrSet("current_hashrate-{$itemAlgo}", function () use ($db, $itemAlgo) {
-				return $db->createCommand(
-					"SELECT hashrate FROM hashrate WHERE algo=:a ORDER BY time DESC LIMIT 1",
-					[':a' => $itemAlgo]
-				)->queryScalar() ?: 0.0;
-			}, 60);
-
-			if ($isAdmin) {
-				$totalInvalid += (float) $cache->getOrSet("current_hashrate_bad-{$itemAlgo}", function () use ($db, $itemAlgo) {
-					return $db->createCommand(
-						"SELECT hashrate_bad FROM hashrate WHERE algo=:a ORDER BY time DESC LIMIT 1",
-						[':a' => $itemAlgo]
-					)->queryScalar() ?: 0.0;
-				}, 60);
-			}
-
 			foreach ($db->createCommand(
 				"SELECT version, COUNT(*) AS c, SUM(subscribe) AS s FROM workers WHERE algo=:a GROUP BY version ORDER BY c DESC",
 				[':a' => $itemAlgo]
@@ -758,6 +742,13 @@ class SiteController extends BaseController
 				}
 				return $map;
 			}, 60);
+
+			// Derive displayed totals from the same fresh shares data as the rows;
+			// the hashstats table is only written every 15 minutes.
+			foreach ($versionRatesAll[$itemAlgo] as $rates) {
+				$totalHashrate += (float) $rates['hashrate'];
+				$totalInvalid  += (float) $rates['invalid'];
+			}
 
 			foreach ($db->createCommand(
 				"SELECT w.version, COUNT(*) AS d FROM workers w
