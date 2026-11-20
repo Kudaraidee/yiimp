@@ -194,8 +194,7 @@ class ApiController extends CommonController
 				$btcmhd = mbitcoinvaluetoa($btcmhd);
 				
 				//Add network hash difficulty and symbol
-				$min_ttf      = $coin->network_ttf > 0 ? min($coin->actual_ttf, $coin->network_ttf) : $coin->actual_ttf;
-				$network_hash = $coin->difficulty * 0x100000000 / ($min_ttf ? $min_ttf : 60);
+				$network_hash = (float) yaamp_coin_nethash($coin);
 
 				$fees = yaamp_fee($coin->algo);
 				$fees_solo = yaamp_fee_solo($coin->algo);

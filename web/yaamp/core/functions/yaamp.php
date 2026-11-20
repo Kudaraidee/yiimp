@@ -257,33 +257,110 @@ function yaamp_hashrate_step()
 	return 300;
 }
 
+function yaamp_rpc_hex_number($value)
+{
+	if (is_numeric($value)) return (float) $value;
+
+	$value = (string) $value;
+	if (strpos($value, '0x') === 0) $value = substr($value, 2);
+	if ($value === '' || !preg_match('/^[0-9a-f]+$/i', $value)) return 0.0;
+
+	return (float) hexdec($value);
+}
+
+function yaamp_geth_network_hashrate(WalletRPC $remote)
+{
+	$latest = $remote->eth_getBlockByNumber('latest', false);
+	if (!is_object($latest) && !is_array($latest)) return null;
+
+	$field = function ($block, $key) {
+		if (is_object($block)) return isset($block->$key) ? $block->$key : null;
+		return is_array($block) && isset($block[$key]) ? $block[$key] : null;
+	};
+
+	$height = yaamp_rpc_hex_number($field($latest, 'number'));
+	if ($height <= 0) return null;
+
+	// Match getnetworkhashps' 120-block window. A single block gap is too noisy.
+	$blocks = min(120, (int) $height);
+	$previous = $remote->eth_getBlockByNumber('0x'.dechex((int) $height - $blocks), false);
+	if (!is_object($previous) && !is_array($previous)) return null;
+
+	$difficulty = yaamp_rpc_hex_number($field($latest, 'difficulty'));
+	$gap = yaamp_rpc_hex_number($field($latest, 'timestamp'))
+		- yaamp_rpc_hex_number($field($previous, 'timestamp'));
+
+	if ($difficulty <= 0 || $gap <= 0) return null;
+
+	return $difficulty / ($gap / $blocks);
+}
+
+/**
+ * RPC-derived network hashrate shared by legacy backend, API and public pages.
+ * The cache key is the same one used by yiimp2's Coins::getRpcNetworkHashrate(),
+ * so every caller sees the same value within the 60s window.
+ */
+function yaamp_rpc_network_hashrate($coin, $ttl = 60)
+{
+	if (empty($coin->rpchost)) return null;
+
+	// Alphanumeric only: Yii2's Cache::buildKey() otherwise MD5-hashes the key
+	// and would not share this value with the legacy Yii1 backend.
+	$key = "yiimpRpcNethash{$coin->id}";
+	$cached = controller()->memcache->get($key);
+	if (is_string($cached)) {
+		// Yii2 stores serialize([$value, $dependency]) under this key.
+		$decoded = @unserialize($cached);
+		if (is_array($decoded) && array_key_exists(0, $decoded)) {
+			$decoded = $decoded[0];
+		}
+		if ($decoded !== false) $cached = $decoded;
+	}
+	if ($cached !== false && $cached !== null && (float) $cached > 0) {
+		return (float) $cached;
+	}
+
+	$remote = new WalletRPC($coin);
+	if (!empty($remote->error)) return null;
+
+	$rate = null;
+	if ($coin->rpcencoding === 'GETH') {
+		$rate = yaamp_geth_network_hashrate($remote);
+	} else {
+		$raw = $remote->getnetworkhashps(array(120, -1));
+		$rate = is_array($raw)
+			? (float) (isset($raw[$coin->algo]) ? $raw[$coin->algo] : 0)
+			: (float) $raw;
+
+		if ($rate <= 0) {
+			$info = $remote->getmininginfo();
+			if (is_array($info)) {
+				if (isset($info['networkhashps'])) {
+					$raw = $info['networkhashps'];
+					$rate = is_array($raw)
+						? (float) (isset($raw[$coin->algo]) ? $raw[$coin->algo] : 0)
+						: (float) $raw;
+				} elseif (isset($info['networkhps'])) {
+					$rate = (float) $info['networkhps'];
+				} elseif (isset($info['netmhashps'])) {
+					$rate = (float) $info['netmhashps'] * 1e6;
+				}
+			}
+		}
+	}
+
+	if ($rate > 0) {
+		controller()->memcache->set($key, serialize(array($rate, null)), $ttl);
+		return (float) $rate;
+	}
+
+	return null;
+}
+
 function yaamp_coin_nethash($coin , $coin_powlimit_bits = null , $coin_difficulty = null, $coin_reward = null, $coin_price = null) {
 
-	/*
-	$network_hash = controller()
-	->memcache
-	->get("yiimp-nethashrate-{$coin->symbol}");
-	if (!$network_hash)
-	{
-		$remote = new WalletRPC($coin);
-		if ($remote) $info = $remote->getmininginfo();
-		if (isset($info['networkhashps']))
-		{
-			$network_hash = $info['networkhashps'];
-			controller()
-				->memcache
-				->set("yiimp-nethashrate-{$coin->symbol}", $info['networkhashps'], 60);
-		}
-		else if (isset($info['netmhashps']))
-		{
-			$network_hash = floatval($info['netmhashps']) * 1e6;
-			controller()
-				->memcache
-				->set("yiimp-nethashrate-{$coin->symbol}", $network_hash, 60);
-		}
-		if ($network_hash) return $network_hash;
-	}
-	*/
+	$rpc = yaamp_rpc_network_hashrate($coin);
+	if ($rpc !== null) return $rpc;
 
     if (is_null($coin_powlimit_bits)) {
         if (!is_null($coin->powlimit_bits)) {

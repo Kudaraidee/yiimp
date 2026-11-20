@@ -53,7 +53,9 @@ class Coins extends ActiveRecord
             return null;
         }
 
-        $cacheKey = "yiimp-explorer-rpc-nethash-{$this->id}";
+        // Keep the key alphanumeric so Yii2's Cache::buildKey() does not hash
+        // it; the legacy Yii1 backend writes the same raw memcache key.
+        $cacheKey = "yiimpRpcNethash{$this->id}";
         $cached   = Yii::$app->cache->get($cacheKey);
         if ($cached !== false && $cached !== null && (float) $cached > 0) {
             return (float) $cached;
