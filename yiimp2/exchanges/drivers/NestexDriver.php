@@ -21,9 +21,11 @@ class NestexDriver extends ExchangeDriver
 
     protected function publicApiQuery(string $method = 'cg/tickers', string $params = '', string $returnType = 'array'): mixed
     {
-        $url = "https://trade.nestex.one/api/{$method}";
+        // Public tickers moved from trade.nestex.one/api/* to api.nestex.one/*
+        // (the old URL returns a 301 HTML redirect that cannot be json_decoded).
+        $url = "https://api.nestex.one/{$method}";
         if ($params !== '') $url .= "?{$params}";
-        $raw = $this->curlRequest('GET', $url, [], '', false);
+        $raw = $this->curlRequest('GET', $url, [], '', false, [CURLOPT_FOLLOWLOCATION => true]);
         return $returnType === 'object' ? json_decode($raw) : json_decode($raw, true);
     }
 
