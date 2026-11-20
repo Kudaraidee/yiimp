@@ -7,6 +7,7 @@ $this->title = 'Block Explorer';
 $isTailwind  = Yii::$app->LayoutManager->isTailwind();
 $isLegacy    = Yii::$app->LayoutManager->isLegacy();
 $conv        = Yii::$app->ConversionUtils;
+$util        = Yii::$app->YiimpUtils;
 
 // ── Shared coin list + RPC data ───────────────────────────────────────────────
 $list = Coins::find()->where(['enable' => 1, 'visible' => 1])->orderBy('name')->all();
@@ -19,8 +20,17 @@ foreach ($list as $coin) {
 
     $coin->version = $conv->formatWalletVersion($coin);
 
-    $walletInfo         = $coin->getWalletInfo();
-    $coin->network_hash = $walletInfo['networkhashps'] ?? null;
+    $walletInfo = $coin->getWalletInfo();
+    $networkHash = $walletInfo['networkhashps'] ?? ($walletInfo['networkhps'] ?? null);
+
+    // The wallet_info cache is often empty on this stack, but the backend keeps
+    // coins.network_hash up to date. Fall back to the same estimate used there
+    // so the explorer column is never blank because of a missing cache key.
+    if (!$networkHash) $networkHash = $coin->network_hash;
+    if (!$networkHash && $coin->difficulty) {
+        $networkHash = $util->coin_nethash($coin);
+    }
+    $coin->network_hash = $networkHash ? (float) $networkHash : null;
 
     $difficulty  = $conv->Itoa2($coin->difficulty, 3);
     $diffnote    = in_array($coin->algo, ['equihash', 'quark']) ? '*' : '';
