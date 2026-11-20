@@ -1,6 +1,6 @@
-# Firopow / Kiiro setup
+# Firopow / Firo-family setup
 
-วิธีเปิดใช้งาน algo `firopow` สำหรับเหรียญ Kiiro
+วิธีเปิดใช้งาน algo `firopow` สำหรับเหรียญตระกูล Firo (`FIRO`, `KIIRO`)
 
 ## 1. SQL
 
@@ -22,12 +22,16 @@ printf 'delete yaamp_algo_list\r\ndelete yaamp_visible_algos\r\ndelete yaamp_unv
 
 ## 2. Coin
 
-เพิ่ม coin ผ่าน admin UI:
+เพิ่ม coin ผ่าน admin UI (เช่น `FIRO` หรือ `KIIRO`):
 
 - `algo` = `firopow`
-- RPC ชี้ไปยัง Kiiro node ที่รองรับ Firopow
+- RPC ชี้ไปยัง Firo-family node ที่รองรับ Firopow
 - node ต้องรองรับ `getblocktemplate` / `submitblock` แบบ Firopow
 - `enable = 1`, `auto_ready = 1`
+
+stratum อ่าน payee ของ `znode` / `community` / `developer` / `datamining`
+จาก GBT แบบ dynamic (รองรับทั้ง `script` และ `payee`) สำหรับ FIRO node
+รุ่นเก่าที่ไม่ส่ง field เหล่านี้ โค้ดจะใช้ค่ hardcoded เดิมเป็น fallback
 
 firopow ใช้ RPC แบบ Bitcoin-style เหมือน kawpow ไม่ใช่ `GETH`
 
