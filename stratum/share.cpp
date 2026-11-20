@@ -329,7 +329,8 @@ bool block_confirm(int coinid, const char *blockhash)
 			if(strcmp(block->hash1, hash) && strcmp(block->hash2, hash)) continue;
 			if (!block->confirmed) {
 				debuglog("*** CONFIRMED %d : %s\n", block->height, block->hash2);
-				strncpy(block->hash, blockhash, 65);
+				// Ethereum block hashes are 0x-prefixed (66 chars); do not truncate.
+				snprintf(block->hash, sizeof(block->hash), "%s", blockhash);
 				block->confirmed = true;
 			}
 			return true;
