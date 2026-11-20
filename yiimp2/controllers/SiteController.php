@@ -374,7 +374,26 @@ class SiteController extends BaseController
      *
      * @return string
      */
-	public function actionDiff()
+	public function actionDiff(): string
+	{
+		return $this->render('diff', $this->buildDiffData());
+	}
+
+	/**
+	 * AJAX refresh endpoint for the live diff page.
+	 */
+	public function actionDiff_data(): Response
+	{
+		$data = $this->buildDiffData();
+		Yii::$app->response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+
+		return $this->asJson([
+			'generated' => gmdate('Y-m-d H:i:s', $data['now']),
+			'html'      => $this->renderPartial('diff_live', $data),
+		]);
+	}
+
+	private function buildDiffData(): array
 	{
 		$now       = time();
 		$configDir = dirname(Yii::$app->basePath) . '/config/stratum';
@@ -442,7 +461,7 @@ class SiteController extends BaseController
 			$algo = (string) ($coin['algo'] ?? '');
 			if (!isset($rows[$algo])) continue;
 			if ($rows[$algo]['symbol'] === '') {
-				$rows[$algo]['symbol']  = (string) $coin['symbol'];
+				$rows[$algo]['symbol']   = (string) $coin['symbol'];
 				$rows[$algo]['coin_name'] = (string) $coin['name'];
 			}
 			$rows[$algo]['network_diff'] = (float) $coin['difficulty'];
@@ -476,12 +495,12 @@ class SiteController extends BaseController
 			? YAAMP_STRATUM_URL
 			: (defined('YIIMP_STRATUM_URL') ? YIIMP_STRATUM_URL : 'localhost');
 
-		return $this->render('diff', [
+		return [
 			'rows'       => $rows,
 			'workers'    => $workers,
 			'now'        => $now,
 			'stratumUrl' => $stratumUrl,
-		]);
+		];
 	}
 
     /**
