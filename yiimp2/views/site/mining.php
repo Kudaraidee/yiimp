@@ -175,6 +175,12 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
     </div>
 </div>
 
+<div class="row gx-3">
+    <div class="col-12 mining-col">
+        <?= $this->render('_mining_command', ['algoNav' => $algoNav]) ?>
+    </div>
+</div>
+
 <script>
 var global_algo = <?= json_encode($algo) ?>;
 var querystring = global_algo ? '?algo=' + encodeURIComponent(global_algo) : '';

@@ -117,9 +117,10 @@ class SiteController extends BaseController
      */
     private function buildMiningAlgoNav(): array
     {
-        $util   = Yii::$app->YiimpUtils;
-        $conv   = Yii::$app->ConversionUtils;
-        $active = (string) Yii::$app->session->get('yaamp-algo', 'all');
+        $util     = Yii::$app->YiimpUtils;
+        $conv     = Yii::$app->ConversionUtils;
+        $active   = (string) Yii::$app->session->get('yaamp-algo', 'all');
+        $tlsPorts = $this->buildTlsPortMap();
 
         $items        = [];
         $totalWorkers = 0;
@@ -135,6 +136,23 @@ class SiteController extends BaseController
 
             $workers = (int) \app\models\Workers::find()->where(['algo' => $algo])->count();
             $stratum = \app\models\Stratums::find()->where(['algo' => $algo])->one();
+
+            // Coins for the command generator. auto_ready is intentionally not
+            // checked here — it controls auto-exchange, not miner availability.
+            $coinData = [];
+            foreach ($coins as $coin) {
+                $symbol = (string) $coin->getOfficialSymbol();
+                $portRow = \app\models\Stratums::find()
+                    ->where(['symbol' => $symbol, 'algo' => $algo])->one();
+                $coinData[] = [
+                    'symbol'      => $symbol,
+                    'name'        => (string) $coin->name,
+                    'algo'        => $algo,
+                    'port'        => $portRow ? (int) $portRow->port : (int) ($stratum->port ?? 0),
+                    'tls_port'    => (int) ($tlsPorts[$algo] ?? 0),
+                    'no_exchange' => isset($coin->auto_exchange) && $coin->auto_exchange == 0,
+                ];
+            }
 
             $poolHash   = 0.0;
             $networkHash = 0.0;
@@ -154,6 +172,7 @@ class SiteController extends BaseController
                 'workers'      => $workers,
                 'pool_hash'    => $poolHash > 0 ? $conv->Itoa2($poolHash) . 'h/s' : '0 h/s',
                 'network_hash' => $networkHash > 0 ? strtoupper($conv->Itoa2($networkHash)) . 'H/s' : '—',
+                'coins'        => $coinData,
             ];
 
             $totalWorkers  += $workers;
@@ -164,6 +183,11 @@ class SiteController extends BaseController
             $active = 'all';
         }
 
+        $allCoins = [];
+        foreach ($items as $item) {
+            $allCoins = array_merge($allCoins, $item['coins']);
+        }
+
         $all = [
             'algo'         => 'all',
             'label'        => 'All',
@@ -172,6 +196,7 @@ class SiteController extends BaseController
             'workers'      => $totalWorkers,
             'pool_hash'    => $totalPoolHash > 0 ? $conv->Itoa2($totalPoolHash) . 'h/s' : '0 h/s',
             'network_hash' => '—',
+            'coins'        => $allCoins,
         ];
 
         return [
