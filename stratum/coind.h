@@ -58,6 +58,7 @@ public:
 	double reward_mul;
 
 	double price;
+	double network_hash;
 	int pool_ttf;
 	int actual_ttf;
 	int blocktime;

@@ -36,6 +36,10 @@ double coind_profitability(YAAMP_COIND *coind)
 
 double coind_nethash(YAAMP_COIND *coind)
 {
+	// Prefer the RPC-derived value stored by CoinService::updateCoinStats().
+	// Fall back to the legacy difficulty estimate if the job has not run yet.
+	if (coind->network_hash > 0) return coind->network_hash;
+
 	int blocktime = (coind->blocktime)? coind->blocktime : std::max(std::min(coind->actual_ttf, 60), 30);
 	int powlimit_bits = 32;
 

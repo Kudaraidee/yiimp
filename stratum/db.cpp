@@ -207,7 +207,7 @@ void db_update_coinds(YAAMP_DB *db)
 		"hassubmitblock, txmessage, enable, auto_ready, algo, pool_ttf, charity_address, charity_amount, charity_percent, "
 		"reward_mul, symbol, auxpow, actual_ttf, network_ttf, usememorypool, hasmasternodes, algo, symbol2, "
 		"rpccurl, rpcssl, rpccert, account, multialgos, max_miners, max_shares, usesegwit, "
-		"auto_exchange, enable_rpcdebug, personalization, powlimit_bits, block_time, usemweb "
+		"auto_exchange, enable_rpcdebug, personalization, powlimit_bits, block_time, usemweb, network_hash "
 		"FROM coins WHERE enable AND auto_ready AND algo='%s' ORDER BY index_avg", g_stratum_algo);
 
 	MYSQL_RES *result = mysql_store_result(&db->mysql);
@@ -338,6 +338,9 @@ void db_update_coinds(YAAMP_DB *db)
 		if(row[40]) coind->blocktime = atoi(row[40]);
 		
 		if(row[41]) coind->usemweb = atoi(row[41]) > 0;		
+
+		// Network hashrate refreshed by the PHP coin stats job (RPC-first).
+		coind->network_hash = row[42] ? atof(row[42]) : 0;
 
 		if(coind->usesegwit) g_stratum_segwit = true;
 		

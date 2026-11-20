@@ -253,7 +253,7 @@ class CoinService
             }
 
             if ($coin->difficulty) {
-                $coin->network_hash = Yii::$app->YiimpUtils->coin_nethash($coin);
+                $coin->network_hash = Yii::$app->YiimpUtils->display_network_hashrate($coin);
                 $coin->index_avg    = $coin->reward * $coin->price * 10000 / $coin->difficulty;
 
                 if (!$coin->auxpow && $coin->rpcencoding === 'POW') {
@@ -271,7 +271,7 @@ class CoinService
 
             if (isset($poolRate[$coin->algo]) && $poolRate[$coin->algo]) {
                 $coin->pool_ttf = (int) min(
-                    Yii::$app->YiimpUtils->coin_nethash($coin) / $poolRate[$coin->algo] * ((float) ($coin->actual_ttf ?? 0)),
+                    $coin->network_hash / $poolRate[$coin->algo] * ((float) ($coin->actual_ttf ?? 0)),
                     2147483647
                 );
             }

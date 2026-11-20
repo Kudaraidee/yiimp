@@ -186,7 +186,7 @@ class ApiController extends Controller
             $timeSinceLastSolo   = $timeLastSolo   ? time() - $timeLastSolo   : 0;
 
             $miners = (int) $db->createCommand(
-                "SELECT COUNT(DISTINCT userid) FROM accounts WHERE coinid=:cid AND id IN (SELECT DISTINCT userid FROM workers)",
+                "SELECT COUNT(DISTINCT id) FROM accounts WHERE coinid=:cid AND id IN (SELECT DISTINCT userid FROM workers)",
                 [':cid' => $coin->id]
             )->queryScalar();
 
@@ -228,8 +228,7 @@ class ApiController extends Controller
 
             $btcMhd = $conv->mbitcoinvaluetoa($util->yiimp_profitability($coin));
 
-            $minTtf      = ($coin->network_ttf > 0) ? min($coin->actual_ttf, $coin->network_ttf) : $coin->actual_ttf;
-            $networkHash = $coin->difficulty * 0x100000000 / ($minTtf ?: 60);
+            $networkHash = (float) ($util->display_network_hashrate($coin) ?: 0);
 
             $stratumRow = $db->createCommand(
                 "SELECT port FROM stratums WHERE algo=:algo AND symbol=:sym LIMIT 1",
