@@ -419,11 +419,26 @@ json_value *rpc_curl_call(YAAMP_RPC *rpc, char const *method, char const *params
 	else
 		sprintf(message, "{\"method\":\"%s\",\"id\":\"%d\"}", method, ++rpc->id);
 
+	YAAMP_COIND *coind = rpc->coind;
+	if (coind && coind->rpcdebug) {
+		if (strlen(message) > (YAAMP_SMALLBUFSIZE/2))
+			debuglog("RPC-Call [%s] *** buffer too small ***\n", coind->name);
+		else
+			debuglog("RPC-Call [%s] %s\n", coind->name, message);
+	}
+
 	json_value *json = rpc_curl_do_call(rpc, message);
 	free(message);
 	//rpc_curl_close(rpc);
 
-	if(!json) return NULL;
+	if(!json) {
+		if (coind && coind->rpcdebug) {
+			char err[1024];
+			rpc_curl_get_lasterr(err, sizeof(err));
+			debuglog("RPC-Error [%s] %s: %s\n", coind->name, method, err);
+		}
+		return NULL;
+	}
 
 	int s2 = current_timestamp();
 	if(s2-s1 > 2000)
@@ -433,6 +448,21 @@ json_value *rpc_curl_call(YAAMP_RPC *rpc, char const *method, char const *params
 	{
 		json_value_free(json);
 		return NULL;
+	}
+
+	if (coind && coind->rpcdebug) {
+		json_value *result = json_get_object(json, "result");
+		json_value *error = json_get_object(json, "error");
+		if (error && error->type != json_null) {
+			json_value *msg = json_get_object(error, "message");
+			debuglog("RPC-Resp [%s] %s error %s\n", coind->name, method,
+				msg && msg->type == json_string ? msg->u.string.ptr : "");
+		} else if (result && result->type == json_boolean) {
+			debuglog("RPC-Resp [%s] %s result=%s\n", coind->name, method,
+				result->u.boolean ? "true" : "false");
+		} else {
+			debuglog("RPC-Resp [%s] %s ok\n", coind->name, method);
+		}
 	}
 
 	return json;
