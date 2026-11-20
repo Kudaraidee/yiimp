@@ -470,8 +470,9 @@ class YiimpUtils extends Component
 		$delay = time()-$interval;
 
 		$subquery = (new \yii\db\Query())->select(['id'])->from('coins')->where(['rpcencoding' => 'POW']);
-		$rate = Yii::$app->cache->get("YIIMP_pool_rate_pow-$algo");
-		if (!$rate) {
+		$cacheKey = "YIIMP_pool_rate_pow_v2-$algo";
+		$rate = Yii::$app->cache->get($cacheKey);
+		if ($rate === false) {
 			$rate = (new \yii\db\Query())
 					->select(["(sum(difficulty) * $target / $interval / 1000)"])
 					->from('shares')
@@ -479,7 +480,9 @@ class YiimpUtils extends Component
 					->andWhere(['>', 'time', $delay])
 					->andWhere(['in', 'coinid', $subquery])
 					->scalar();
-			Yii::$app->cache->set("YIIMP_pool_rate_pow-$algo", $rate);
+			$rate = $rate ?: 0;
+			// Short TTL so public pool hash follows miner hashrate within a refresh.
+			Yii::$app->cache->set($cacheKey, $rate, 30);
 		}
 		return $rate;
 	}
@@ -492,15 +495,18 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-		$rate = Yii::$app->cache->get("YIIMP_pool_rate-$algo");
-		if (!$rate) {
+		$cacheKey = "YIIMP_pool_rate_v2-$algo";
+		$rate = Yii::$app->cache->get($cacheKey);
+		if ($rate === false) {
 			$rate = (new \yii\db\Query())
 					->select(["(sum(difficulty) * $target / $interval / 1000)"])
 					->from('shares')
 					->where(['valid' => true, 'algo' => $algo])
 					->andWhere(['>', 'time', $delay])
 					->scalar();
-			Yii::$app->cache->set("YIIMP_pool_rate-$algo", $rate);
+			$rate = $rate ?: 0;
+			// Short TTL so public pool hash follows miner hashrate within a refresh.
+			Yii::$app->cache->set($cacheKey, $rate, 30);
 		}
 		return $rate;
 	}
@@ -513,15 +519,17 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-		$rate = Yii::$app->cache->get("YIIMP_pool_shared_rate-$algo");
-		if (!$rate) {
+		$cacheKey = "YIIMP_pool_shared_rate_v2-$algo";
+		$rate = Yii::$app->cache->get($cacheKey);
+		if ($rate === false) {
 			$rate = (new \yii\db\Query())
 					->select(["(sum(difficulty) * $target / $interval / 1000)"])
 					->from('shares')
 					->where(['valid' => true, 'algo' => $algo, 'solo' => 0])
 					->andWhere(['>', 'time', $delay])
 					->scalar();
-			Yii::$app->cache->set("YIIMP_pool_shared_rate-$algo", $rate);
+			$rate = $rate ?: 0;
+			Yii::$app->cache->set($cacheKey, $rate, 30);
 		}
 
 		return $rate;
@@ -535,13 +543,15 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-		$rate = Yii::$app->cache->get("YIIMP_pool_solo_rate-$algo");
+		$cacheKey = "YIIMP_pool_solo_rate_v2-$algo";
+		$rate = Yii::$app->cache->get($cacheKey);
 		if ($rate === false) {
 			$rate = Yii::$app->db->createCommand(
 				"SELECT (sum(difficulty) * $target / $interval / 1000) FROM shares WHERE valid AND time>$delay AND algo=:algo AND solo=1",
 				[':algo' => $algo]
 			)->queryScalar();
-			Yii::$app->cache->set("YIIMP_pool_solo_rate-$algo", $rate);
+			$rate = $rate ?: 0;
+			Yii::$app->cache->set($cacheKey, $rate, 30);
 		}
 		return $rate;
 	}
@@ -800,15 +810,17 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-	$rate = Yii::$app->session->get("YIIMP_coin_rate-$coinid");
-	if (!$rate) {
+	$cacheKey = "YIIMP_coin_rate_v2-$coinid";
+	$rate = Yii::$app->cache->get($cacheKey);
+	if ($rate === false) {
 		$rate = (new \yii\db\Query())
 				->select(["(sum(difficulty) * $target / $interval / 1000)"])
 				->from('shares')
 				->where(['valid' => 1, 'coinid' => $coinid])
 				->andwhere(['>' , 'time' , $delay])
 				->scalar();
-		Yii::$app->session->set("YIIMP_coin_rate-$coinid", $rate);
+		$rate = $rate ?: 0;
+		Yii::$app->cache->set($cacheKey, $rate, 30);
 	}
 
 		return $rate;
@@ -823,15 +835,17 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-	$rate = Yii::$app->session->get("YIIMP_coin_shared_rate-$coinid");
-	if (!$rate) {
+	$cacheKey = "YIIMP_coin_shared_rate_v2-$coinid";
+	$rate = Yii::$app->cache->get($cacheKey);
+	if ($rate === false) {
 		$rate = (new \yii\db\Query())
 				->select(["(sum(difficulty) * $target / $interval / 1000)"])
 				->from('shares')
 				->where(['valid' => 1, 'coinid' => $coinid, 'solo' => 0])
 				->andwhere(['>' , 'time' , $delay])
 				->scalar();
-		Yii::$app->session->set("YIIMP_coin_shared_rate-$coinid", $rate);
+		$rate = $rate ?: 0;
+		Yii::$app->cache->set($cacheKey, $rate, 30);
 	}
 
 		return $rate;
@@ -846,15 +860,17 @@ class YiimpUtils extends Component
 		$interval = $this->hashrate_step();
 		$delay = time()-$interval;
 
-		$rate = Yii::$app->session->get("YIIMP_coin_solo_rate-$coinid");
-		if (!$rate) {
+		$cacheKey = "YIIMP_coin_solo_rate_v2-$coinid";
+		$rate = Yii::$app->cache->get($cacheKey);
+		if ($rate === false) {
 			$rate = (new \yii\db\Query())
 					->select(["(sum(difficulty) * $target / $interval / 1000)"])
 					->from('shares')
 					->where(['valid' => 1, 'coinid' => $coinid, 'solo' => 1])
 					->andwhere(['>' , 'time' , $delay])
 					->scalar();
-			Yii::$app->session->set("YIIMP_coin_solo_rate-$coinid", $rate);
+			$rate = $rate ?: 0;
+			Yii::$app->cache->set($cacheKey, $rate, 30);
 		}
 
 		return $rate;
