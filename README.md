@@ -297,6 +297,25 @@ After a certificate is issued, enable HAProxy in `supervisord.conf` by setting `
 
 HAProxy listens on port 443 for HTTPS and can also terminate TLS for stratum connections (port 25+ for SSL stratum, configurable in the HAProxy config).
 
+The stratum C++ server can also terminate TLS itself, so miners can use
+`stratum+ssl://` (or `tcps://`) directly. Add these keys to a stratum `.conf`:
+
+```ini
+[TCP]
+; Main port stays plaintext and also accepts TLS clients by first-byte sniffing.
+tls_cert = /etc/nginx/ssl/pool.example.com/fullchain.pem
+tls_key  = /etc/nginx/ssl/pool.example.com/key.pem
+tls_autodetect = 1
+
+; Optional dedicated TLS-only port. Use 0 to disable it.
+tls_port = 4433
+```
+
+TLS is optional: if the certificate cannot be loaded, the message is logged and
+the plaintext listener still starts. Miners can keep using `stratum+tcp://` on
+the main port while TLS miners use either that same port or `tls_port`.
+`stratum/tls-smoke.py` verifies both modes end to end.
+
 ---
 
 ## Stratum configuration

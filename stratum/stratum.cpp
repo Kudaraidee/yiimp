@@ -18,6 +18,12 @@ CommonList g_list_source;
 
 int g_tcp_port;
 
+int g_tcp_tls_port = 0;
+char g_tcp_tls_cert[1024] = "";
+char g_tcp_tls_key[1024] = "";
+bool g_tcp_tls_autodetect = true;
+bool g_tls_enabled = false;
+
 char g_tcp_server[1024];
 char g_tcp_password[1024];
 
@@ -336,6 +342,15 @@ int main(int argc, char **argv)
 	strcpy(g_tcp_server, iniparser_getstring(ini, "TCP:server", NULL));
 	strcpy(g_tcp_password, iniparser_getstring(ini, "TCP:password", NULL));
 
+	// Optional TLS. A certificate enables same-port auto-detection on the
+	// main port; tls_port additionally opens a TLS-only listener.
+	g_tcp_tls_port = iniparser_getint(ini, "TCP:tls_port", 0);
+	const char *tls_cert = iniparser_getstring(ini, "TCP:tls_cert", NULL);
+	const char *tls_key = iniparser_getstring(ini, "TCP:tls_key", NULL);
+	snprintf(g_tcp_tls_cert, sizeof(g_tcp_tls_cert), "%s", tls_cert ? tls_cert : "");
+	snprintf(g_tcp_tls_key, sizeof(g_tcp_tls_key), "%s", tls_key ? tls_key : "");
+	g_tcp_tls_autodetect = iniparser_getint(ini, "TCP:tls_autodetect", 1) != 0;
+
 	strcpy(g_sql_host, iniparser_getstring(ini, "SQL:host", NULL));
 	strcpy(g_sql_database, iniparser_getstring(ini, "SQL:database", NULL));
 	strcpy(g_sql_username, iniparser_getstring(ini, "SQL:username", NULL));
@@ -397,6 +412,14 @@ int main(int argc, char **argv)
 	// re-init logfiles
 	closelogs(); initlog(g_stratum_algo);
 
+	// TLS is strictly optional: a bad path or unreadable key only disables
+	// TLS, it must never stop the plaintext listener from starting.
+	g_tls_enabled = socket_tls_setup(g_tcp_tls_cert, g_tcp_tls_key);
+	if (g_tcp_tls_port && !g_tls_enabled)
+		stratumlogdate("TLS: tls_port %d ignored because TLS could not be enabled\n", g_tcp_tls_port);
+	if (g_tcp_tls_port == g_tcp_port && g_tcp_tls_port != 0)
+		stratumlogdate("TLS: tls_port equals the main port; using shared-port auto-detection only\n");
+
 	validate_hashfunctions();
 	
 	g_current_algo = stratum_find_algo(g_stratum_algo);
@@ -435,8 +458,11 @@ int main(int argc, char **argv)
 	struct rlimit rlim_threads = {0x8000, 0x8000};
 	setrlimit(RLIMIT_NPROC, &rlim_threads);
 
-	stratumlogdate("starting stratum for %s on %s:%d\n",
-		g_current_algo->name, g_tcp_server, g_tcp_port);
+	stratumlogdate("starting stratum for %s on %s:%d (tls %s, shared-port %s, tls_port %d)\n",
+		g_current_algo->name, g_tcp_server, g_tcp_port,
+		g_tls_enabled ? "enabled" : "disabled",
+		(g_tls_enabled && g_tcp_tls_autodetect) ? "yes" : "no",
+		g_tls_enabled ? g_tcp_tls_port : 0);
 
 	// init Equihash parameters
 	if (!strcmp(g_current_algo->name,"equihash144")) {
@@ -491,8 +517,17 @@ int main(int argc, char **argv)
 	pthread_t thread1;
 	pthread_create(&thread1, NULL, monitor_thread, NULL);
 
+	// Main listener accepts plaintext, and TLS too when a certificate is
+	// configured and shared-port auto-detection was not turned off.
+	int main_tls_mode = (g_tls_enabled && g_tcp_tls_autodetect) ? YAAMP_TLS_SNIFF : YAAMP_TLS_NONE;
 	pthread_t thread2;
-	pthread_create(&thread2, NULL, stratum_thread, NULL);
+	pthread_create(&thread2, NULL, stratum_thread, (void *)(long)main_tls_mode);
+
+	// Optional TLS-only listener. If it equals the main port the shared-port
+	// sniffer already covers it, so do not try to bind the port twice.
+	pthread_t thread3 = 0;
+	if (g_tls_enabled && g_tcp_tls_port > 0 && g_tcp_tls_port != g_tcp_port)
+		pthread_create(&thread3, NULL, stratum_thread, (void *)(long)YAAMP_TLS_FORCE);
 
 	sleep(20);
 
@@ -546,7 +581,10 @@ int main(int argc, char **argv)
 	db_close(db);
 
 	pthread_join(thread2, NULL);
+	if (thread3) pthread_join(thread3, NULL);
 	db_close(g_db); // client threads (called by stratum one)
+
+	socket_tls_shutdown();
 
 	closelogs();
 
@@ -577,6 +615,9 @@ void *monitor_thread(void *p)
 
 void *stratum_thread(void *p)
 {
+	int tls_mode = (int)(long)p;
+	int listen_port = (tls_mode == YAAMP_TLS_FORCE) ? g_tcp_tls_port : g_tcp_port;
+
 	int listen_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if(listen_sock <= 0) yaamp_error("socket");
 
@@ -587,13 +628,17 @@ void *stratum_thread(void *p)
 
 	serv.sin_family = AF_INET;
 	serv.sin_addr.s_addr = htonl(INADDR_ANY);
-	serv.sin_port = htons(g_tcp_port);
+	serv.sin_port = htons(listen_port);
 
 	int res = bind(listen_sock, (struct sockaddr*)&serv, sizeof(serv));
 	if(res < 0) yaamp_error("bind");
 
 	res = listen(listen_sock, 4096);
 	if(res < 0) yaamp_error("listen");
+
+	stratumlogdate("%s listening on port %d (%s)\n", g_stratum_algo, listen_port,
+		tls_mode == YAAMP_TLS_FORCE ? "TLS only" :
+		tls_mode == YAAMP_TLS_SNIFF ? "plaintext + TLS" : "plaintext");
 
 	/////////////////////////////////////////////////////////////////////////
 
@@ -616,17 +661,24 @@ void *stratum_thread(void *p)
 		}
 
 		failcount = 0;
+		YAAMP_CLIENT_START *start = new YAAMP_CLIENT_START;
+		start->sock = sock;
+		start->tls_mode = tls_mode;
+
 		pthread_t thread;
-		int res = pthread_create(&thread, NULL, client_thread, (void *)(long)sock);
+		int res = pthread_create(&thread, NULL, client_thread, start);
 		if(res != 0)
 		{
 			int error = errno;
+			delete start;
 			close(sock);
 			g_exiting = true;
 			stratumlog("%s pthread_create error %d %d\n", g_stratum_algo, res, error);
 		}
-
-		pthread_detach(thread);
+		else
+		{
+			pthread_detach(thread);
+		}
 	}
 }
 

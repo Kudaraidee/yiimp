@@ -68,7 +68,28 @@ class SiteController extends BaseController
         if (!is_null($address))
             return $this->render('wallet');
         else
-            return $this->render('index');
+            return $this->render('index', ['tlsPorts' => $this->buildTlsPortMap()]);
+    }
+
+    /**
+     * Dedicated TLS port per algo, read from the live stratum configs so the
+     * miner command generator never shows a port that is not actually enabled.
+     *
+     * @return array<string,int>
+     */
+    private function buildTlsPortMap(): array
+    {
+        $configDir = dirname(Yii::$app->basePath) . '/config/stratum';
+        $ports = [];
+
+        foreach (glob($configDir . '/*.conf') ?: [] as $file) {
+            $ini = parse_ini_file($file, true) ?: [];
+            $algo = (string) ($ini['STRATUM']['algo'] ?? basename($file, '.conf'));
+            $tlsPort = (int) ($ini['TCP']['tls_port'] ?? 0);
+            if ($tlsPort > 0) $ports[$algo] = $tlsPort;
+        }
+
+        return $ports;
     }
 
     /**
@@ -78,7 +99,83 @@ class SiteController extends BaseController
      */
     public function actionMining()
     {
-        return $this->render('mining');
+        return $this->render('mining', ['algoNav' => $this->buildMiningAlgoNav()]);
+    }
+
+    /**
+     * JSON version of the mining algo scope bar, refreshed with the page.
+     */
+    public function actionMining_summary(): Response
+    {
+        return $this->asJson($this->buildMiningAlgoNav());
+    }
+
+    /**
+     * Small summary used by the algo scope bar on /site/mining.
+     *
+     * @return array{active:string,items:array<string,array<string,mixed>>}
+     */
+    private function buildMiningAlgoNav(): array
+    {
+        $util   = Yii::$app->YiimpUtils;
+        $conv   = Yii::$app->ConversionUtils;
+        $active = (string) Yii::$app->session->get('yaamp-algo', 'all');
+
+        $items        = [];
+        $totalWorkers = 0;
+        $totalPoolHash = 0.0;
+
+        foreach ($util->get_algos(true) ?: [] as $algo) {
+            $coins = Coins::find()
+                ->where(['enable' => 1, 'visible' => 1, 'auto_ready' => 1, 'algo' => $algo])
+                ->all();
+            if (!$coins) continue;
+
+            $workers = (int) \app\models\Workers::find()->where(['algo' => $algo])->count();
+            $stratum = \app\models\Stratums::find()->where(['algo' => $algo])->one();
+
+            $poolHash   = 0.0;
+            $networkHash = 0.0;
+            foreach ($coins as $coin) {
+                $poolHash += (float) $util->coin_rate($coin->id);
+                $hash = $util->display_network_hashrate($coin);
+                if ($hash !== null && (float) $hash > $networkHash) {
+                    $networkHash = (float) $hash;
+                }
+            }
+
+            $items[$algo] = [
+                'algo'         => $algo,
+                'label'        => $algo,
+                'color'        => $util->getAlgoColors($algo),
+                'port'         => $stratum ? (int) $stratum->port : 0,
+                'workers'      => $workers,
+                'pool_hash'    => $poolHash > 0 ? $conv->Itoa2($poolHash) . 'h/s' : '0 h/s',
+                'network_hash' => $networkHash > 0 ? strtoupper($conv->Itoa2($networkHash)) . 'H/s' : '—',
+            ];
+
+            $totalWorkers  += $workers;
+            $totalPoolHash += $poolHash;
+        }
+
+        if ($active !== 'all' && !isset($items[$active])) {
+            $active = 'all';
+        }
+
+        $all = [
+            'algo'         => 'all',
+            'label'        => 'All',
+            'color'        => '#6c757d',
+            'port'         => 0,
+            'workers'      => $totalWorkers,
+            'pool_hash'    => $totalPoolHash > 0 ? $conv->Itoa2($totalPoolHash) . 'h/s' : '0 h/s',
+            'network_hash' => '—',
+        ];
+
+        return [
+            'active' => $active,
+            'items'  => array_merge(['all' => $all], $items),
+        ];
     }
 
     /**
@@ -412,6 +509,7 @@ class SiteController extends BaseController
 			$rows[$algo] = [
 				'algo'         => $algo,
 				'port'         => (int) ($ini['TCP']['port'] ?? 0),
+				'tls_port'     => (int) ($ini['TCP']['tls_port'] ?? 0),
 				'config_file'  => basename($file),
 				'default'      => $default,
 				'min'          => isset($section['diff_min']) ? (float) $section['diff_min'] : $default / 2,
@@ -521,9 +619,11 @@ class SiteController extends BaseController
      *
      * @return string
      */
-    public function actionMiners(): string
+    public function actionMiners(): Response
 	{
-		return $this->render('miners');
+		$base = defined('YIIMP_SITE_URL') ? trim(YIIMP_SITE_URL) : Yii::$app->request->hostInfo;
+		if ($base !== '' && !preg_match('#^https?://#i', $base)) $base = 'https://' . $base;
+		return $this->redirect(rtrim($base, '/') . '/site/mining');
 	}
 
 	public function actionMiners_results(): string

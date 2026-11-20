@@ -49,6 +49,7 @@ $customNote = function (string $algo): string {
     <tr style="background: #eee;">
         <th style="border: 1px solid #ccc; padding: 4px 6px; text-align: left;">Algo</th>
         <th style="border: 1px solid #ccc; padding: 4px 6px; text-align: left;">Port</th>
+        <th style="border: 1px solid #ccc; padding: 4px 6px; text-align: left;">TLS Port</th>
         <th style="border: 1px solid #ccc; padding: 4px 6px; text-align: left;">Coin</th>
         <th style="border: 1px solid #ccc; padding: 4px 6px; text-align: left;">Status</th>
         <th style="border: 1px solid #ccc; padding: 4px 6px; text-align: left;">Pool diff</th>
@@ -59,7 +60,7 @@ $customNote = function (string $algo): string {
     </thead>
     <tbody>
     <?php if (empty($rows)): ?>
-    <tr><td colspan="8" style="border: 1px solid #ccc; padding: 6px;">No stratum data available.</td></tr>
+    <tr><td colspan="9" style="border: 1px solid #ccc; padding: 6px;">No stratum data available.</td></tr>
     <?php else: ?>
         <?php foreach ($rows as $r): ?>
             <?php
@@ -74,6 +75,7 @@ $customNote = function (string $algo): string {
         <tr>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($r['algo']) ?></td>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= $r['port'] ? (int) $r['port'] : '—' ?></td>
+            <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= $r['tls_port'] ? (int) $r['tls_port'] : '—' ?></td>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($symbol) ?></td>
             <td style="border: 1px solid #ccc; padding: 4px 6px;">
                 <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:<?= $color ?>"></span>

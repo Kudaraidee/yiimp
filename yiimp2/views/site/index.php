@@ -23,6 +23,8 @@ $coinList = Coins::find()
     ->all();
 
 // ── Build coin <option> HTML (shared) ─────────────────────────────────────────
+/** @var array<string,int> $tlsPorts algo => dedicated TLS port (0/absent = none) */
+$tlsPorts = $tlsPorts ?? [];
 $coinOptions = '';
 if (!$coinList) {
     $coinOptions = '<option disabled>No Coins Available</option>';
@@ -35,6 +37,7 @@ if (!$coinList) {
         $noExch  = isset($coin->auto_exchange) && $coin->auto_exchange == 0;
         $portRow = Stratums::find()->where(['symbol' => $symbol, 'algo' => $algo])->one();
         $port    = $portRow ? $portRow->port : '0000';
+        $tlsPort = $tlsPorts[$algo] ?? 0;
         $mc      = $noExch ? ",mc={$symbol}" : '';
 
         if ($algo !== $lastAlgo) {
@@ -43,6 +46,7 @@ if (!$coinList) {
         }
         $coinOptions .= '<option value="' . Html::encode($symbol) . '"'
             . ' data-port="' . Html::encode($port) . '"'
+            . ' data-tls-port="' . ($tlsPort ? (int) $tlsPort : '') . '"'
             . ' data-algo="-a ' . Html::encode($algo) . '"'
             . ' data-symbol="' . Html::encode($symbol) . '"'
             . ' data-extra="-p c=' . Html::encode($symbol . $mc) . '">'
@@ -307,6 +311,14 @@ function generate() {
             + '.' + (rig || 'WORKER_NAME')
             + ' ' + (sel.dataset.extra || '')
             + (solo.value || '');
+
+    // Same-port auto-detection means the plain URL already accepts TLS. When
+    // a dedicated TLS port is configured, show that command as a second line.
+    var tlsPort = sel.dataset.tlsPort || '';
+    if (tlsPort) {
+        cmd += '\n' + cmd.replace('stratum+tcp://', 'stratum+ssl://')
+                        .replace(':' + (sel.dataset.port || '0000'), ':' + tlsPort);
+    }
 
     document.getElementById('stratum-output').textContent = cmd;
 }

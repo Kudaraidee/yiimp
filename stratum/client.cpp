@@ -619,15 +619,31 @@ void *client_thread(void *p)
 	client->created = time(NULL);
 	client->last_best = time(NULL);
 
-	client->sock = socket_initialize((int)(long)p);
+	YAAMP_CLIENT_START *start = (YAAMP_CLIENT_START *)p;
+	int client_sock = start->sock;
+	int tls_mode = start->tls_mode;
+	delete start;
+
+	client->sock = socket_initialize(client_sock);
 //	client->source = source_init(client);
 
 	client->shares_per_minute = YAAMP_SHAREPERSEC;
 	client->last_submit_time = current_timestamp();
 
+	// socket_initialize() has already consumed any HAProxy PROXY header, so
+	// the next byte is either a TLS ClientHello or the first JSON character.
+	bool tls_ok = true;
+	if (tls_mode == YAAMP_TLS_FORCE ||
+	    (tls_mode == YAAMP_TLS_SNIFF && socket_looks_like_tls(client->sock)))
+	{
+		tls_ok = socket_tls_enable(client->sock);
+		if (!tls_ok)
+			clientlog(client, "TLS handshake failed");
+	}
+
 //	usleep(g_list_client.count * 5000);
 
-	while(!g_exiting)
+	while(tls_ok && !g_exiting)
 	{
 		if(client->submit_bad > 1024)
 		{

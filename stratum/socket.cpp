@@ -1,5 +1,68 @@
 
 #include "stratum.h"
+#include <poll.h>
+
+// OpenSSL lives in tls.cpp behind an opaque interface. Keeping <openssl/ssl.h>
+// out of this file avoids the SHA256_CTX name clash with algos/sha256.h.
+bool socket_tls_setup(const char *cert, const char *key)
+{
+	char err[512];
+	if (!stratum_tls_init(cert, key, err, sizeof(err)))
+	{
+		stratumlogdate("TLS: %s\n", err);
+		return false;
+	}
+	return true;
+}
+
+void socket_tls_shutdown()
+{
+	stratum_tls_free();
+}
+
+bool socket_looks_like_tls(YAAMP_SOCKET *s)
+{
+	// A TLS ClientHello starts with 0x16 (handshake); 0x80 is the obsolete
+	// SSLv2 format still sent by a handful of old miners. Stratum JSON always
+	// starts with '{' (0x7B). Wait briefly for the first bytes so an ordinary
+	// connect-without-send does not block a worker thread in the sniffer.
+	struct pollfd pfd;
+	pfd.fd = s->sock;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+
+	int pr = poll(&pfd, 1, 5000);
+	if (pr <= 0)
+		return false;
+
+	unsigned char first = 0;
+	int len;
+	do {
+		len = recv(s->sock, &first, 1, MSG_PEEK);
+	} while (len == -1 && errno == EINTR);
+
+	if (len != 1)
+		return false;
+
+	return first == 0x16 || first == 0x80;
+}
+
+bool socket_tls_enable(YAAMP_SOCKET *s)
+{
+	if (!s || s->ssl)
+		return false;
+
+	SSL *ssl = NULL;
+	char err[512];
+	if (!stratum_tls_accept(s->sock, &ssl, err, sizeof(err)))
+	{
+		stratumlog("TLS handshake failed for %s: %s\n", s->ip, err);
+		return false;
+	}
+
+	s->ssl = ssl;
+	return true;
+}
 
 bool socket_connected(YAAMP_SOCKET *s)
 {
@@ -88,6 +151,13 @@ void socket_close(YAAMP_SOCKET *s)
 	}
 
 	if(!s) return;
+
+	if(s->ssl)
+	{
+		stratum_tls_close(s->ssl);
+		s->ssl = NULL;
+	}
+
 	if(s->sock) close(s->sock);
 
 //	pthread_mutex_unlock(&s->mutex);
@@ -103,7 +173,9 @@ json_value *socket_nextjson(YAAMP_SOCKET *s, YAAMP_CLIENT *client)
 	{
 	//	pthread_mutex_unlock(&s->mutex);
 
-		int len = recv(s->sock, s->buffer+s->buflen, YAAMP_SOCKET_BUFSIZE-s->buflen-1, 0);
+		int want = YAAMP_SOCKET_BUFSIZE-s->buflen-1;
+		int len = s->ssl ? stratum_tls_read(s->ssl, s->buffer+s->buflen, want)
+		                 : recv(s->sock, s->buffer+s->buflen, want, 0);
 		if(len <= 0) return NULL;
 
 		s->last_read = time(NULL);
@@ -193,8 +265,20 @@ int socket_send_raw(YAAMP_SOCKET *s, const char *buffer, int size)
 		debuglog("socket send: %s", buffer);
 	}
 
-	int res = send(s->sock, buffer, size, MSG_NOSIGNAL);
-	return res;
+	if (!s->ssl)
+		return send(s->sock, buffer, size, MSG_NOSIGNAL);
+
+	// SSL_write can perform a partial write; push the whole JSON line out so
+	// miners never see a truncated notify/result message.
+	int sent = 0;
+	while (sent < size)
+	{
+		int n = stratum_tls_write(s->ssl, buffer+sent, size-sent);
+		if (n <= 0)
+			return sent ? sent : n;
+		sent += n;
+	}
+	return sent;
 }
 
 int socket_send(YAAMP_SOCKET *s, const char *format, ...)

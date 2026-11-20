@@ -82,6 +82,15 @@ extern bool is_etchash;
 
 extern int g_tcp_port;
 
+// Optional TLS listeners. tls_port = 0 disables the dedicated TLS port; the
+// main port still accepts TLS when a certificate is configured and
+// tls_autodetect is enabled.
+extern int g_tcp_tls_port;
+extern char g_tcp_tls_cert[1024];
+extern char g_tcp_tls_key[1024];
+extern bool g_tcp_tls_autodetect;
+extern bool g_tls_enabled;
+
 extern char g_tcp_server[1024];
 extern char g_tcp_password[1024];
 
