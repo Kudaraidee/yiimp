@@ -730,6 +730,13 @@ void *client_thread(void *p)
 				get_nonce_prefix(client->extranonce1_default);
 				snprintf(client->extranonce1, sizeof(client->extranonce1),
 					"%06x", (unsigned int) strtoul(client->extranonce1_default, NULL, 16) & 0xffffff);
+
+				// mining.subscribe normally records the starting prefix here.
+				// ethproxy has no subscribe, so seed it as well; otherwise the
+				// next job broadcast thinks the prefix changed and sends
+				// client.reconnect with the bind address (0.0.0.0).
+				strcpy(client->extranonce1_last, client->extranonce1);
+				client->extranonce2size = client->extranonce2size_last = 0;
 			}
 
 			// ethproxy clients never send mining.subscribe, so the difficulty
