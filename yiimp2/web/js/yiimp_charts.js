@@ -68,6 +68,17 @@
             data  = data.slice(0, -1);
         }
 
+        // jqPlot multi-series with title wraps the series array in one extra
+        // level: [[series1, series2, ...], "title"]. Unwrap it so the series
+        // detection below sees [[date, value], ...] directly.
+        if (data.length === 1
+            && Array.isArray(data[0])
+            && Array.isArray(data[0][0])
+            && Array.isArray(data[0][0][0])
+            && typeof data[0][0][0][0] === 'string') {
+            data = data[0];
+        }
+
         // Single series: data[0][0] is a scalar (not an array of arrays)
         if (!Array.isArray(data[0])) {
             return { seriesArray: [data], title: title };

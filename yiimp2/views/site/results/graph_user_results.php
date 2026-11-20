@@ -31,6 +31,26 @@ $stats = Hashuser::find()
 			->andWhere(['>', 'time', $t])
 			->orderBy('time')
 			->all();
+
+// Corrupt hashuser rows (some are 1000x+ the real rate) make the whole
+// 24h chart look flat. Drop values outside median + 3*MAD, a robust
+// outlier test that still keeps real short bursts.
+$rateValues = array();
+foreach($stats as $row)
+	if((float) $row->hashrate > 0) $rateValues[] = (float) $row->hashrate;
+sort($rateValues);
+$rateCap = 0.0;
+if(count($rateValues))
+{
+	$median = $rateValues[intdiv(count($rateValues), 2)];
+	$deviations = array_map(fn($rate) => abs($rate - $median), $rateValues);
+	sort($deviations);
+	$mad = $deviations[intdiv(count($deviations), 2)];
+	// When most samples are identical MAD is 0; fall back to a generous
+	// multiple of the median instead of zeroing every normal fluctuation.
+	$rateCap = $mad > 0 ? $median + 3 * $mad : $median * 10;
+}
+
 $averages = array();
 
 $charttitle = $algo.' Hashrate ('.$algo_unit.'/s)';
@@ -50,7 +70,9 @@ for($i = $t+$step, $j = 0; $i < time(); $i += $step)
 
 	else if(isset($stats[$j]) && $i > $stats[$j]->time)
 	{
-		$m = round(($stats[$j]->hashrate/1000000) / $factor, 3);
+		$rate = (float) $stats[$j]->hashrate;
+		if($rateCap > 0 && $rate > $rateCap) $rate = 0;
+		$m = round(($rate/1000000) / $factor, 3);
 		$j++;
 	}
 
