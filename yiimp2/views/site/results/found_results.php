@@ -137,13 +137,16 @@ span.block.immature{color:#fff;background:#f0ad4e;}
 span.block.confirmed{color:#fff;background:#5cb85c;}
 span.shared{padding:2px;display:inline-block;text-align:center;min-width:15px;border-radius:3px;color:#fff;background:#87d547;}
 span.solo{padding:2px;display:inline-block;text-align:center;min-width:15px;border-radius:3px;color:#fff;background:#48D8D8;}
-.ssrow td.row{font-size:.8em;}td.right{text-align:right;}
+/* Legacy "row" class on table cells conflicts with Bootstrap 5 .row (flex). */
+.ssrow td.row{font-size:.8em;display:table-cell;margin:0;}td.right{text-align:right;}
+table.found-blocks-table th, table.found-blocks-table td{padding:.2em .25em;}
+table.found-blocks-table span.block, table.found-blocks-table span.shared, table.found-blocks-table span.solo{min-width:0;padding:1px 3px;font-size:.75em;}
 </style>
 CSS;
     echo "<div class='main-left-box'>";
     echo "<div class='main-left-title'>" . Html::encode($title) . "</div>";
     echo "<div class='main-left-inner'>";
-    echo "<table class='dataGrid2'>";
+    echo "<table class='dataGrid2 found-blocks-table'>";
     echo "<thead><tr><td></td><th>Name</th><th align='right'>Amount</th><th align='right'>Difficulty</th><th align='right'>Block</th><th align='right'>Time</th><th>Effort</th><th align='right'>Type</th><th align='right'>Status</th></tr></thead>";
     echo "<tbody>";
 } elseif (!$isTailwind) {
@@ -237,7 +240,7 @@ foreach ($db_blocks as $db_block) {
         $flags = $db_block->segwit ? '&nbsp;<img src="/images/ui/segwit.png" height="8px" valign="center" title="segwit"/>' : '';
         echo '<tr class="ssrow">';
         echo '<td width="18px"><img width="16px" src="' . Html::encode($coin->image) . '"></td>';
-        echo '<td class="row"><b class="row">' . $link . '</b> (' . Html::encode($db_block->algo) . ')' . $flags . '</td>';
+        echo '<td class="row"><b>' . $link . '</b> (' . Html::encode($db_block->algo) . ')' . $flags . '</td>';
         echo '<td class="row right"><b>' . $reward . ' ' . Html::encode($coin->symbol_show) . '</b></td>';
         echo '<td class="row right" title="found ' . Html::encode($db_block->difficulty_user) . '">' . $difficulty . '</td>';
         echo '<td class="row right">' . $height . '</td>';
