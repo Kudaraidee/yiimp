@@ -146,7 +146,6 @@ $jsHomeUrl  = json_encode($homeUrl);
         </div>
     </div>
     <div class="col-12 col-md-6 wallet-col" style="overflow-x:auto;">
-        <div id="pool_current_results" class="ajax-placeholder"></div>
         <?php if ($user): ?><div id="found_results" class="ajax-placeholder"></div><?php endif ?>
     </div>
 </div>
@@ -232,7 +231,6 @@ $jsHomeUrl  = json_encode($homeUrl);
 
     <!-- RIGHT -->
     <div class="col-12 col-md-6" style="overflow-x:auto;">
-        <div id="pool_current_results" class="mb-3"></div>
         <?php if ($user): ?><div id="found_results" class="mb-3"></div><?php endif ?>
     </div>
 
@@ -365,7 +363,6 @@ $jsHomeUrl  = json_encode($homeUrl);
 
     <!-- RIGHT -->
     <div class="flex flex-col gap-4 min-w-0 overflow-x-auto">
-        <div id="pool_current_results"></div>
         <?php if ($user): ?><div id="found_results"></div><?php endif ?>
     </div>
 
@@ -379,7 +376,6 @@ var _homeUrl  = <?= $jsHomeUrl ?>;
 var _address  = <?= $jsAddress ?>;
 
 function page_refresh() {
-    pool_current_refresh();
     found_refresh();
     if (_username !== '') {
         main_wallet_refresh();
@@ -403,9 +399,6 @@ function main_found_refresh() {
 }
 function main_miners_refresh() {
     $.get(_homeUrl + 'site/wallet_miners_results?address=' + encodeURIComponent(_username), '', function(d){ $('#main_miners_results').html(d); });
-}
-function pool_current_refresh() {
-    $.get(_homeUrl + 'site/current_results', '', function(d){ $('#pool_current_results').html(d); if(typeof lucide!=='undefined')lucide.createIcons(); });
 }
 function main_title_refresh() {
     $.get(_homeUrl + 'site/title_results?address=' + encodeURIComponent(_username), '', function(d){ document.title = d; });

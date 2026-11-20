@@ -113,7 +113,6 @@ if (YIIMP_ALLOW_EXCHANGE)   $links['Algo Switching'] = $homeUrl . 'site/multialg
 </div></div><br>
 
 </td><td valign="top">
-<div id="pool_current_results"></div>
 <div id="pool_history_results"></div>
 <div id="pool_coins_info"></div>
 </td></tr></table>
@@ -179,7 +178,6 @@ if (YIIMP_ALLOW_EXCHANGE)   $links['Algo Switching'] = $homeUrl . 'site/multialg
 
     <!-- RIGHT -->
     <div class="col-12 col-md-6">
-        <div id="pool_current_results" class="mb-3"></div>
         <div id="pool_history_results" class="mb-3"></div>
         <div id="pool_coins_info"></div>
     </div>
@@ -267,7 +265,6 @@ if (YIIMP_ALLOW_EXCHANGE)   $links['Algo Switching'] = $homeUrl . 'site/multialg
 
     <!-- RIGHT -->
     <div class="flex flex-col gap-4">
-        <div id="pool_current_results"></div>
         <div id="pool_history_results"></div>
         <div id="pool_coins_info"></div>
     </div>
@@ -278,15 +275,11 @@ if (YIIMP_ALLOW_EXCHANGE)   $links['Algo Switching'] = $homeUrl . 'site/multialg
 
 <script>
 function page_refresh() {
-    pool_current_refresh();
     pool_history_refresh();
     pool_coins_info_refresh();
 }
 function select_algo(algo) {
     window.location.href = '<?= $homeUrl ?>site/algo?algo=' + encodeURIComponent(algo) + '&r=/';
-}
-function pool_current_refresh() {
-    $.get('<?= $homeUrl ?>site/current_results', '', function(d){ $('#pool_current_results').html(d); if(typeof lucide!=='undefined')lucide.createIcons(); });
 }
 function pool_history_refresh() {
     $.get('<?= $homeUrl ?>site/history_results', '', function(d){ $('#pool_history_results').html(d); });
