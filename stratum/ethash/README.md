@@ -172,6 +172,15 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
   -u WALLET.WORKER -p c=LRS,mc=LRS --intensity 16 --kernel 0
 ```
 
+ตัวอย่าง GMiner 3.43 แบบ ethproxy (ไม่ใส่ scheme → `--proto proxy`) และแบบ NiceHash ethstratum:
+
+```bash
+./miner --proto proxy --server pool.example.com --port 3639 \
+  --user WALLET.WORKER --pass c=LRS,mc=LRS --cuda 1
+./miner --server stratum+tcp://pool.example.com:3639 \
+  --user WALLET.WORKER --pass c=LRS,mc=LRS --cuda 1
+```
+
 ตัวอย่าง T-Rex แบบ NiceHash `stratum2` (ใช้ protocol เดียวกับ NiceHash/MiningPoolHub):
 
 ```bash
@@ -186,7 +195,7 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 > stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
 >
 > - `eth_submitLogin` → ใช้ username/password แบบเดียวกับ `mining.authorize`
-> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget]` โดย target คือ `floor(2^224 / difficulty)` ตามสเกล ethash มาตรฐาน (raw difficulty = `difficulty × 2^32`) Rigel รับ difficulty เป็นตัวเลขแล้วโชว์ `34.36G (8.00)` สำหรับ `d=8`, T-Rex อ่าน target แล้วโชว์ raw difficulty `34.36G` — สองตัวจริง ๆ แล้วขุดที่ difficulty เดียวกัน รองรับ difficulty ทศนิยม เช่น `d=0.1` หรือ `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม ค่า `difficulty` ใน config คือค่าหลังหาร 2^32 เช่น `0.1` → raw 429.5M เหมาะกับการ์ดระดับ 1050 Ti (~1 share/นาที)
+> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget, noncePrefix]` ตามรูปแบบ Claymore ethproxy (มี `jsonrpc:"2.0"` ด้วย) โดย target คือ 58 hex หลักแรกของ `floor(2^224 / difficulty)` ตามสเกล ethash มาตรฐาน (raw difficulty = `difficulty × 2^32`) และ `noncePrefix` คือ session prefix 6 hex ที่ miner ต้องต่อเข้ากับ nonce ตอนส่งงาน Rigel รับ difficulty เป็นตัวเลขแล้วโชว์ `34.36G (8.00)` สำหรับ `d=8`, T-Rex อ่าน target แล้วโชว์ raw difficulty `34.36G` — สองตัวจริง ๆ แล้วขุดที่ difficulty เดียวกัน รองรับ difficulty ทศนิยม เช่น `d=0.1` หรือ `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม ค่า `difficulty` ใน config คือค่าหลังหาร 2^32 เช่น `0.1` → raw 429.5M เหมาะกับการ์ดระดับ 1050 Ti (~1 share/นาที)
 > - `-p d=...` → ตั้ง difficulty เริ่มต้นแล้ว **ล็อกไว้ตลอด session** (vardiff ไม่เปลี่ยน) ใช้ได้ทั้ง Rigel และ T-Rex
 > - `-p sd=...` → ตั้ง difficulty เริ่มต้นแบบเดียวกัน แต่ **ไม่ล็อก** ให้ vardiff ปรับขึ้น/ลงตามอัตรา share ได้เหมือน miner ทั่วไป ถ้าใส่ทั้ง `d=` และ `sd=` ฝั่ง `d=` จะชนะ
 >
@@ -194,9 +203,11 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 > - `eth_submitHashrate` → ตอบ `true`
 > - `eth_submitWork` → pool ตรวจ mix digest ด้วย `ethash_hash()` เอง บันทึก share และส่งบล็อกให้ node ด้วย `eth_submitWork` ถ้าเจอ block
 >
-> กับ client แบบ ethproxy pool **จะไม่ส่ง** `mining.set_difficulty` / `mining.notify` (T-Rex จะฟ้อง `Unregistered stratum method`) แต่จะส่ง work ใหม่เป็น `{"jsonrpc":"2.0","result":[...]}` แทน
+> กับ client แบบ ethproxy pool **จะไม่ส่ง** `mining.set_difficulty` / `mining.notify` (T-Rex จะฟ้อง `Unregistered stratum method`) แต่จะส่ง work ใหม่เป็น `{"id":0,"jsonrpc":"2.0","result":[...]}` แทนส่วน `eth_getWork` จะตอบด้วย id ของคำขอและ result 4 ฟิลด์แบบเดียวกัน
 >
 > ใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` กับ T-Rex ก็ได้ เพราะทั้งหมดตกลงมาเป็น ethproxy ฝั่ง pool รองรับหมดแล้ว ส่วน `stratum2+tcp://` / `stratum2+ssl://` จะตกลงมาเป็น NiceHash ethstratum (รองรับแล้วเช่นกัน)
+>
+> GMiner 3.43 ก็ใช้กฎเดียวกัน: `--server host` (ไม่มี scheme) → ethproxy ต้องได้ result 4 ฟิลด์ตามข้างบน, ส่วน `--server stratum+tcp://host` → NiceHash EthereumStratum/1.0.0 (subscribe array, `mining.set_difficulty`, `mining.notify`)
 
 ### Vardiff สำหรับ Ethash/Etchash
 

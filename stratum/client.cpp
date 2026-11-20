@@ -722,6 +722,16 @@ void *client_thread(void *p)
 			// ethash algorithm. Treat it as a first-class protocol here.
 			client->is_ethproxy = true;
 
+			// ethproxy has no mining.subscribe, so allocate the session's
+			// 24-bit nonce prefix here. Claymore/GMiners include this prefix in
+			// eth_getWork and prepend it to the miner nonce on submit.
+			if (!client->extranonce1[0])
+			{
+				get_nonce_prefix(client->extranonce1_default);
+				snprintf(client->extranonce1, sizeof(client->extranonce1),
+					"%06x", (unsigned int) strtoul(client->extranonce1_default, NULL, 16) & 0xffffff);
+			}
+
 			// ethproxy clients never send mining.subscribe, so the difficulty
 			// normally assigned in client_subscribe() is still zero here.
 			// Set it before authorize() sends the initial work and records the

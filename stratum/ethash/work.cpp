@@ -203,13 +203,34 @@ static void ethash_ethproxy_target_hex(YAAMP_CLIENT *client, char *hex66)
 	ethash_bin_to_hex(be, hex66);
 }
 
+// Claymore-style ethproxy advertises the low 232 bits of the target and a
+// 24-bit nonce prefix. This is the shape used by BTC.com and expected by
+// GMiner when it is started with a bare --server address (no scheme).
+static void ethash_ethproxy_claymore_target(char *out, const char *hex66)
+{
+	snprintf(out, 64, "0x%.58s", hex66 + 8);
+}
+
+static void ethash_ethproxy_nonce_prefix(YAAMP_CLIENT *client, char *out)
+{
+	const char *prefix = (client && client->extranonce1[0]) ? client->extranonce1 : "000000";
+	size_t len = strlen(prefix);
+	if (len > 6) prefix += len - 6;
+	snprintf(out, 16, "%06x", (unsigned int) strtoul(prefix, NULL, 16) & 0xffffff);
+}
+
 static void ethash_ethproxy_work_result(YAAMP_JOB *job, YAAMP_CLIENT *client, char *result)
 {
-	char target[80] = { 0 };
-	ethash_ethproxy_target_hex(client, target);
+	char full_target[80] = { 0 };
+	char target[64] = { 0 };
+	char nonce_prefix[16] = { 0 };
 
-	snprintf(result, 512, "[\"%s\",\"%s\",\"%s\"]",
-		job->templ->eth_header, job->templ->eth_seed, target);
+	ethash_ethproxy_target_hex(client, full_target);
+	ethash_ethproxy_claymore_target(target, full_target);
+	ethash_ethproxy_nonce_prefix(client, nonce_prefix);
+
+	snprintf(result, 512, "[\"%s\",\"%s\",\"%s\",\"%s\"]",
+		job->templ->eth_header, job->templ->eth_seed, target, nonce_prefix);
 }
 
 void ethash_ethproxy_work_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer)
@@ -217,8 +238,21 @@ void ethash_ethproxy_work_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buf
 	char result[512] = { 0 };
 	ethash_ethproxy_work_result(job, client, result);
 
-	// Unsolicited work push, matching the shape geth's ethproxy uses.
-	sprintf(buffer, "{\"jsonrpc\":\"2.0\",\"result\":%s}\n", result);
+	// Unsolicited work push. id 0 marks it as a notification, matching the
+	// ETHPROXY jobs sent by production pools.
+	snprintf(buffer, 1024, "{\"id\":0,\"jsonrpc\":\"2.0\",\"result\":%s}\n", result);
+}
+
+static int ethash_ethproxy_send_result(YAAMP_CLIENT *client, const char *result)
+{
+	char id[64] = { 0 };
+	if (client->id_str)
+		snprintf(id, sizeof(id), "\"%s\"", client->id_str);
+	else
+		snprintf(id, sizeof(id), "%d", client->id_int);
+
+	return socket_send(client->sock,
+		"{\"id\":%s,\"jsonrpc\":\"2.0\",\"result\":%s}\n", id, result);
 }
 
 bool ethash_ethproxy_send_work(YAAMP_CLIENT *client)
@@ -251,7 +285,7 @@ bool ethash_ethproxy_get_work(YAAMP_CLIENT *client)
 
 	char result[512] = { 0 };
 	ethash_ethproxy_work_result(job, client, result);
-	client_send_result(client, "%s", result);
+	ethash_ethproxy_send_result(client, result);
 
 	client->jobid_sent = job->id;
 	return true;
