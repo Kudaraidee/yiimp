@@ -41,6 +41,18 @@ const char *ethash_strip_prefix(const char *src)
 	return src ? src : "";
 }
 
+// geth requires every eth_submitWork argument to be 0x-prefixed. Internally the
+// nonce is kept bare for mining/duplicate keys, so add the prefix only here.
+static const char *ethash_rpc_hex(const char *src, char *dst, size_t size)
+{
+	if (!src) src = "";
+	if (src[0] == '0' && (src[1] == 'x' || src[1] == 'X'))
+		snprintf(dst, size, "%s", src);
+	else
+		snprintf(dst, size, "0x%s", src);
+	return dst;
+}
+
 static ethash::hash256 ethash_to_hash256(const char *hex)
 {
 	ethash::hash256 h;
@@ -459,8 +471,12 @@ bool ethash_ethproxy_submit_work(YAAMP_CLIENT *client, json_value *json_params)
 bool ethash_submit_work(YAAMP_COIND *coind, const char *nonce,
 	const char *header, const char *mix)
 {
+	char nonce_hex[24], header_hex[68], mix_hex[68];
 	char params[512];
-	snprintf(params, sizeof(params), "[\"%s\",\"%s\",\"%s\"]", nonce, header, mix);
+	snprintf(params, sizeof(params), "[\"%s\",\"%s\",\"%s\"]",
+		ethash_rpc_hex(nonce, nonce_hex, sizeof(nonce_hex)),
+		ethash_rpc_hex(header, header_hex, sizeof(header_hex)),
+		ethash_rpc_hex(mix, mix_hex, sizeof(mix_hex)));
 
 	json_value *json = rpc_call(&coind->rpc, "eth_submitWork", params, coind);
 	if (!json)
