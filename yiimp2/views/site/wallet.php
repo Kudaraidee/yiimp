@@ -34,6 +34,7 @@ if ($dropAddress !== '' && isset($recents[$dropAddress])) {
 
 // ── Primary user lookup ───────────────────────────────────────────────────────
 $user = null;
+$coin = null;
 if ($address !== '') {
     $user = Accounts::find()->where(['username' => $address])->one();
 }
@@ -75,7 +76,229 @@ $jsUsername = json_encode($username);
 $jsAddress  = json_encode($address);
 $jsHomeUrl  = json_encode($homeUrl);
 
+// ── Dashboard shell data ───────────────────────────────────────────────────────
+$payoutSymbol = 'BTC';
+if ($user && isset($coin) && $coin) $payoutSymbol = (string) $coin->symbol;
+$walletInitials = strtoupper(substr($payoutSymbol, 0, 3));
+$shortAddress   = $username !== ''
+    ? substr($username, 0, 8) . '…' . substr($username, -6)
+    : '';
+$walletFormAction = Yii::$app->YiimpUtils->walletUrl();
+
+// Reusable dashboard fragments — rendered by all three layouts.
+$renderWalletHero = function () use ($username, $shortAddress, $payoutSymbol, $walletInitials, $coin): void {
+    if ($username === '') return;
+    ?>
+    <section class="wd-hero">
+        <div class="wd-hero-main">
+            <span class="wd-avatar"><?= Html::encode($walletInitials) ?>
+                <?php if ($coin && !empty($coin->image)): ?>
+                    <img src="<?= Html::encode($coin->image) ?>" alt="" onerror="this.remove()">
+                <?php endif ?>
+            </span>
+            <div class="wd-identity">
+                <div class="wd-eyebrow">Wallet Overview</div>
+                <div class="wd-address-line">
+                    <span class="wd-address" title="<?= Html::encode($username) ?>"><?= Html::encode($shortAddress) ?></span>
+                    <button type="button" class="wd-copy" data-copy="<?= Html::encode($username) ?>"
+                            onclick="copyWalletAddress(this)">Copy</button>
+                    <span id="wd-status" class="wd-status">● Checking</span>
+                </div>
+                <div class="wd-meta">Payout <b><?= Html::encode($payoutSymbol) ?></b> · auto refresh 60s · values in payout coin</div>
+            </div>
+        </div>
+        <div class="wd-actions">
+            <button type="button" class="wd-btn primary" onclick="main_wallet_refresh()">Refresh</button>
+            <button type="button" class="wd-btn" onclick="main_wallet_refresh_details()">Details</button>
+        </div>
+    </section>
+    <?php
+};
+
+$renderWalletKpis = function () use ($payoutSymbol): void {
+    ?>
+    <section class="wd-kpis" aria-label="Wallet summary">
+        <div class="wd-kpi accent"><span>Balance</span><b id="kpi-balance">—</b><small><?= Html::encode($payoutSymbol) ?></small></div>
+        <div class="wd-kpi"><span>Pending</span><b id="kpi-pending">—</b><small>confirmed</small></div>
+        <div class="wd-kpi"><span>Hashrate</span><b id="kpi-hashrate">—</b><small>active algo</small></div>
+        <div class="wd-kpi"><span>Workers</span><b id="kpi-workers">—</b><small>connections</small></div>
+        <div class="wd-kpi"><span>Blocks</span><b id="kpi-blocks">—</b><small>recent</small></div>
+    </section>
+    <?php
+};
+
+$renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers, $recentCoins, $username, $address): void {
+    ?>
+    <section id="wallet-search-card" class="wd-switch">
+        <div class="wd-switch-head">
+            <span class="wd-switch-title">Switch Wallet</span>
+            <span class="wd-switch-hint">Recent wallets are stored in this browser for 30 days</span>
+        </div>
+        <div class="wd-switch-body">
+            <form action="<?= Html::encode($walletFormAction) ?>" method="get" class="wd-switch-form">
+                <input type="text" name="address" placeholder="Wallet address" autocomplete="off">
+                <button type="submit">Go</button>
+            </form>
+            <?php if ($recents): ?>
+                <div class="wd-recent">
+                    <?php foreach ($recents as $addr):
+                        if (empty($addr)) continue;
+                        $rUser = $recentUsers[$addr] ?? null; if (!$rUser) continue;
+                        $rCoin = $recentCoins[$rUser->coinid] ?? null;
+                        $active = $rUser->username === $username;
+                        $short = substr($addr, 0, 6) . '…' . substr($addr, -4);
+                    ?>
+                        <span class="wd-chip-wallet <?= $active ? 'active' : '' ?>">
+                            <?php if ($rCoin && !empty($rCoin->image)): ?>
+                                <img src="<?= Html::encode($rCoin->image) ?>" alt="" onerror="this.remove()">
+                            <?php endif ?>
+                            <a class="address" href="<?= Html::encode(Yii::$app->YiimpUtils->walletUrl($addr)) ?>"
+                               title="<?= Html::encode($addr) ?>"><?= Html::encode($short) ?></a>
+                            <?php if ($address !== $addr): ?>
+                                <img class="wd-chip-del" src="/images/base/delete.png" alt="remove"
+                                     data-address="<?= Html::encode($addr) ?>" onclick="drop_cookie(this);">
+                            <?php endif ?>
+                        </span>
+                    <?php endforeach ?>
+                </div>
+            <?php else: ?>
+                <div class="wd-empty-recent">No recent wallets</div>
+            <?php endif ?>
+        </div>
+    </section>
+    <?php
+};
+
 ?>
+
+<style>
+/* ── Wallet dashboard shell (shared by Legacy / AdminLTE / Tailwind) ─────────── */
+#wallet-cards {
+    --wd-ink: #26385a;
+    --wd-blue: #2c5aa0;
+    --wd-line: #d8e2ef;
+    --wd-soft: #f8fafc;
+}
+#wallet-cards .wd-hero,
+#wallet-cards .wd-switch {
+    border: 1px solid var(--wd-line) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 1px 3px rgba(20,40,80,.05);
+    background: #fff;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+#wallet-cards .wd-hero {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef4ff 100%);
+}
+#wallet-cards .wd-hero-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+#wallet-cards .wd-avatar {
+    position: relative; flex: 0 0 44px; height: 44px; border-radius: 10px;
+    display: grid; place-items: center; overflow: hidden;
+    background: linear-gradient(135deg, #4f79c8, #2c5aa0);
+    color: #fff; font-size: 8px; font-weight: 800; letter-spacing: .04em;
+}
+#wallet-cards .wd-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+#wallet-cards .wd-identity { min-width: 0; }
+#wallet-cards .wd-eyebrow {
+    font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #8a94a6;
+}
+#wallet-cards .wd-address-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+#wallet-cards .wd-address {
+    font: 700 15px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--wd-ink); overflow-wrap: anywhere;
+}
+#wallet-cards .wd-copy,
+#wallet-cards .wd-btn {
+    border: 1px solid #d7e5ff; border-radius: 6px; background: #eef4ff; color: var(--wd-blue);
+    font-size: 10px; font-weight: 700; padding: 4px 9px; cursor: pointer; line-height: 1.4;
+}
+#wallet-cards .wd-copy:hover { background: #e2ecff; }
+#wallet-cards .wd-btn { padding: 6px 11px; font-size: 11px; }
+#wallet-cards .wd-btn.primary { background: var(--wd-blue); border-color: var(--wd-blue); color: #fff; }
+#wallet-cards .wd-btn.primary:hover { background: #234a84; }
+#wallet-cards .wd-status {
+    border-radius: 999px; padding: 2px 8px; font-size: 9px; font-weight: 700;
+    background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;
+}
+#wallet-cards .wd-status.active { background: #e8f7ee; color: #187d46; border-color: #ccebd8; }
+#wallet-cards .wd-meta { margin-top: 4px; font-size: 10px; color: #8a94a6; }
+#wallet-cards .wd-meta b { color: #475569; }
+#wallet-cards .wd-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+#wallet-cards .wd-kpis {
+    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px;
+}
+#wallet-cards .wd-kpi {
+    min-width: 0; padding: 10px 12px; border: 1px solid var(--wd-line);
+    border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgba(20,40,80,.03);
+}
+#wallet-cards .wd-kpi span {
+    display: block; font-size: 9px; font-weight: 800; letter-spacing: .1em;
+    text-transform: uppercase; color: #98a3b5;
+}
+#wallet-cards .wd-kpi b {
+    display: block; margin-top: 4px; color: var(--wd-ink);
+    font: 700 15px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#wallet-cards .wd-kpi.accent b { color: var(--wd-blue); }
+#wallet-cards .wd-kpi small { display: block; margin-top: 2px; font-size: 9px; color: #98a3b5; }
+
+#wallet-cards .wd-grid {
+    display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 14px; align-items: start;
+}
+#wallet-cards .wd-col { min-width: 0; }
+#wallet-cards .wd-col > * { margin-bottom: 14px; }
+
+#wallet-cards .wd-switch-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 14px; background: var(--wd-soft); border-bottom: 1px solid #e8eef6;
+}
+#wallet-cards .wd-switch-title { font-size: 12px; font-weight: 800; color: var(--wd-ink); }
+#wallet-cards .wd-switch-hint { font-size: 9px; color: #98a3b5; }
+#wallet-cards .wd-switch-body { padding: 12px 14px; }
+#wallet-cards .wd-switch-form { display: flex; gap: 8px; }
+#wallet-cards .wd-switch-form input {
+    flex: 1 1 auto; min-width: 0; padding: 8px 10px; border: 1px solid var(--wd-line);
+    border-radius: 7px; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #334155;
+}
+#wallet-cards .wd-switch-form input:focus { outline: none; border-color: var(--wd-blue); box-shadow: 0 0 0 2px rgba(44,90,160,.12); }
+#wallet-cards .wd-switch-form button {
+    flex: 0 0 auto; padding: 8px 16px; border: 1px solid var(--wd-blue); border-radius: 7px;
+    background: var(--wd-blue); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer;
+}
+#wallet-cards .wd-switch-form button:hover { background: #234a84; }
+#wallet-cards .wd-recent { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+#wallet-cards .wd-chip-wallet {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
+    border: 1px solid #e2e8f0; border-radius: 999px; background: var(--wd-soft);
+    font: 10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #475569;
+}
+#wallet-cards .wd-chip-wallet.active { background: #eef4ff; border-color: #d7e5ff; color: var(--wd-blue); font-weight: 700; }
+#wallet-cards .wd-chip-wallet img { width: 14px; height: 14px; object-fit: contain; }
+#wallet-cards .wd-chip-wallet a { color: inherit; text-decoration: none; }
+#wallet-cards .wd-chip-wallet a:hover { text-decoration: underline; }
+#wallet-cards .wd-chip-del { width: 12px; height: 12px; cursor: pointer; opacity: .6; }
+#wallet-cards .wd-chip-del:hover { opacity: 1; }
+#wallet-cards .wd-empty-recent { margin-top: 10px; font-size: 10px; color: #98a3b5; }
+
+@media(max-width:1000px){
+    #wallet-cards .wd-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    #wallet-cards .wd-grid { grid-template-columns: 1fr; }
+}
+@media(max-width:640px){
+    #wallet-cards .wd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #wallet-cards .wd-hero { flex-direction: column; align-items: flex-start; }
+    #wallet-cards .wd-actions { justify-content: flex-start; }
+    #wallet-cards .wd-address { font-size: 13px; }
+    #wallet-cards .wd-switch-hint { display: none; }
+}
+</style>
+
 
 <?php if ($isLegacy): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
@@ -241,78 +464,38 @@ $jsHomeUrl  = json_encode($homeUrl);
 </div>
 
 <div id="wallet-cards" class="mt-2">
-<div class="row gx-4">
-    <div class="col-12 wallet-col">
-        <div id="wallet-search-card" class="main-left-box">
-            <div class="main-left-title">
-                <span class="wl-head-main">
-                    <span class="wl-title">Search Wallet</span>
-                    <span class="wl-sub">Look up balance, workers and blocks</span>
-                </span>
-                <span class="wl-chips"><span class="wl-pill blue"><?= count($recents) ?> recent</span></span>
-            </div>
-            <div class="main-left-inner">
-                <form action="<?= Html::encode($homeUrl) ?>" method="get" class="wl-form">
-                    <input type="text" name="address" class="wl-input" placeholder="Wallet Address">
-                    <input type="submit" value="Search" class="wl-submit">
-                </form>
-                <table class="dataGrid2">
-                    <thead><tr><th style="width:30px">Coin</th><th class="wl-left">Address</th><th style="width:20px"></th></tr></thead>
-                    <tbody>
-                    <?php $recentRows = 0; foreach ($recents as $addr):
-                        if (empty($addr)) continue;
-                        $rUser = $recentUsers[$addr] ?? null; if (!$rUser) continue;
-                        $rCoin = $recentCoins[$rUser->coinid] ?? null;
-                        $active = $rUser->username === $username;
-                        $del   = $address !== $addr
-                            ? '<img class="wl-del" src="/images/base/delete.png" onclick="drop_cookie(this);" alt="remove">'
-                            : '';
-                        $recentRows++;
-                    ?>
-                    <tr class="<?= $active ? 'wl-total' : '' ?>">
-                        <td><?php if ($rCoin && !empty($rCoin->image)): ?><img width="16" height="16" src="<?= Html::encode($rCoin->image) ?>" alt=""><?php endif ?></td>
-                        <td class="wl-left"><?= Html::a(Html::encode($addr), Yii::$app->YiimpUtils->walletUrl($addr), ['class' => 'wl-link address']) ?></td>
-                        <td><?= $del ?></td>
-                    </tr>
-                    <?php endforeach; if (!$recentRows): ?>
-                    <tr><td colspan="3" class="wl-empty">No Recent Wallets</td></tr>
-                    <?php endif ?>
-                    </tbody>
-                </table>
-                <div class="wl-foot"><span>Recent wallets are stored in this browser for 30 days</span><span>Refresh 60s</span></div>
-            </div>
-        </div>
-    </div>
-</div>
-<?php if ($user): ?>
-<div class="row gx-4">
-    <div class="col-12 col-md-6 wallet-col">
-        <div id="main_wallet_results" class="ajax-placeholder"></div>
-        <div id="wallet-balance-card" class="main-left-box">
-            <div class="main-left-title">
-                <span class="wl-head-main">
-                    <span class="wl-title">Last 24 Hours Balance</span>
-                    <span class="wl-sub"><?= Html::encode($username) ?></span>
-                </span>
-                <span class="wl-chips"><span class="wl-pill blue">24h</span><span class="wl-pill">auto · 60s</span></span>
-            </div>
-            <div class="main-left-inner">
-                <div class="graph-wrap"><div id="graph_earnings_results" style="height:240px;"></div></div>
-                <div class="wl-foot">
-                    <span><b style="color:#4bb2c5;">●</b> Balance &nbsp; <b style="color:#eaa228;">●</b> Pending</span>
-                    <span>Values in payout coin</span>
+    <?php $renderWalletHero(); ?>
+    <?php if ($user): ?>
+    <?php $renderWalletKpis(); ?>
+    <div class="wd-grid">
+        <div class="wd-col">
+            <div id="main_wallet_results" class="ajax-placeholder"></div>
+            <div id="wallet-balance-card" class="main-left-box">
+                <div class="main-left-title">
+                    <span class="wl-head-main">
+                        <span class="wl-title">Last 24 Hours Balance</span>
+                        <span class="wl-sub"><?= Html::encode($username) ?></span>
+                    </span>
+                    <span class="wl-chips"><span class="wl-pill blue">24h</span><span class="wl-pill">auto · 60s</span></span>
+                </div>
+                <div class="main-left-inner">
+                    <div class="graph-wrap"><div id="graph_earnings_results" style="height:240px;"></div></div>
+                    <div class="wl-foot">
+                        <span><b style="color:#4bb2c5;">●</b> Balance &nbsp; <b style="color:#eaa228;">●</b> Pending</span>
+                        <span>Values in payout coin</span>
+                    </div>
                 </div>
             </div>
+            <div id="main_graphs_results" class="ajax-placeholder"></div>
+            <div id="main_found_results"  class="ajax-placeholder"></div>
         </div>
-        <div id="main_graphs_results"  class="ajax-placeholder"></div>
-        <div id="main_miners_results"  class="ajax-placeholder"></div>
-        <div id="main_found_results"   class="ajax-placeholder"></div>
+        <div class="wd-col" style="overflow-x:auto;">
+            <div id="main_miners_results" class="ajax-placeholder"></div>
+            <div id="found_results"       class="ajax-placeholder"></div>
+        </div>
     </div>
-    <div class="col-12 col-md-6 wallet-col" style="overflow-x:auto;">
-        <div id="found_results" class="ajax-placeholder"></div>
-    </div>
-</div>
-<?php endif ?>
+    <?php endif ?>
+    <?php $renderWalletSwitch(); ?>
 </div>
 
 
@@ -328,77 +511,37 @@ $jsHomeUrl  = json_encode($homeUrl);
     <strong>Auto refresh is paused</strong> — click to resume
 </div>
 
-<div class="row gx-3 mt-2">
+<div id="wallet-cards" class="mt-2">
+    <?php $renderWalletHero(); ?>
+    <?php if ($user): ?>
+    <?php $renderWalletKpis(); ?>
+    <div class="wd-grid">
+        <div class="wd-col">
+            <div id="main_wallet_results"></div>
 
-    <!-- LEFT -->
-    <div class="col-12 col-md-6">
-
-        <?php if ($user): ?>
-        <div id="main_wallet_results" class="mb-3"></div>
-
-        <div class="card shadow-sm mb-3">
-            <div class="card-header py-2 small fw-semibold">
-                <i class="bi bi-graph-up me-1"></i>Last 24h Balance — <?= Html::encode($username) ?>
-            </div>
-            <div class="card-body">
-                <div id="graph_earnings_results" style="height:200px;"></div>
-                <div class="d-flex justify-content-end gap-3 mt-1" style="font-size:.75rem;">
-                    <span style="color:#4bb2c5;">● Balance</span>
-                    <span style="color:#eaa228;">● Pending</span>
+            <div class="card shadow-sm">
+                <div class="card-header py-2 small fw-semibold">
+                    <i class="bi bi-graph-up me-1"></i>Last 24h Balance — <?= Html::encode($username) ?>
+                </div>
+                <div class="card-body">
+                    <div id="graph_earnings_results" style="height:200px;"></div>
+                    <div class="d-flex justify-content-end gap-3 mt-1" style="font-size:.75rem;">
+                        <span style="color:#4bb2c5;">● Balance</span>
+                        <span style="color:#eaa228;">● Pending</span>
+                    </div>
                 </div>
             </div>
+
+            <div id="main_graphs_results"></div>
+            <div id="main_found_results"></div>
         </div>
-
-        <div id="main_graphs_results"  class="mb-3"></div>
-        <div id="main_miners_results"  class="mb-3"></div>
-        <div id="main_found_results"   class="mb-3"></div>
-        <?php endif ?>
-
-        <div class="card shadow-sm mb-3">
-            <div class="card-header py-2 small fw-semibold">
-                <i class="bi bi-search me-1"></i>Search Wallet
-            </div>
-            <div class="card-body pb-2">
-                <form action="<?= Html::encode($homeUrl) ?>" method="get" class="d-flex gap-2 mb-3">
-                    <input type="text" name="address" class="form-control form-control-sm font-monospace"
-                           placeholder="Wallet address">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">Go</button>
-                </form>
-
-                <?php if ($recents): ?>
-                <table class="table table-sm table-hover mb-0">
-                <?php foreach ($recents as $addr):
-                    if (empty($addr)) continue;
-                    $rUser = $recentUsers[$addr] ?? null; if (!$rUser) continue;
-                    $rCoin = $recentCoins[$rUser->coinid] ?? null;
-                    $bal   = Yii::$app->ConversionUtils->bitcoinvaluetoa($rUser->balance);
-                    $balD  = $rCoin && $bal > 0 ? "{$bal} {$rCoin->symbol}" : ($bal > 0 ? "{$bal} BTC" : '');
-                    $active = $rUser->username === $username;
-                ?>
-                <tr class="<?= $active ? 'table-info' : '' ?>">
-                    <td width="24"><?php if ($rCoin && !empty($rCoin->image)): ?>
-                        <img width="16" src="<?= Html::encode($rCoin->image) ?>" alt="" style="object-fit:contain">
-                    <?php endif ?></td>
-                    <td><?= Html::a(Html::encode($addr), Yii::$app->YiimpUtils->walletUrl($addr),
-                        ['class' => 'font-monospace small text-decoration-none']) ?></td>
-                    <td class="text-end small font-monospace text-muted"><?= Html::encode($balD) ?></td>
-                    <td width="20"><?php if ($address !== $addr): ?>
-                        <img src="/images/base/delete.png" onclick="drop_cookie(this);" style="cursor:pointer;">
-                    <?php endif ?></td>
-                </tr>
-                <?php endforeach ?>
-                </table>
-                <?php endif ?>
-            </div>
+        <div class="wd-col" style="overflow-x:auto;">
+            <div id="main_miners_results"></div>
+            <div id="found_results"></div>
         </div>
-
     </div>
-
-    <!-- RIGHT -->
-    <div class="col-12 col-md-6" style="overflow-x:auto;">
-        <?php if ($user): ?><div id="found_results" class="mb-3"></div><?php endif ?>
-    </div>
-
+    <?php endif ?>
+    <?php $renderWalletSwitch(); ?>
 </div>
 
 
@@ -417,120 +560,49 @@ $jsHomeUrl  = json_encode($homeUrl);
     <strong>Auto refresh is paused</strong> — click to resume
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+<div id="wallet-cards" class="mt-2">
+    <?php $renderWalletHero(); ?>
+    <?php if ($user): ?>
+    <?php $renderWalletKpis(); ?>
+    <div class="wd-grid">
+        <div class="wd-col">
+            <div id="main_wallet_results"></div>
 
-    <!-- LEFT -->
-    <div class="flex flex-col gap-4 min-w-0">
-
-        <?php if ($user): ?>
-        <div id="main_wallet_results"></div>
-
-        <div class="rounded-xl border border-gray-200 dark:border-gray-700
-                    bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-            <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
-                        flex items-center gap-2">
-                <i data-lucide="trending-up" class="w-4 h-4 text-indigo-500 shrink-0"></i>
-                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                    Last 24h Balance
-                    <span class="font-mono text-indigo-600 dark:text-indigo-400 ml-1"><?= Html::encode($username) ?></span>
-                </span>
-            </div>
-            <div class="p-4">
-                <div id="graph_earnings_results" style="height:200px;"></div>
-                <div class="flex justify-end gap-4 mt-2 text-xs">
-                    <span class="flex items-center gap-1">
-                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#4bb2c5;"></span>
-                        Balance
-                    </span>
-                    <span class="flex items-center gap-1">
-                        <span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#eaa228;"></span>
-                        Pending
+            <div class="rounded-xl border border-gray-200 dark:border-gray-700
+                        bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
+                            flex items-center gap-2">
+                    <i data-lucide="trending-up" class="w-4 h-4 text-indigo-500 shrink-0"></i>
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        Last 24h Balance
+                        <span class="font-mono text-indigo-600 dark:text-indigo-400 ml-1"><?= Html::encode($username) ?></span>
                     </span>
                 </div>
-            </div>
-        </div>
-
-        <div id="main_graphs_results"></div>
-        <div id="main_miners_results"></div>
-        <div id="main_found_results"></div>
-        <?php endif ?>
-
-        <div class="rounded-xl border border-gray-200 dark:border-gray-700
-                    bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
-            <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
-                        flex items-center gap-2">
-                <i data-lucide="search" class="w-4 h-4 text-gray-400 shrink-0"></i>
-                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">Search Wallet</span>
-            </div>
-            <div class="p-4">
-                <form action="<?= Html::encode($homeUrl) ?>" method="get"
-                      class="flex items-center gap-2 mb-4">
-                    <input type="text" name="address"
-                           class="flex-1 px-3 py-1.5 text-sm rounded-lg border
-                                  border-gray-300 dark:border-gray-600
-                                  bg-white dark:bg-gray-700
-                                  text-gray-900 dark:text-gray-100 font-mono
-                                  focus:outline-none focus:ring-2 focus:ring-indigo-500
-                                  placeholder-gray-400 dark:placeholder-gray-500"
-                           placeholder="Wallet address">
-                    <button type="submit"
-                            class="px-3 py-1.5 text-sm rounded-lg border
-                                   border-gray-300 dark:border-gray-600
-                                   bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300
-                                   hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
-                        Go
-                    </button>
-                </form>
-
-                <?php if ($recents): ?>
-                <div class="divide-y divide-gray-100 dark:divide-gray-700/50">
-                <?php foreach ($recents as $addr):
-                    if (empty($addr)) continue;
-                    $rUser = $recentUsers[$addr] ?? null; if (!$rUser) continue;
-                    $rCoin = $recentCoins[$rUser->coinid] ?? null;
-                    $bal   = Yii::$app->ConversionUtils->bitcoinvaluetoa($rUser->balance);
-                    $balD  = $rCoin && $bal > 0 ? "{$bal} {$rCoin->symbol}" : ($bal > 0 ? "{$bal} BTC" : '');
-                    $active = $rUser->username === $username;
-                ?>
-                <div class="flex items-center gap-3 py-2
-                            <?= $active ? 'bg-indigo-50/50 dark:bg-indigo-900/10 -mx-4 px-4' : '' ?>">
-                    <?php if ($rCoin && !empty($rCoin->image)): ?>
-                        <img width="18" height="18" src="<?= Html::encode($rCoin->image) ?>"
-                             class="rounded object-contain shrink-0" alt=""
-                             onerror="this.style.display='none'">
-                    <?php else: ?>
-                        <span class="w-[18px] shrink-0"></span>
-                    <?php endif ?>
-                    <span class="flex-1 min-w-0">
-                        <?= Html::a(Html::encode($addr),
-                            Yii::$app->YiimpUtils->walletUrl($addr),
-                            ['class' => 'font-mono text-xs text-gray-700 dark:text-gray-300
-                                         hover:text-indigo-600 dark:hover:text-indigo-400
-                                         transition-colors truncate block']) ?>
-                    </span>
-                    <?php if ($balD): ?>
-                        <span class="text-xs font-mono text-gray-400 dark:text-gray-500 shrink-0">
-                            <?= Html::encode($balD) ?>
+                <div class="p-4">
+                    <div id="graph_earnings_results" style="height:200px;"></div>
+                    <div class="flex justify-end gap-4 mt-2 text-xs">
+                        <span class="flex items-center gap-1">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#4bb2c5;"></span>
+                            Balance
                         </span>
-                    <?php endif ?>
-                    <?php if ($address !== $addr): ?>
-                        <img src="/images/base/delete.png" onclick="drop_cookie(this);"
-                             class="shrink-0 cursor-pointer opacity-40 hover:opacity-100 transition-opacity" alt="remove">
-                    <?php endif ?>
+                        <span class="flex items-center gap-1">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#eaa228;"></span>
+                            Pending
+                        </span>
+                    </div>
                 </div>
-                <?php endforeach ?>
-                </div>
-                <?php endif ?>
             </div>
+
+            <div id="main_graphs_results"></div>
+            <div id="main_found_results"></div>
         </div>
-
+        <div class="wd-col" style="overflow-x:auto;">
+            <div id="main_miners_results"></div>
+            <div id="found_results"></div>
+        </div>
     </div>
-
-    <!-- RIGHT -->
-    <div class="flex flex-col gap-4 min-w-0 overflow-x-auto">
-        <?php if ($user): ?><div id="found_results"></div><?php endif ?>
-    </div>
-
+    <?php endif ?>
+    <?php $renderWalletSwitch(); ?>
 </div>
 
 <?php endif ?>
@@ -539,6 +611,90 @@ $jsHomeUrl  = json_encode($homeUrl);
 var _username = <?= $jsUsername ?>;
 var _homeUrl  = <?= $jsHomeUrl ?>;
 var _address  = <?= $jsAddress ?>;
+
+function kpiSet(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = (value === '' || value === null || typeof value === 'undefined') ? '—' : value;
+}
+function summaryValue(label) {
+    var val = '';
+    $('#main_wallet_results tr').each(function () {
+        var cells = $(this).find('td');
+        if (cells.length >= 2 && $.trim(cells.eq(cells.length - 2).text()) === label) {
+            val = $.trim(cells.last().text());
+            return false;
+        }
+    });
+    return val;
+}
+function countIn(scope, re) {
+    var m = $.trim(scope.text()).match(re);
+    return m ? m[1] : '';
+}
+function connectionCount(scope) {
+    var found = '';
+    scope.find('span,div,small').each(function () {
+        var text = $.trim($(this).text());
+        if (text.length > 40) return;
+        var m = text.match(/^(\d+)\s*connections?$/i);
+        if (m) { found = m[1]; return false; }
+    });
+    return found;
+}
+function shownCount(scope) {
+    var found = '';
+    scope.find('span,div,small').each(function () {
+        var text = $.trim($(this).text());
+        if (text.length > 40) return;
+        var m = text.match(/^(\d+)\s*(?:shown|blocks found)$/i);
+        if (m) { found = m[1]; return false; }
+    });
+    return found || countIn(scope, /\b(\d+)\s*shown\b/i);
+}
+function updateWalletKpis() {
+    if (_username === '') return;
+
+    kpiSet('kpi-balance', summaryValue('Balance'));
+    kpiSet('kpi-pending', summaryValue('Pending (confirmed)'));
+
+    var $miners  = $('#main_miners_results');
+    var workers  = connectionCount($miners);
+    var rate     = $.trim($miners.find('.wm-table tbody tr').first().find('td').eq(2).text());
+    kpiSet('kpi-workers', workers === '' ? '—' : workers + ' conn');
+    kpiSet('kpi-hashrate', rate);
+
+    var $blocks = $('#main_found_results');
+    var blocks  = shownCount($blocks);
+    kpiSet('kpi-blocks', blocks === '' ? '—' : blocks + ' recent');
+
+    var $status = $('#wd-status');
+    if ($status.length) {
+        var online = workers !== '' && parseInt(workers, 10) > 0;
+        $status.toggleClass('active', online)
+                .text(online ? '● Active' : (workers === '' ? '● Checking' : '○ Idle'));
+    }
+}
+function fallbackCopy(text, done) {
+    var $t = $('<textarea>').val(text).css({position:'fixed', top:'-1000px'}).appendTo('body');
+    $t.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    $t.remove();
+}
+function copyWalletAddress(btn) {
+    var text = $(btn).data('copy') || '';
+    if (!text) return;
+    function done() {
+        var $b = $(btn), old = $b.text();
+        $b.text('Copied');
+        setTimeout(function () { $b.text(old); }, 1200);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+    } else {
+        fallbackCopy(text, done);
+    }
+}
+$(function () { updateWalletKpis(); });
 
 function page_refresh() {
     found_refresh();
@@ -554,22 +710,22 @@ function select_algo(algo) {
     window.location.href = _homeUrl + 'site/algo?algo=' + encodeURIComponent(algo) + '&r=/site/mining';
 }
 function main_wallet_refresh() {
-    $.get(_homeUrl + 'site/wallet_results?address=' + encodeURIComponent(_username), '', function(d){ $('#main_wallet_results').html(d); if(typeof lucide!=='undefined')lucide.createIcons(); });
+    $.get(_homeUrl + 'site/wallet_results?address=' + encodeURIComponent(_username), '', function(d){ $('#main_wallet_results').html(d); updateWalletKpis(); if(typeof lucide!=='undefined')lucide.createIcons(); });
 }
 function main_wallet_refresh_details() {
-    $.get(_homeUrl + 'site/wallet_results?address=' + encodeURIComponent(_username) + '&showdetails=1', '', function(d){ $('#main_wallet_results').html(d); });
+    $.get(_homeUrl + 'site/wallet_results?address=' + encodeURIComponent(_username) + '&showdetails=1', '', function(d){ $('#main_wallet_results').html(d); updateWalletKpis(); });
 }
 function main_found_refresh() {
-    $.get(_homeUrl + 'site/wallet_found_results?address=' + encodeURIComponent(_username), '', function(d){ $('#main_found_results').html(d); });
+    $.get(_homeUrl + 'site/wallet_found_results?address=' + encodeURIComponent(_username), '', function(d){ $('#main_found_results').html(d); updateWalletKpis(); });
 }
 function main_miners_refresh() {
-    $.get(_homeUrl + 'site/wallet_miners_results?address=' + encodeURIComponent(_username), '', function(d){ $('#main_miners_results').html(d); });
+    $.get(_homeUrl + 'site/wallet_miners_results?address=' + encodeURIComponent(_username), '', function(d){ $('#main_miners_results').html(d); updateWalletKpis(); });
 }
 function main_title_refresh() {
     $.get(_homeUrl + 'site/title_results?address=' + encodeURIComponent(_username), '', function(d){ document.title = d; });
 }
 function found_refresh() {
-    $.get(_homeUrl + 'site/user_earning_results?address=' + encodeURIComponent(_username), '', function(d){ $('#found_results').html(d); });
+    $.get(_homeUrl + 'site/user_earning_results?address=' + encodeURIComponent(_username), '', function(d){ $('#found_results').html(d); updateWalletKpis(); });
 }
 var _lastGraphUpdate = 0;
 function main_graphs_refresh() {
@@ -596,9 +752,9 @@ function main_wallet_tx() {
     window.open(_homeUrl + 'site/tx?address=' + encodeURIComponent(_username), 'YIIMP_tx', 'width=800,height=600,location=no,menubar=no,resizable=yes,status=yes,toolbar=no');
 }
 function drop_cookie(el) {
-    var addr = $(el).closest('tr,div').find('a.address,.address,.font-mono').first().text();
+    var addr = $(el).data('address') || $(el).closest('tr,div').find('a.address,.address,.font-mono').first().text();
     window.location.href = <?= json_encode(Yii::$app->YiimpUtils->walletUrl()) ?> +
         (_address !== '' ? '/' + encodeURIComponent(_address) : '') +
-        '?drop=' + encodeURIComponent(addr.trim());
+        '?drop=' + encodeURIComponent(String(addr).trim());
 }
 </script>
