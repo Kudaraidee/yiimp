@@ -41,22 +41,6 @@ $block_query = Blocks::find()
 
 $db_blocks = $block_query->all();
 
-// The pool can mine several algos at once. If the currently selected algo has
-// no blocks yet, still show the most recent blocks from the other algos so the
-// "found blocks" panel is not misleadingly empty.
-if (empty($db_blocks) && $algo_header !== 'all') {
-    $all_coins = (new \yii\db\Query())->select(['id'])->from('coins')->where(['visible' => 1]);
-    $db_blocks = Blocks::find()
-        ->where(['not in', 'category', ['stake', 'generated']])
-        ->andWhere(['in', 'coin_id', $all_coins])
-        ->with('coin')
-        ->orderBy(['time' => SORT_DESC])
-        ->limit($count)
-        ->all();
-    $algo_header = 'all algos';
-    $title = "Last {$count} Blocks ({$algo_header})";
-}
-
 // ── Header summary ────────────────────────────────────────────────────────────
 $blockStats = ['confirmed' => 0, 'immature' => 0, 'new' => 0, 'orphan' => 0, 'shared' => 0, 'solo' => 0];
 foreach ($db_blocks as $statBlock) {
