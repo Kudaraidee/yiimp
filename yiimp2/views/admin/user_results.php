@@ -116,7 +116,7 @@ tr.ssrow.filtered { display: none; }
     <td width="24"><?= (int) $uid ?></td>
     <td width="16"><?= $coinImg ?></td>
     <td width="48"><b><?= $coinLink ?></b></td>
-    <td><?= Html::a('<b>' . Html::encode($user->username) . '</b>', ['/?address=' . urlencode($user->username)], ['encode' => false]) ?></td>
+    <td><?= Html::a('<b>' . Html::encode($user->username) . '</b>', [Yii::$app->YiimpUtils->walletUrl($user->username)], ['encode' => false]) ?></td>
     <td data="<?= (int) $user->last_earning ?>"><?= $conv->datetoa2($user->last_earning) ?></td>
     <td align="right"><?= $r['minerCount'] ?></td>
     <td width="32" data="<?= (int) $r['userRate'] ?>" align="right">
@@ -234,7 +234,7 @@ tr.ssrow.filtered { display: none; }
         </td>
         <td>
             <?= Html::a('<strong>' . Html::encode($user->username) . '</strong>',
-                '/?address=' . urlencode($user->username),
+                Yii::$app->YiimpUtils->walletUrl($user->username),
                 ['encode' => false]) ?>
             <?php if ($user->is_locked): ?>
                 <span class="badge bg-danger ms-1">locked</span>
@@ -409,7 +409,7 @@ Yii::$app->ViewUtils->JavascriptReady("
             <div class="flex items-center gap-1.5 flex-wrap">
                 <?= Html::a('<span class="font-medium text-gray-900 dark:text-gray-100">'
                     . Html::encode($user->username) . '</span>',
-                    '/?address=' . urlencode($user->username),
+                    Yii::$app->YiimpUtils->walletUrl($user->username),
                     ['encode' => false,
                      'class'  => 'hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors']) ?>
                 <?php if ($locked): ?>

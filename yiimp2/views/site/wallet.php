@@ -271,7 +271,7 @@ $jsHomeUrl  = json_encode($homeUrl);
                     ?>
                     <tr class="<?= $active ? 'wl-total' : '' ?>">
                         <td><?php if ($rCoin && !empty($rCoin->image)): ?><img width="16" height="16" src="<?= Html::encode($rCoin->image) ?>" alt=""><?php endif ?></td>
-                        <td class="wl-left"><?= Html::a(Html::encode($addr), $homeUrl . '?address=' . urlencode($addr), ['class' => 'wl-link address']) ?></td>
+                        <td class="wl-left"><?= Html::a(Html::encode($addr), Yii::$app->YiimpUtils->walletUrl($addr), ['class' => 'wl-link address']) ?></td>
                         <td><?= $del ?></td>
                     </tr>
                     <?php endforeach; if (!$recentRows): ?>
@@ -379,7 +379,7 @@ $jsHomeUrl  = json_encode($homeUrl);
                     <td width="24"><?php if ($rCoin && !empty($rCoin->image)): ?>
                         <img width="16" src="<?= Html::encode($rCoin->image) ?>" alt="" style="object-fit:contain">
                     <?php endif ?></td>
-                    <td><?= Html::a(Html::encode($addr), $homeUrl . '?address=' . urlencode($addr),
+                    <td><?= Html::a(Html::encode($addr), Yii::$app->YiimpUtils->walletUrl($addr),
                         ['class' => 'font-monospace small text-decoration-none']) ?></td>
                     <td class="text-end small font-monospace text-muted"><?= Html::encode($balD) ?></td>
                     <td width="20"><?php if ($address !== $addr): ?>
@@ -503,7 +503,7 @@ $jsHomeUrl  = json_encode($homeUrl);
                     <?php endif ?>
                     <span class="flex-1 min-w-0">
                         <?= Html::a(Html::encode($addr),
-                            $homeUrl . '?address=' . urlencode($addr),
+                            Yii::$app->YiimpUtils->walletUrl($addr),
                             ['class' => 'font-mono text-xs text-gray-700 dark:text-gray-300
                                          hover:text-indigo-600 dark:hover:text-indigo-400
                                          transition-colors truncate block']) ?>
@@ -597,6 +597,8 @@ function main_wallet_tx() {
 }
 function drop_cookie(el) {
     var addr = $(el).closest('tr,div').find('a.address,.address,.font-mono').first().text();
-    window.location.href = '?address=' + encodeURIComponent(_address) + '&drop=' + encodeURIComponent(addr.trim());
+    window.location.href = <?= json_encode(Yii::$app->YiimpUtils->walletUrl()) ?> +
+        (_address !== '' ? '/' + encodeURIComponent(_address) : '') +
+        '?drop=' + encodeURIComponent(addr.trim());
 }
 </script>

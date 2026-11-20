@@ -79,7 +79,7 @@ table.dataGrid a.red { color: darkred; }
     <td><?= Html::img(Html::encode($coin->image), ['width' => 16, 'alt' => Html::encode($coin->symbol)]) ?></td>
     <td><?= Html::a(Html::encode($coin->name), ['/admin/coinwallet', 'id' => $coin->id]) ?></td>
     <td><?= Html::encode($botnet['algo']) ?></td>
-    <td><?= Html::a(Html::encode($user->username), ['/?address=' . urlencode($user->username)]) ?></td>
+    <td><?= Html::a(Html::encode($user->username), [Yii::$app->YiimpUtils->walletUrl($user->username)]) ?></td>
     <td data="<?= (int) $botnet['time'] ?>"><?= $d ?></td>
     <td><?= (int) $botnet['pid'] ?></td>
     <td><b><?= (int) $botnet['ips'] ?></b></td>
@@ -160,7 +160,7 @@ table.dataGrid a.red { color: darkred; }
         <td><?= Html::a('<strong>' . Html::encode($coin->name) . '</strong>',
             ['/admin/coinwallet', 'id' => $coin->id], ['encode' => false]) ?></td>
         <td><span class="badge bg-light text-dark border font-monospace"><?= Html::encode($botnet['algo']) ?></span></td>
-        <td><?= Html::a(Html::encode($user->username), '/?address=' . urlencode($user->username)) ?></td>
+        <td><?= Html::a(Html::encode($user->username), Yii::$app->YiimpUtils->walletUrl($user->username)) ?></td>
         <td class="small text-muted" data="<?= (int) $botnet['time'] ?>"><?= $d ?></td>
         <td class="text-end small tabular-nums"><?= (int) $botnet['pid'] ?></td>
         <td class="text-end <?= $highIp ? 'text-danger fw-bold' : 'text-warning fw-semibold' ?>">
@@ -296,7 +296,7 @@ Yii::$app->ViewUtils->JavascriptReady("
 
         <td class="px-3 py-2.5">
             <?= Html::a(Html::encode($user->username),
-                '/?address=' . urlencode($user->username),
+                Yii::$app->YiimpUtils->walletUrl($user->username),
                 ['class' => 'hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors']) ?>
         </td>
 

@@ -112,6 +112,13 @@ $config = [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
+                // Canonical wallet pages: /wallet and /wallet/ADDRESS
+                'wallet' => 'site/wallet',
+                'wallet/<address:[^/]+>' => 'site/wallet',
+
+                // Canonical coin block page: /coins/LRS (old /site/block?id=N redirects here)
+                'coins/<symbol:[A-Za-z0-9_.-]+>' => 'site/block',
+
                 // Market actions live under /admin/market/* for access-control clarity
                 'admin/market/<action:\w+>' => 'market/<action>',
 

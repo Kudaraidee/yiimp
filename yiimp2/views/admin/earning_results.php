@@ -146,7 +146,7 @@ table.totals td { text-align: right; }
 <tr class="ssrow">
     <td><?= Html::img(Html::encode($rowCoin->image), ['width' => 16, 'alt' => Html::encode($rowCoin->symbol)]) ?></td>
     <td><b><?= Html::a(Html::encode($rowCoin->name), ['/admin/coin', 'id' => $rowCoin->id]) ?></b>&nbsp;(<?= Html::encode($rowCoin->symbol_show) ?>)</td>
-    <td><b><?= Html::a(Html::encode($user->username), ['/?address=' . urlencode($user->username)]) ?></b></td>
+    <td><b><?= Html::a(Html::encode($user->username), [Yii::$app->YiimpUtils->walletUrl($user->username)]) ?></b></td>
     <td><?= $cu->bitcoinvaluetoa($earning->amount) ?></td>
     <td><?= $cu->bitcoinvaluetoa($earning->amount * $earning->price) ?></td>
     <td><?= (int) $block->height ?></td>
@@ -228,7 +228,7 @@ table.totals td { text-align: right; }
             <small class="text-muted">(<?= Html::encode($rowCoin->symbol_show) ?>)</small>
         </td>
         <td>
-            <?= Html::a(Html::encode($user->username), '/?address=' . urlencode($user->username)) ?>
+            <?= Html::a(Html::encode($user->username), Yii::$app->YiimpUtils->walletUrl($user->username)) ?>
         </td>
         <td class="text-end small font-monospace"><?= $cu->bitcoinvaluetoa($earning->amount) ?></td>
         <td class="text-end small font-monospace"><?= $cu->bitcoinvaluetoa($earning->amount * $earning->price) ?></td>
@@ -383,7 +383,7 @@ Yii::$app->ViewUtils->JavascriptReady("
 
         <td class="px-3 py-2">
             <?= Html::a(Html::encode($user->username),
-                '/?address=' . urlencode($user->username),
+                Yii::$app->YiimpUtils->walletUrl($user->username),
                 ['class' => 'hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors']) ?>
         </td>
 

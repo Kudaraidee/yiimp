@@ -1000,4 +1000,11 @@ class YiimpUtils extends Component
 
 		return ExchangeFactory::make($market)->marketUrl($symbol, $base);
 	}
+
+	/* Public wallet URL: /wallet or /wallet/ADDRESS */
+	public function walletUrl($address = ''): string
+	{
+		$address = trim((string) $address);
+		return $address === '' ? '/wallet' : '/wallet/' . rawurlencode($address);
+	}
 }

@@ -49,7 +49,7 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
     $items_navbar = [
             ['label' => 'Home', 'url' => ['/site/index']],
             ['label' => 'Pool', 'url' => ['/site/mining']],
-            ['label' => 'Wallet', 'url' => ['/?address=']],
+            ['label' => 'Wallet', 'url' => ['/wallet']],
             ['label' => 'Graphs', 'url' => ['/stats'], 'active' => in_array(\Yii::$app->controller->id, ['stats']),],
             ['label' => 'API', 'url' => ['/site/api']],
             ['label' => 'Explorers', 'url' => ['/explorer'], 'active' => in_array(\Yii::$app->controller->id, ['explorer']),],

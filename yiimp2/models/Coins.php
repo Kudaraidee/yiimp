@@ -232,6 +232,27 @@ class Coins extends ActiveRecord
 	}
 
 	/**
+	 * Canonical public block page URL: /coins/SYMBOL.
+	 *
+	 * Keep this in one place so every listing (mining, history, admin) agrees.
+	 * Numeric/empty symbols fall back to /coins/<id>, which actionBlock()
+	 * resolves just like a symbol-only route.
+	 */
+	public static function blockUrl($symbol, int $id = 0): string
+	{
+		$symbol = trim((string) $symbol);
+		if ($symbol === '' || is_numeric($symbol)) {
+			return '/coins/' . (int) $id;
+		}
+		return '/coins/' . rawurlencode($symbol);
+	}
+
+	public function getBlockUrl(): string
+	{
+		return static::blockUrl($this->getOfficialSymbol(), (int) $this->id);
+	}
+
+	/**
 	 * Internal explorer URL. Visible coins use the clean /explorer/SYMBOL form;
 	 * the numeric id is only needed for hidden or numeric-symbol coins.
 	 */

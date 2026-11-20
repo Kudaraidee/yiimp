@@ -54,13 +54,14 @@ if ($isLegacy) {
 
 // ── Rows ──────────────────────────────────────────────────────────────────────
 foreach ($list as $coin) {
-    $id   = $coin->id;
-    $name = substr($coin->name, 0, 20);
+    $id       = $coin->id;
+    $name     = substr($coin->name, 0, 20);
+    $blockUrl = Html::encode($coin->blockUrl);
 
     if ($isLegacy) {
         echo '<tr class="ssrow">';
         echo '<td width="18"><img width="16" src="' . Html::encode($coin->image) . '"></td>';
-        echo '<td><a href="/site/block?id=' . $id . '"><b>' . Html::encode($name) . '</b></a></td>';
+        echo '<td><a href="' . $blockUrl . '"><b>' . Html::encode($name) . '</b></a></td>';
         echo '<td>';
         foreach ($linkDefs as [$field, $img, $label]) {
             if ($coin->$field)
@@ -77,7 +78,7 @@ foreach ($list as $coin) {
             : '';
         echo '<tr>';
         echo '<td>' . $coinImg . '</td>';
-        echo '<td class="small fw-bold"><a href="/site/block?id=' . $id . '">' . Html::encode($name) . '</a></td>';
+        echo '<td class="small fw-bold"><a href="' . $blockUrl . '">' . Html::encode($name) . '</a></td>';
         echo '<td><div class="d-flex flex-wrap gap-1 py-1">';
         foreach ($linkDefs as [$field, $img, $label]) {
             if ($coin->$field)
@@ -100,7 +101,7 @@ foreach ($list as $coin) {
         echo '<tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/10 transition-colors border-b border-gray-100 dark:border-gray-700/50">';
         echo '<td class="px-3 py-2">' . $coinImg . '</td>';
         echo '<td class="px-3 py-2 font-medium whitespace-nowrap">';
-        echo '<a href="/site/block?id=' . $id . '" class="text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">'
+        echo '<a href="' . $blockUrl . '" class="text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">'
            . Html::encode($name) . '</a>';
         echo '</td>';
         echo '<td class="px-3 py-2"><div class="flex flex-wrap gap-1">';

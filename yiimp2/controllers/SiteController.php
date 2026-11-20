@@ -63,15 +63,31 @@ class SiteController extends BaseController
      */
     public function actionIndex()
     {
-        $address = Yii::$app->getRequest()->getQueryParam('address');
-        
-        if (!is_null($address))
-            return $this->render('wallet');
-        else
-            return $this->render('index', [
-                'tlsPorts' => $this->buildTlsPortMap(),
-                'algoNav'  => $this->buildMiningAlgoNav(),
-            ]);
+        $request = Yii::$app->getRequest();
+        $address = $request->getQueryParam('address');
+
+        // Legacy /?address=ADDR and /?address= move to /wallet/ADDR and /wallet.
+        if ($address !== null) {
+            $url = Yii::$app->YiimpUtils->walletUrl($address);
+            $query = $request->getQueryParams();
+            unset($query['address']);
+            if ($query) $url .= '?' . http_build_query($query);
+            return $this->redirect($url, 301);
+        }
+
+        return $this->render('index', [
+            'tlsPorts' => $this->buildTlsPortMap(),
+            'algoNav'  => $this->buildMiningAlgoNav(),
+        ]);
+    }
+
+    /**
+     * Wallet page. The URL rule supplies `address` for /wallet/ADDR;
+     * /wallet alone renders the empty/recent-wallets view.
+     */
+    public function actionWallet()
+    {
+        return $this->render('wallet');
     }
 
     /**
@@ -954,9 +970,37 @@ class SiteController extends BaseController
 
 	public function actionBlock()
 	{
-		$id   = (int) Yii::$app->request->get('id');
-		$coin = $id ? Coins::findOne($id) : null;
-		return $this->render('block', ['coin' => $coin, 'id' => $id]);
+		$request = Yii::$app->request;
+		$id      = (int) $request->get('id');
+		$symbol  = trim((string) $request->get('symbol', ''));
+		$coin    = null;
+
+		if ($id) {
+			$coin = Coins::findOne($id);
+		} elseif ($symbol !== '') {
+			$symbol = strtoupper($symbol);
+			$coin   = Coins::find()
+				->where(['symbol' => $symbol])
+				->orWhere(['symbol2' => $symbol])
+				->one();
+			if (!$coin && ctype_digit($symbol)) {
+				$coin = Coins::findOne((int) $symbol);
+			}
+		}
+
+		// Legacy /site/block?id=N links keep working but move to /coins/SYMBOL.
+		if ($coin && ltrim($request->getPathInfo(), '/') === 'site/block') {
+			$query = $request->getQueryParams();
+			unset($query['id'], $query['symbol']);
+			$url = Coins::blockUrl($coin->getOfficialSymbol(), (int) $coin->id);
+			if ($query) $url .= '?' . http_build_query($query);
+			return $this->redirect($url, 301);
+		}
+
+		return $this->render('block', [
+			'coin' => $coin,
+			'id'   => $coin ? (int) $coin->id : $id,
+		]);
 	}
 
 	public function actionBlock_results()

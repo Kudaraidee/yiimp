@@ -98,7 +98,7 @@ table.totals tr.red td { color:darkred; }
         <b><?= Html::a(Html::encode($rowCoin->name), ['/admin/coinwallet', 'id' => $rowCoin->id]) ?></b>
         &nbsp;(<?= Html::encode($rowCoin->symbol_show) ?>)
     <?php endif ?></td>
-    <td><?= Html::a('<b>' . Html::encode($user->username) . '</b>', '/?address=' . urlencode($user->username), ['encode' => false]) ?></td>
+    <td><?= Html::a('<b>' . Html::encode($user->username) . '</b>', Yii::$app->YiimpUtils->walletUrl($user->username), ['encode' => false]) ?></td>
     <td data="<?= (int) $user->last_earning ?>"><?= $conv->datetoa2($user->last_earning) ?></td>
     <td class="currency"><?= Html::encode($r['coinBalance']) ?></td>
     <td class="currency"><?= Html::encode($balanceFmt) ?></td>
@@ -197,7 +197,7 @@ table.totals tr.red td { color:darkred; }
             <small class="text-muted">(<?= Html::encode($rowCoin->symbol_show) ?>)</small>
         <?php endif ?></td>
         <td>
-            <?= Html::a(Html::encode($user->username), '/?address=' . urlencode($user->username)) ?>
+            <?= Html::a(Html::encode($user->username), Yii::$app->YiimpUtils->walletUrl($user->username)) ?>
         </td>
         <td class="small text-muted" data="<?= (int) $user->last_earning ?>">
             <?= $conv->datetoa2($user->last_earning) ?>
@@ -376,7 +376,7 @@ Yii::$app->ViewUtils->JavascriptReady("
 
         <td class="px-3 py-2">
             <?= Html::a(Html::encode($user->username),
-                '/?address=' . urlencode($user->username),
+                Yii::$app->YiimpUtils->walletUrl($user->username),
                 ['class' => 'hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors']) ?>
         </td>
 

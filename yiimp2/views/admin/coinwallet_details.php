@@ -375,7 +375,7 @@ $tdL = $isLegacy ? '' : ($isTailwind ? 'px-3 py-2 text-gray-700 dark:text-gray-2
 echo $isLegacy ? "<tr class='ssrow'>" : "<tr>";
 echo "<td class='{$tdL}'>{$coinImg}</td>";
 echo "<td class='{$tdL}'>{$enBadge}</td>";
-echo "<td class='{$tdL}'><b>" . Html::a(Html::encode($coin->name), '/site/block?id=' . $coin->id) . "</b></td>";
+echo "<td class='{$tdL}'><b>" . Html::a(Html::encode($coin->name), Html::encode($coin->blockUrl)) . "</b></td>";
 echo "<td class='{$tdL}'><b>" . Html::encode($coin->symbol) . "</b></td>";
 echo "<td class='{$tdL}'>" . Html::a(Html::encode($coin->algo), '/site/gomining?algo=' . urlencode($coin->algo)) . "</td>";
 echo "<td class='{$tdR}'>{$diffFmt}</td>";
@@ -594,7 +594,7 @@ foreach ($txs_array as $tx) {
     if (isset($tx['address'])) {
         $address = $tx['address'];
         $addrCell = isset($knownAddresses[$address])
-            ? Html::a(Html::encode($address), '/?address=' . urlencode($address))
+            ? Html::a(Html::encode($address), Yii::$app->YiimpUtils->walletUrl($address))
             : Html::encode($address);
     }
 

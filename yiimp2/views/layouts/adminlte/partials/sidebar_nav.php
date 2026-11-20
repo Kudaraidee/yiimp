@@ -12,11 +12,10 @@ $vu = Yii::$app->ViewUtils;
 $route = $controller . '/' . $action;
 
 // Returns true when the nav item's URL matches the current page.
-// '/?address=' is the wallet URL — active only when an address param is present.
-// '/site/index'  (Home)  — active only when no address param.
+// '/wallet' is the wallet page; '/site/index' (Home) is the homepage.
 $active = function (string $url) use ($route, $hasAddress): bool {
-    if (strpos($url, '/?address=') !== false) {
-        return $route === 'site/index' && $hasAddress;
+    if ($url === '/wallet') {
+        return $route === 'site/wallet';
     }
     $path = trim(parse_url($url, PHP_URL_PATH) ?? '', '/');
     if ($path === '') return false;
@@ -28,7 +27,7 @@ $active = function (string $url) use ($route, $hasAddress): bool {
 $publicNav = [
     ['home',      'Home',      '/site/index'],
     ['pool',      'Pool',      '/site/mining'],
-    ['wallet',    'Wallet',    '/?address='],
+    ['wallet',    'Wallet',    '/wallet'],
     ['graphs',    'Graphs',    '/stats'],
     ['api',       'API',       '/site/api'],
     ['explorer',  'Explorers', '/explorer'],

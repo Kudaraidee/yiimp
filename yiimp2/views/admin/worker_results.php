@@ -117,7 +117,7 @@ foreach ($workers as $worker) {
         <b><?= $coinLink ?></b>
         <?= $coinsym ? '&nbsp;(' . Html::encode($coinsym) . ')' : '<span class="text-muted">-</span>' ?>
     </td>
-    <td><?= Html::a('<b>' . Html::encode($worker->name) . '</b>', '/?address=' . urlencode($worker->name), ['encode' => false]) ?></td>
+    <td><?= Html::a('<b>' . Html::encode($worker->name) . '</b>', Yii::$app->YiimpUtils->walletUrl($worker->name), ['encode' => false]) ?></td>
     <td><?= Html::encode($worker->password) ?></td>
     <td title="<?= Html::encode($worker->ip) ?>"><?= Html::encode($r['dns']) ?></td>
     <td><?= Html::encode($worker->version) ?></td>
@@ -195,7 +195,7 @@ foreach ($workers as $worker) {
         </td>
         <td>
             <?= Html::a('<strong>' . Html::encode($worker->name) . '</strong>',
-                '/?address=' . urlencode($worker->name), ['encode' => false]) ?>
+                Yii::$app->YiimpUtils->walletUrl($worker->name), ['encode' => false]) ?>
         </td>
         <td class="small text-muted"><?= Html::encode($worker->password) ?></td>
         <td class="small font-monospace text-muted" title="<?= Html::encode($worker->ip) ?>">
@@ -338,7 +338,7 @@ Yii::$app->ViewUtils->JavascriptReady("
         <td class="px-3 py-2">
             <?= Html::a('<span class="font-medium text-gray-900 dark:text-gray-100">'
                 . Html::encode($worker->name) . '</span>',
-                '/?address=' . urlencode($worker->name),
+                Yii::$app->YiimpUtils->walletUrl($worker->name),
                 ['encode' => false,
                  'class'  => 'hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors']) ?>
         </td>

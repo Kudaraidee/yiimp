@@ -112,7 +112,7 @@ div.terminal { color: silver; background: black; min-height: 180px; margin: 8px 
     \$('input[name=query]').focus();
     \$('s.addr').each(function() {
         var addr = \$(this).text();
-        \$(this).html('<a href=\"/?address='+addr+'\" target=\"_blank\">'+addr+'</a>');
+        \$(this).html('<a href=\"/wallet/'+encodeURIComponent(addr)+'\" target=\"_blank\">'+addr+'</a>');
     });
     \$('s.hash').each(function() {
         var hash = \$(this).text();
@@ -183,7 +183,7 @@ div.terminal { color: silver; background: black; min-height: 180px; margin: 8px 
     \$('input[name=query]').focus();
     \$('s.addr').each(function() {
         var addr = \$(this).text();
-        \$(this).html('<a href=\"/?address='+addr+'\" target=\"_blank\" style=\"color:#ce9178\">'+addr+'</a>');
+        \$(this).html('<a href=\"/wallet/'+encodeURIComponent(addr)+'\" target=\"_blank\" style=\"color:#ce9178\">'+addr+'</a>');
     });
     \$('s.hash').each(function() {
         var hash = \$(this).text();
@@ -266,7 +266,7 @@ div.terminal { color: silver; background: black; min-height: 180px; margin: 8px 
     document.querySelector('input[name=query]').focus();
     document.querySelectorAll('s.addr').forEach(function(el) {
         var addr = el.textContent;
-        el.innerHTML = '<a href=\"/?address='+addr+'\" target=\"_blank\" style=\"color:#ffa657\">'+addr+'</a>';
+        el.innerHTML = '<a href=\"/wallet/'+encodeURIComponent(addr)+'\" target=\"_blank\" style=\"color:#ffa657\">'+addr+'</a>';
     });
     document.querySelectorAll('s.hash').forEach(function(el) {
         var hash = el.textContent;

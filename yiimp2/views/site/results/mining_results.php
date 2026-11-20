@@ -289,6 +289,7 @@ foreach ($list as $coin) {
     // Owed check
     $owed = (new \yii\db\Query())->select(['SUM(balance)'])->from('accounts')->where(['coinid' => $coin->id])->scalar();
     $short = YIIMP_ALLOW_EXCHANGE && $coin->balance + $coin->mint < $owed * 0.9;
+    $blockUrl = Html::encode($coin->blockUrl);
 
     if ($isLegacy) {
         $paySymbol = Html::encode((string) ($coin->symbol ?: $coin->symbol_show));
@@ -317,7 +318,7 @@ foreach ($list as $coin) {
 
         echo "<tr class='" . ($coin->auto_ready ? '' : 'mn-dim') . "'>";
         echo "<td><div class='mn-coin'><span class='{$icoClass}'>{$initials}{$img}</span><div class='mn-coin-main'>";
-        echo "<a class='{$linkClass}' href='/site/block?id={$coin->id}'{$coinHint}>{$name}</a>";
+        echo "<a class='{$linkClass}' href='{$blockUrl}'{$coinHint}>{$name}</a>";
         echo "<div class='mn-meta'><span class='mn-algo'>" . Html::encode($coin->algo) . "</span>{$payBadge}</div>";
         echo "</div></div></td>";
         echo "<td class='mn-val'><span>{$reward} {$showSymbol}</span><span class='mn-cap'>per block</span></td>";
@@ -340,9 +341,9 @@ foreach ($list as $coin) {
         echo "<tr class='{$dimmed}'>";
         echo '<td>' . ($coin->image ? "<img src='" . Html::encode($coin->image) . "' width='18' style='object-fit:contain' onerror='this.style.display=\"none\"'>" : '') . '</td>';
         if ($short) {
-            echo "<td class='small'><a href='/site/block?id={$coin->id}' class='fw-bold text-danger' title='Short supply'>{$name}</a> <span class='text-muted'>({$coin->algo})</span></td>";
+            echo "<td class='small'><a href='{$blockUrl}' class='fw-bold text-danger' title='Short supply'>{$name}</a> <span class='text-muted'>({$coin->algo})</span></td>";
         } else {
-            echo "<td class='small'><a href='/site/block?id={$coin->id}' class='fw-bold'>{$name}</a> <span class='text-muted'>({$coin->algo})</span>";
+            echo "<td class='small'><a href='{$blockUrl}' class='fw-bold'>{$name}</a> <span class='text-muted'>({$coin->algo})</span>";
             if (!$coin->auto_exchange) echo " <span class='badge bg-danger'>no autotrade</span>";
             echo "</td>";
         }
@@ -363,7 +364,7 @@ foreach ($list as $coin) {
         echo "<tr class='{$rowCls}'>";
         echo '<td class="px-3 py-2">' . ($coin->image ? "<img src='" . Html::encode($coin->image) . "' width='18' height='18' class='rounded object-contain' onerror='this.style.display=\"none\"'>" : '') . '</td>';
         echo "<td class='px-3 py-2'>";
-        echo "<div class='font-medium'><a href='/site/block?id={$coin->id}' class='{$shortCls}'>{$name}</a>";
+        echo "<div class='font-medium'><a href='{$blockUrl}' class='{$shortCls}'>{$name}</a>";
         if (!$coin->auto_exchange) echo " <span class='inline-flex items-center px-1 py-0.5 rounded text-xs bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'>no autotrade</span>";
         echo "</div>";
         echo "<div class='font-mono text-gray-400 dark:text-gray-500'>" . Html::encode($coin->algo) . "</div></td>";

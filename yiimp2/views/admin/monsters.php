@@ -110,7 +110,7 @@ if ($isTailwind) {
         <td width="60" colspan="2"></td>
     <?php endif ?>
     <td><?= Html::a('<b>' . Html::encode($user->username) . '</b>',
-            '/?address=' . urlencode($user->username), ['encode' => false]) ?></td>
+            Yii::$app->YiimpUtils->walletUrl($user->username), ['encode' => false]) ?></td>
     <td><?= Html::encode($r['what']) ?></td>
     <td><?= $conv->datetoa2($user->last_earning) ?></td>
     <td><?= $r['blockCount'] ?></td>
@@ -180,7 +180,7 @@ if ($isTailwind) {
         <?php endif ?></td>
         <td>
             <?= Html::a('<strong>' . Html::encode($user->username) . '</strong>',
-                '/?address=' . urlencode($user->username), ['encode' => false]) ?>
+                Yii::$app->YiimpUtils->walletUrl($user->username), ['encode' => false]) ?>
             <?php if ($user->is_locked): ?>
                 <span class="badge bg-danger ms-1">locked</span>
             <?php endif ?>
@@ -309,7 +309,7 @@ Yii::$app->ViewUtils->JavascriptReady("
             <div class="flex items-center gap-1.5 flex-wrap">
                 <?= Html::a('<span class="font-medium text-gray-900 dark:text-gray-100">'
                     . Html::encode($user->username) . '</span>',
-                    '/?address=' . urlencode($user->username),
+                    Yii::$app->YiimpUtils->walletUrl($user->username),
                     ['encode' => false,
                      'class'  => 'hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors']) ?>
                 <?php if ($locked): ?>

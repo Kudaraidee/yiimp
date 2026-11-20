@@ -138,12 +138,13 @@ foreach ($list as $item) {
         $total4 = (float) $val4;
     }
 
-    $name = substr($coin->name, 0, 12);
+    $name     = substr($coin->name, 0, 12);
+    $blockUrl = Html::encode($coin->blockUrl);
 
     if ($isLegacy) {
         echo '<tr class="ssrow">';
         echo '<td width="18"><img width="16" src="' . Html::encode($coin->image) . '"></td>';
-        echo '<td><b><a href="/site/block?id=' . $id . '">' . Html::encode($name) . '</a></b></td>';
+        echo '<td><b><a href="' . $blockUrl . '">' . Html::encode($name) . '</a></b></td>';
         echo '<td class="symb">' . Html::encode($coin->symbol) . '</td>';
         echo '<td align="right" style="font-size:.9em;">' . $res[1]['a'] . '</td>';
         echo '<td align="right" style="font-size:.9em;">' . $res[2]['a'] . '</td>';
@@ -154,7 +155,7 @@ foreach ($list as $item) {
         $coinImg = !empty($coin->image) ? "<img src='" . Html::encode($coin->image) . "' width='16' style='object-fit:contain' onerror='this.style.display=\"none\"'>" : '';
         echo '<tr>';
         echo '<td>' . $coinImg . '</td>';
-        echo '<td class="small"><a href="/site/block?id=' . $id . '" class="fw-bold">' . Html::encode($name) . '</a></td>';
+        echo '<td class="small"><a href="' . $blockUrl . '" class="fw-bold">' . Html::encode($name) . '</a></td>';
         echo '<td class="text-center small font-monospace text-muted">' . Html::encode($coin->symbol) . '</td>';
         echo '<td class="text-end small tabular-nums">' . $res[1]['a'] . '</td>';
         echo '<td class="text-end small tabular-nums">' . $res[2]['a'] . '</td>';
@@ -167,7 +168,7 @@ foreach ($list as $item) {
             : '';
         echo '<tr class="hover:bg-gray-50/50 dark:hover:bg-gray-700/10 transition-colors border-b border-gray-100 dark:border-gray-700/50">';
         echo '<td class="px-3 py-2">' . $coinImg . '</td>';
-        echo '<td class="px-3 py-2 font-medium"><a href="/site/block?id=' . $id . '" class="text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">' . Html::encode($name) . '</a></td>';
+        echo '<td class="px-3 py-2 font-medium"><a href="' . $blockUrl . '" class="text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">' . Html::encode($name) . '</a></td>';
         echo '<td class="px-3 py-2 text-center font-mono text-gray-400 dark:text-gray-500">' . Html::encode($coin->symbol) . '</td>';
         echo '<td class="px-3 py-2 text-right tabular-nums font-mono text-gray-600 dark:text-gray-300">' . $res[1]['a'] . '</td>';
         echo '<td class="px-3 py-2 text-right tabular-nums font-mono text-gray-600 dark:text-gray-300">' . $res[2]['a'] . '</td>';
@@ -187,23 +188,24 @@ $others = (new \yii\db\Query())
 
 foreach ($others as $item) {
     if (array_key_exists($item['id'], $main_ids)) continue;
+    $blockUrl = Html::encode(Coins::blockUrl($item['symbol'], (int) $item['id']));
     if ($isLegacy) {
         echo '<tr class="ssrow">';
         echo '<td width="18px"><img width="16px" src="' . Html::encode($item['image']) . '"></td>';
-        echo '<td><b><a href="/site/block?id=' . $item['id'] . '">' . Html::encode($item['name']) . '</a></b></td>';
+        echo '<td><b><a href="' . $blockUrl . '">' . Html::encode($item['name']) . '</a></b></td>';
         echo '<td class="symb">' . Html::encode($item['symbol']) . '</td>';
         echo '<td colspan="4"></td></tr>';
     } elseif (!$isTailwind) {
         $img = !empty($item['image']) ? "<img src='" . Html::encode($item['image']) . "' width='16' style='object-fit:contain' onerror='this.style.display=\"none\"'>" : '';
         echo '<tr><td>' . $img . '</td>';
-        echo '<td class="small"><a href="/site/block?id=' . $item['id'] . '" class="fw-bold">' . Html::encode($item['name']) . '</a></td>';
+        echo '<td class="small"><a href="' . $blockUrl . '" class="fw-bold">' . Html::encode($item['name']) . '</a></td>';
         echo '<td class="text-center small font-monospace text-muted">' . Html::encode($item['symbol']) . '</td>';
         echo '<td colspan="4" class="text-muted small text-center">—</td></tr>';
     } else {
         $img = !empty($item['image']) ? "<img src='" . Html::encode($item['image']) . "' width='16' height='16' class='rounded object-contain' onerror='this.style.display=\"none\"'>" : '';
         echo '<tr class="opacity-50 border-b border-gray-100 dark:border-gray-700/50">';
         echo '<td class="px-3 py-1.5">' . $img . '</td>';
-        echo '<td class="px-3 py-1.5 font-medium"><a href="/site/block?id=' . $item['id'] . '" class="text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">' . Html::encode($item['name']) . '</a></td>';
+        echo '<td class="px-3 py-1.5 font-medium"><a href="' . $blockUrl . '" class="text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400">' . Html::encode($item['name']) . '</a></td>';
         echo '<td class="px-3 py-1.5 text-center font-mono text-gray-400 dark:text-gray-500">' . Html::encode($item['symbol']) . '</td>';
         echo '<td colspan="4" class="px-3 py-1.5 text-center text-gray-300 dark:text-gray-600">—</td></tr>';
     }
