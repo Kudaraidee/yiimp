@@ -269,8 +269,8 @@ CSS;
                     <span class='bk-cap'>share diff <?= Html::encode($r['diffUser']) ?></span>
                 </td>
                 <td>
-                    <span class='bk-type <?= $typeClass ?>'><?= $typeLabel ?></span><?= $segwit ?>
                     <span class='bk-finder'><?= Html::encode($finder) ?></span>
+                    <span class='bk-type <?= $typeClass ?>'><?= $typeLabel ?></span><?= $segwit ?>
                 </td>
                 <td>
                     <span class='bk-status <?= $statusInfo[1] ?>'<?= $statusTitle ?>><?= Html::encode($statusInfo[0]) ?></span>
