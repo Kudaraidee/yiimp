@@ -396,14 +396,16 @@ class StatsService
     private function convertEarningsForUser(object $user, string $statusCondition): float
     {
         $db    = Yii::$app->db;
+        $util  = Yii::$app->YiimpUtils;
         $allow = defined('YIIMP_ALLOW_EXCHANGE') && YIIMP_ALLOW_EXCHANGE;
 
         $refCoin = $user->coinid ? Coins::findOne((int) $user->coinid) : null;
         if (!$refCoin && $allow) {
-            $refCoin = Coins::find()->where(['symbol' => 'BTC'])->one();
+            $refCoin = Coins::find()->where(['symbol' => $util->payoutQuoteSymbol()])->one();
         }
+        $refPrice = $util->payoutPrice($refCoin);
 
-        if (!$refCoin || $refCoin->price <= 0) {
+        if (!$refCoin || $refPrice <= 0) {
             return 0.0;
         }
 
@@ -422,8 +424,8 @@ class StatsService
             }
             if ($coin->id == $refCoin->id) {
                 $total += (float) $row['total'];
-            } elseif ($coin->auto_exchange && $coin->price > 0 && $refCoin->price > 0) {
-                $total += (float) $row['total'] * $coin->price / $refCoin->price;
+            } elseif ($coin->auto_exchange && $coin->price > 0 && $refPrice > 0) {
+                $total += (float) $row['total'] * $coin->price / $refPrice;
             }
         }
 

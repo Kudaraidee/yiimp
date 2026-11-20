@@ -40,17 +40,20 @@ function BackendClearEarnings($coinid = NULL)
 
 		$value = yaamp_convert_amount_user($coin, $earning->amount, $user);
 
-		if($user->coinid == 6 && !YAAMP_ALLOW_EXCHANGE)
+		$paycoin = getdbo('db_coins', $user->coinid);
+		// Quote payouts (BTC by default, USDT when configured) are not mined
+		// coins; without exchange enabled they must not collect conversions.
+		if($paycoin && yaamp_is_quote_coin($paycoin) && !YAAMP_ALLOW_EXCHANGE)
 			continue;
 
 		$user->balance += $value;
 		$user->save();
 
-		if($user->coinid == 6)
+		if($paycoin && yaamp_is_quote_coin($paycoin))
 			$total_cleared += $value;
 	}
 
 	if($total_cleared>0)
-		debuglog("total cleared from mining ".bitcoinvaluetoa($total_cleared)." BTC");
+		debuglog("total cleared from mining ".bitcoinvaluetoa($total_cleared)." ".yaamp_payout_quote_symbol());
 }
 

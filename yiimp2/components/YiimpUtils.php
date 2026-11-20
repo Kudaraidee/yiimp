@@ -282,6 +282,43 @@ class YiimpUtils extends Component
 		return $btcmhd * $algo_unit_factor;
 	}
 
+	/** Currency users are paid in. BTC by default, configurable via settings. */
+	public function payoutQuoteSymbol()
+	{
+		static $symbol = null;
+		if ($symbol === null) {
+			$row = (new \yii\db\Query())
+				->select(['value'])->from('settings')->where(['param' => 'payout_quote'])->one();
+			$symbol = strtoupper(trim((string) ($row['value'] ?? 'BTC')));
+			if ($symbol === '' || $symbol === 'NONE') $symbol = 'BTC';
+		}
+		return $symbol;
+	}
+
+	public function isQuoteSymbol($symbol)
+	{
+		return strtoupper(trim((string) $symbol)) === $this->payoutQuoteSymbol();
+	}
+
+	/** BTC keeps its reserve-coin behaviour when another quote is configured. */
+	public function isPayoutCoin($coin)
+	{
+		if (!$coin) return false;
+		$symbol = strtoupper(trim((string) ($coin->symbol ?? '')));
+		return $symbol === 'BTC' || $this->isQuoteSymbol($symbol);
+	}
+
+	/** BTC value of a coin, with quote rows reading their live settings rate. */
+	public function payoutPrice($coin)
+	{
+		if (!$coin) return 0.;
+		if ($this->isQuoteSymbol($coin->symbol ?? null)) {
+			$rate = $this->quoteBtcPrice($coin->symbol, 0);
+			if ($rate > 0) return $rate;
+		}
+		return (float) ($coin->price ?? 0);
+	}
+
 	public function convert_amount_user($coin, $amount, $user)
 	{
 		$refcoin = Coins::find()->where(['id' => $user->coinid])->one();
@@ -290,11 +327,12 @@ class YiimpUtils extends Component
 			$value = $amount;
 		} else {
 			if (YIIMP_ALLOW_EXCHANGE) {
-				if(!$refcoin) $refcoin = Coins::find()->where(['symbol' => 'BTC'])->one();
-				if(!$refcoin || $refcoin->price <= 0) return 0;
-				$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $refcoin->price;
-			} else if ($coin->price && $refcoin && $refcoin->price > 0.) {
-				$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $refcoin->price;
+				if(!$refcoin) $refcoin = Coins::find()->where(['symbol' => $this->payoutQuoteSymbol()])->one();
+				$refPrice = $this->payoutPrice($refcoin);
+				if(!$refcoin || $refPrice <= 0) return 0;
+				$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $refPrice;
+			} else if ($coin->price && $refcoin && $this->payoutPrice($refcoin) > 0.) {
+				$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $this->payoutPrice($refcoin);
 			}
 		}
 		
@@ -323,23 +361,24 @@ class YiimpUtils extends Component
 							->andWhere(['userid' => $user->id, 'coinid' => $user->coinid])
 							->scalar();
 		} else if (YIIMP_ALLOW_EXCHANGE) {
-			if(!$refcoin) $refcoin = Coins::find()->where(['symbol' => 'BTC'])->one();
-			if(!$refcoin || $refcoin->price <= 0) return 0;
+			if(!$refcoin) $refcoin = Coins::find()->where(['symbol' => $this->payoutQuoteSymbol()])->one();
+			$refPrice = $this->payoutPrice($refcoin);
+			if(!$refcoin || $refPrice <= 0) return 0;
 			$value = (new \yii\db\Query())
 							->select(['sum(amount*price)'])
 							->from('earnings')
 							->where($statusCond)
 							->andWhere(['userid' => $user->id])
 							->scalar();
-			$value = $value / $refcoin->price;
-		} else if ($refcoin && $refcoin->price > 0.) {
+			$value = $value / $refPrice;
+		} else if ($refcoin && $this->payoutPrice($refcoin) > 0.) {
 			$value = (new \yii\db\Query())
 							->select(['sum(amount*price)'])
 							->from('earnings')
 							->where($statusCond)
 							->andWhere(['userid' => $user->id])
 							->scalar();
-			$value = $value / $refcoin->price;
+			$value = $value / $this->payoutPrice($refcoin);
 		} else if ($user->coinid) {
 			$value = (new \yii\db\Query())
 							->select(['sum(amount)'])

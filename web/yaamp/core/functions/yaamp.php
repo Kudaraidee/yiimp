@@ -409,6 +409,48 @@ function yaamp_profitability($coin)
 	return $btcmhd * $algo_unit_factor;
 }
 
+// ── Payout quote helpers ───────────────────────────────────────────────────────
+// BTC is the internal numeraire, but the currency users are paid in is a
+// setting. Quote rows (USDT, ...) store their BTC rate in settings/<sym>_btc
+// so the value can be refreshed without touching the coins table.
+function yaamp_payout_quote_symbol()
+{
+	static $symbol = null;
+	if ($symbol === null) {
+		$symbol = strtoupper(trim((string) settings_get('payout_quote', 'BTC')));
+		if ($symbol === '' || $symbol === 'NONE') $symbol = 'BTC';
+	}
+	return $symbol;
+}
+
+function yaamp_is_quote_symbol($symbol)
+{
+	return strtoupper(trim((string) $symbol)) === yaamp_payout_quote_symbol();
+}
+
+// BTC keeps its original reserve-coin behaviour even when another quote is
+// configured for autoexchange.
+function yaamp_is_quote_coin($coin)
+{
+	if (!$coin) return false;
+	$symbol = strtoupper(trim((string) $coin->symbol));
+	return $symbol === 'BTC' || yaamp_is_quote_symbol($symbol);
+}
+
+function yaamp_payout_price($coin)
+{
+	if (!$coin) return 0.;
+	if (yaamp_is_quote_symbol($coin->symbol)) {
+		static $rates = array();
+		$key = strtoupper((string) $coin->symbol);
+		if (!isset($rates[$key])) {
+			$rates[$key] = (double) settings_get(strtolower($key).'_btc', 0);
+		}
+		if ($rates[$key] > 0) return $rates[$key];
+	}
+	return (double) $coin->price;
+}
+
 function yaamp_convert_amount_user($coin, $amount, $user)
 {
 	$refcoin = getdbo('db_coins', $user->coinid);
@@ -416,12 +458,14 @@ function yaamp_convert_amount_user($coin, $amount, $user)
 	if ($coin->id == $user->coinid) {
 		$value = $amount;
 	} else {
+		$refPrice = yaamp_payout_price($refcoin);
 		if (YAAMP_ALLOW_EXCHANGE) {
-			if(!$refcoin) $refcoin = getdbosql('db_coins', "symbol='BTC'");
-			if(!$refcoin || $refcoin->price <= 0) return 0;
-			$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $refcoin->price;
-		} else if ($coin->price && $refcoin && $refcoin->price > 0.) {
-			$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $refcoin->price;
+			if(!$refcoin) $refcoin = getdbosql('db_coins', "symbol=:sym", array(':sym'=>yaamp_payout_quote_symbol()));
+			$refPrice = yaamp_payout_price($refcoin);
+			if(!$refcoin || $refPrice <= 0) return 0;
+			$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $refPrice;
+		} else if ($coin->price && $refcoin && $refPrice > 0.) {
+			$value = $amount * (($coin->auto_exchange)?$coin->price : 0.) / $refPrice;
 		}
 	}
 	
@@ -435,13 +479,19 @@ function yaamp_convert_earnings_user($user, $status)
 	if ($refcoin && !$refcoin->auto_exchange) {
 		$value = dboscalar("SELECT sum(amount) FROM earnings WHERE $status AND userid={$user->id} and coinid={$user->coinid}");
 	} else if (YAAMP_ALLOW_EXCHANGE) {
-		if(!$refcoin) $refcoin = getdbosql('db_coins', "symbol='BTC'");
-		if(!$refcoin || $refcoin->price <= 0) return 0;
+		if(!$refcoin) $refcoin = getdbosql('db_coins', "symbol=:sym", array(':sym'=>yaamp_payout_quote_symbol()));
+		$refPrice = yaamp_payout_price($refcoin);
+		if(!$refcoin || $refPrice <= 0) return 0;
 		$value = dboscalar("SELECT sum(amount*price) FROM earnings WHERE $status AND userid={$user->id}");
-		$value = $value / $refcoin->price;
-	} else if ($refcoin && $refcoin->price > 0.) {
-		$value = dboscalar("SELECT sum(amount*price) FROM earnings WHERE $status AND userid={$user->id}");
-		$value = $value / $refcoin->price;
+		$value = $value / $refPrice;
+	} else if ($refcoin) {
+		$refPrice = yaamp_payout_price($refcoin);
+		if ($refPrice > 0.) {
+			$value = dboscalar("SELECT sum(amount*price) FROM earnings WHERE $status AND userid={$user->id}");
+			$value = $value / $refPrice;
+		} else if ($user->coinid) {
+			$value = dboscalar("SELECT sum(amount) FROM earnings WHERE $status AND userid={$user->id} AND coinid=".$user->coinid);
+		}
 	} else if ($user->coinid) {
 		$value = dboscalar("SELECT sum(amount) FROM earnings WHERE $status AND userid={$user->id} AND coinid=".$user->coinid);
 	}

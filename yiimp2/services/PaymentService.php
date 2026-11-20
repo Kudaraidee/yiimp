@@ -425,8 +425,13 @@ class PaymentService
 
             $value = $this->convertAmountForUser($coin, (float) $earning->amount, $user);
 
-            // coinid=6 is BTC; skip if exchange not allowed
-            if ($user->coinid == 6 && !(defined('YIIMP_ALLOW_EXCHANGE') && YIIMP_ALLOW_EXCHANGE)) {
+            // Quote payouts (BTC by default, USDT when configured) are not
+            // mined coins; without exchange enabled they cannot receive
+            // converted earnings.
+            $util     = Yii::$app->YiimpUtils;
+            $payCoin  = Coins::findOne((int) $user->coinid);
+            if ($util->isPayoutCoin($payCoin)
+                && !(defined('YIIMP_ALLOW_EXCHANGE') && YIIMP_ALLOW_EXCHANGE)) {
                 continue;
             }
 
@@ -695,20 +700,23 @@ class PaymentService
         }
 
         $allowExchange = defined('YIIMP_ALLOW_EXCHANGE') && YIIMP_ALLOW_EXCHANGE;
+        $util          = Yii::$app->YiimpUtils;
         $refCoin       = Coins::findOne((int) $user->coinid);
 
         if ($allowExchange) {
             if (!$refCoin) {
-                $refCoin = Coins::find()->where(['symbol' => 'BTC'])->one();
+                $refCoin = Coins::find()->where(['symbol' => $util->payoutQuoteSymbol()])->one();
             }
-            if (!$refCoin || $refCoin->price <= 0) {
+            $refPrice = $util->payoutPrice($refCoin);
+            if (!$refCoin || $refPrice <= 0) {
                 return 0.0;
             }
-            return $amount * ($coin->auto_exchange ? (float) $coin->price : 0.0) / (float) $refCoin->price;
+            return $amount * ($coin->auto_exchange ? (float) $coin->price : 0.0) / $refPrice;
         }
 
-        if ($coin->price && $refCoin && $refCoin->price > 0) {
-            return $amount * ($coin->auto_exchange ? (float) $coin->price : 0.0) / (float) $refCoin->price;
+        $refPrice = $util->payoutPrice($refCoin);
+        if ($coin->price && $refCoin && $refPrice > 0) {
+            return $amount * ($coin->auto_exchange ? (float) $coin->price : 0.0) / $refPrice;
         }
 
         return 0.0;

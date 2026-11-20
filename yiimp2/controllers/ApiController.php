@@ -491,12 +491,14 @@ class ApiController extends Controller
     private function convertEarnings(Accounts $user, string $statusCondition): float
     {
         $db        = Yii::$app->db;
+        $util      = Yii::$app->YiimpUtils;
         $allow     = defined('YIIMP_ALLOW_EXCHANGE') && YIIMP_ALLOW_EXCHANGE;
         $refCoin   = Coins::findOne((int) $user->coinid);
         if (!$refCoin && $allow) {
-            $refCoin = Coins::find()->where(['symbol' => 'BTC'])->one();
+            $refCoin = Coins::find()->where(['symbol' => $util->payoutQuoteSymbol()])->one();
         }
-        if (!$refCoin || $refCoin->price <= 0) return 0.0;
+        $refPrice  = $util->payoutPrice($refCoin);
+        if (!$refCoin || $refPrice <= 0) return 0.0;
 
         $rows = $db->createCommand(
             "SELECT coinid, SUM(amount) AS total FROM earnings WHERE userid=:uid AND {$statusCondition} GROUP BY coinid",
@@ -510,7 +512,7 @@ class ApiController extends Controller
             if ($coin->id == $refCoin->id) {
                 $total += (float) $row['total'];
             } elseif ($coin->auto_exchange && $coin->price > 0) {
-                $total += (float) $row['total'] * $coin->price / $refCoin->price;
+                $total += (float) $row['total'] * $coin->price / $refPrice;
             }
         }
         return $total;

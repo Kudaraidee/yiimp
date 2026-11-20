@@ -57,15 +57,18 @@ class UserService
                             $oldCoin = Coins::findOne((int) $user->coinid);
                             if (!$oldCoin) {
                                 if ($allowExchange) {
-                                    $oldCoin = Coins::find()->where(['symbol' => 'BTC'])->one();
+                                    $oldCoin = Coins::find()->where(['symbol' => Yii::$app->YiimpUtils->payoutQuoteSymbol()])->one();
                                 } else {
                                     $user->save();
                                     continue;
                                 }
                             }
 
-                            if ($oldCoin && $oldCoin->price > 0 && $coin->price > 0) {
-                                $user->balance = $user->balance * $oldCoin->price / $coin->price;
+                            $util     = Yii::$app->YiimpUtils;
+                            $oldPrice = $util->payoutPrice($oldCoin);
+                            $newPrice = $util->payoutPrice($coin);
+                            if ($oldPrice > 0 && $newPrice > 0) {
+                                $user->balance = $user->balance * $oldPrice / $newPrice;
                             }
                         }
 

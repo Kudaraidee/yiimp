@@ -11,6 +11,7 @@ function BackendPricesUpdate()
 	// Quote currencies (USDT/USDC) must be priced in BTC before converting
 	// pairs such as LRS/USDT into the BTC price Yiimp stores in coins.price.
 	updateQuoteCoinPrices();
+	yiimp_sync_quote_coin_prices();
 
 	$exchanges = getdbolist('db_balances');
 	foreach ($exchanges as $exchange) {
@@ -127,6 +128,21 @@ function updateQuoteCoinPrices()
 			if (isset($bySymbol[$binanceSymbol]))
 				settings_set(strtolower($symbol).'_btc', 1 / $bySymbol[$binanceSymbol]);
 		}
+	}
+}
+
+// Keep seeded quote rows (USDT, ...) priced in BTC from the refreshed
+// settings rate. Conversion helpers also read settings directly, but other
+// code paths still read coins.price.
+function yiimp_sync_quote_coin_prices()
+{
+	$symbols = array('USDT', 'USDC', 'BUSD', 'DAI', yaamp_payout_quote_symbol());
+	foreach (array_unique($symbols) as $symbol) {
+		$rate = (double) settings_get(strtolower($symbol).'_btc', 0);
+		if ($rate <= 0) continue;
+		dborun("UPDATE coins SET price=:price WHERE symbol=:sym", array(
+			':price'=>$rate, ':sym'=>$symbol,
+		));
 	}
 }
 

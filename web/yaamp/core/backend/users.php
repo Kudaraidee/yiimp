@@ -33,12 +33,15 @@ function BackendUsersUpdate()
 						$coinref = getdbo('db_coins', $user->coinid);
 						if(!$coinref) {
 							if (YAAMP_ALLOW_EXCHANGE)
-								$coinref = getdbosql('db_coins', "symbol='BTC'");
+								$coinref = getdbosql('db_coins', "symbol=:sym", array(':sym'=>yaamp_payout_quote_symbol()));
 							else
 								continue;
 						}
 
-						$user->balance = $user->balance * $coinref->price / $coin->price;
+						$oldPrice = yaamp_payout_price($coinref);
+						$newPrice = yaamp_payout_price($coin);
+						if ($oldPrice <= 0 || $newPrice <= 0) continue;
+						$user->balance = $user->balance * $oldPrice / $newPrice;
 					}
 
 					$user->coinid = $coin->id;
