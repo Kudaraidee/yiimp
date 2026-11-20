@@ -3,6 +3,7 @@
 /** @var yii\web\View  $this             */
 /** @var string        $algo             */
 /** @var string        $algoUnit         */
+/** @var int           $algoCount        */
 /** @var bool          $isAdmin          */
 /** @var int           $totalWorkers     */
 /** @var int           $totalExtranonce  */
@@ -25,6 +26,9 @@ if (!$algo) {
     return;
 }
 
+$showAlgo  = ($algo === 'all');
+$algoLabel = $showAlgo ? 'all algos' : $algo;
+
 // Numeric key for tablesorter from values like "2.2 MH/s" or "62.4%".
 $sortVal = function ($value): float {
     $value = trim((string) $value);
@@ -35,7 +39,12 @@ $sortVal = function ($value): float {
 };
 
 $versionsCount = count($versionData);
-$cols          = $isAdmin ? 6 : 5;
+$cols          = ($isAdmin ? 6 : 5) + ($showAlgo ? 1 : 0);
+
+$algoSet = [];
+foreach ($versionData as $row) {
+    if (!empty($row['algo'])) $algoSet[(string) $row['algo']] = true;
+}
 
 // ── Wrapper ───────────────────────────────────────────────────────────────────
 if ($isLegacy) {
@@ -133,6 +142,20 @@ echo <<<'CSS'
     color: #187d46;
 }
 #maintable2 .chip.es { background: #eef4ff; color: #2c5aa0; }
+#maintable2 .algo-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 9px;
+    font-weight: 700;
+    border: 1px solid var(--c, #d8e2ef);
+    background: #f8fafc;
+    color: #33405a;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 #maintable2 .pct { color: #1f467f; }
 #maintable2 .bar {
     display: block;
@@ -198,12 +221,20 @@ echo <<<'CSS'
 CSS;
 
 // ── Sorting ───────────────────────────────────────────────────────────────────
-$extract = "1:function(n){return \$(n).attr('data')||\$(n).text()},"
-         . "2:function(n){return \$(n).attr('data')||\$(n).text()},"
-         . "3:function(n){return \$(n).attr('data')||\$(n).text()},"
-         . "4:function(n){return \$(n).attr('data')||\$(n).text()}";
+// Column 0 is Algo only in "All" scope; the version name stays text-sortable.
+$verIdx   = $showAlgo ? 1 : 0;
+$shareIdx = $verIdx + 1;
+$workIdx  = $verIdx + 2;
+$hashIdx  = $verIdx + 3;
+$avgIdx   = $verIdx + 4;
+$rejectIdx = $verIdx + 5;
+
+$extract = "{$shareIdx}:function(n){return \$(n).attr('data')||\$(n).text()},"
+         . "{$workIdx}:function(n){return \$(n).attr('data')||\$(n).text()},"
+         . "{$hashIdx}:function(n){return \$(n).attr('data')||\$(n).text()},"
+         . "{$avgIdx}:function(n){return \$(n).attr('data')||\$(n).text()}";
 if ($isAdmin) {
-    $extract .= ",5:function(n){return \$(n).attr('data')||\$(n).text()}";
+    $extract .= ",{$rejectIdx}:function(n){return \$(n).attr('data')||\$(n).text()}";
 }
 $sortCfg = "{tableClass:'dataGrid2',textExtraction:{{$extract}}}";
 if ($isLegacy) {
@@ -216,7 +247,11 @@ if ($isLegacy) {
 // ── Header strip ──────────────────────────────────────────────────────────────
 echo '<div class="mv-head">';
 echo '<span style="font-size:12px;font-weight:700;color:#1f467f">Miners Version</span>';
-echo '<span class="pill">' . Html::encode($algo) . '</span>';
+echo '<span class="pill">' . Html::encode($algoLabel) . '</span>';
+if ($showAlgo) {
+    $displayAlgoCount = isset($algoCount) ? (int) $algoCount : count($algoSet);
+    echo '<span class="pill gray">' . $displayAlgoCount . ' algos</span>';
+}
 echo '<span class="pill gray">' . $versionsCount . ' versions</span>';
 echo '<span class="pill gray">' . $totalWorkers . ' workers</span>';
 echo '<span class="live"><i></i>live · 60s</span>';
@@ -227,17 +262,27 @@ echo '</div>';
 echo '<div style="overflow-x:auto">';
 echo '<table id="maintable2" class="mv-table">';
 echo '<thead><tr>';
-echo '<th style="width:30%">Miner / Version</th>';
-echo '<th style="width:18%">Share<span class="sort">↕</span></th>';
-echo '<th class="num" style="width:14%">Workers<span class="sort">↕</span></th>';
-echo '<th class="num" style="width:22%">Hashrate<span class="sort">↕</span></th>';
-echo '<th class="num" style="width:16%">Avg / miner<span class="sort">↕</span></th>';
-if ($isAdmin) echo '<th class="num" style="width:15%">Reject<span class="sort">↕</span></th>';
+if ($showAlgo) {
+    $w = $isAdmin
+        ? ['algo' => 9, 'ver' => 21, 'share' => 14, 'work' => 11, 'hash' => 18, 'avg' => 11, 'reject' => 16]
+        : ['algo' => 10, 'ver' => 26, 'share' => 17, 'work' => 13, 'hash' => 22, 'avg' => 12];
+    echo '<th style="width:' . $w['algo'] . '%">Algo<span class="sort">↕</span></th>';
+} else {
+    $w = $isAdmin
+        ? ['ver' => 26, 'share' => 15, 'work' => 12, 'hash' => 19, 'avg' => 13, 'reject' => 15]
+        : ['ver' => 30, 'share' => 18, 'work' => 14, 'hash' => 22, 'avg' => 16];
+}
+echo '<th style="width:' . $w['ver'] . '%">Miner / Version</th>';
+echo '<th style="width:' . $w['share'] . '%">Share<span class="sort">↕</span></th>';
+echo '<th class="num" style="width:' . $w['work'] . '%">Workers<span class="sort">↕</span></th>';
+echo '<th class="num" style="width:' . $w['hash'] . '%">Hashrate<span class="sort">↕</span></th>';
+echo '<th class="num" style="width:' . $w['avg'] . '%">Avg / miner<span class="sort">↕</span></th>';
+if ($isAdmin) echo '<th class="num" style="width:' . $w['reject'] . '%">Reject<span class="sort">↕</span></th>';
 echo '</tr></thead><tbody>';
 
 if (!$versionData) {
     echo '<tr><td colspan="' . $cols . '" style="text-align:center;color:#98a3b5;padding:14px">'
-       . 'No miner versions reported for ' . Html::encode($algo) . '.</td></tr>';
+       . 'No miner versions reported for ' . Html::encode($algoLabel) . '.</td></tr>';
 }
 
 // ── Rows ──────────────────────────────────────────────────────────────────────
@@ -265,6 +310,16 @@ foreach ($versionData as $r) {
     $barCls  = $pctNum > 40 ? 'bar' : 'bar alt';
 
     echo '<tr>';
+
+    // Algo (only in All scope)
+    if ($showAlgo) {
+        $rowAlgo   = (string) ($r['algo'] ?? '');
+        $algoColor = Html::encode(Yii::$app->YiimpUtils->getAlgoColors($rowAlgo));
+        echo "<td data='" . Html::encode($rowAlgo) . "'>";
+        echo "<span class='algo-badge' style='--c:{$algoColor}' title='" . Html::encode($rowAlgo) . "'>"
+           . Html::encode($rowAlgo !== '' ? $rowAlgo : '—') . '</span>';
+        echo '</td>';
+    }
 
     // Miner / Version
     echo '<td><div class="ver">';
@@ -319,6 +374,7 @@ echo '</tbody>';
 // ── Total row ─────────────────────────────────────────────────────────────────
 $totalBar = $sortVal($totalHashrateFmt) > 0 ? 100 : 0;
 echo '<tr class="total">';
+if ($showAlgo) echo '<td>All algos</td>';
 echo "<td>Total · {$versionsCount} versions</td>";
 echo "<td data='{$totalBar}'><span class='big mono pct'>" . ($totalBar ? '100%' : '—') . '</span>'
    . "<span class='bar'><i style='width:{$totalBar}%'></i></span></td>";
