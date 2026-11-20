@@ -20,19 +20,8 @@ foreach ($list as $coin) {
 
     $coin->version = $conv->formatWalletVersion($coin);
 
-    $walletInfo  = $coin->getWalletInfo();
-    $networkHash = $coin->getRpcNetworkHashrate();
-
-    // Fall back to the cached wallet info, then the backend-maintained DB value,
-    // and finally the same estimate used by the backend. The explorer column
-    // stays filled even when the daemon cannot be reached from the web tier.
-    if (!$networkHash) {
-        $networkHash = $walletInfo['networkhashps'] ?? ($walletInfo['networkhps'] ?? null);
-    }
-    if (!$networkHash) $networkHash = $coin->network_hash;
-    if (!$networkHash && $coin->difficulty) {
-        $networkHash = $util->coin_nethash($coin);
-    }
+    // Shared with the pool status table so both pages show the same value.
+    $networkHash = $util->display_network_hashrate($coin);
     $coin->network_hash = $networkHash ? (float) $networkHash : null;
 
     $difficulty  = $conv->Itoa2($coin->difficulty, 3);

@@ -369,6 +369,44 @@ class YiimpUtils extends Component
 		return 300;
 	}
 
+	/**
+	 * Network hashrate used by public display pages (pool status + explorer).
+	 *
+	 * RPC is authoritative and cached by Coins::getRpcNetworkHashrate(). If the
+	 * daemon cannot answer, fall back through the wallet_info cache, the
+	 * backend-maintained coins.network_hash, and finally the legacy estimate.
+	 */
+	public function display_network_hashrate($coin, int $ttl = 60): ?float
+	{
+		if (method_exists($coin, 'getRpcNetworkHashrate')) {
+			$rpc = $coin->getRpcNetworkHashrate($ttl);
+			if ($rpc !== null && (float) $rpc > 0) {
+				return (float) $rpc;
+			}
+		}
+
+		if (method_exists($coin, 'getWalletInfo')) {
+			$info   = $coin->getWalletInfo();
+			$cached = $info['networkhashps'] ?? ($info['networkhps'] ?? null);
+			if ($cached !== null && (float) $cached > 0) {
+				return (float) $cached;
+			}
+		}
+
+		if (!empty($coin->network_hash) && (float) $coin->network_hash > 0) {
+			return (float) $coin->network_hash;
+		}
+
+		if (!empty($coin->difficulty)) {
+			$estimate = $this->coin_nethash($coin);
+			if ($estimate > 0) {
+				return (float) $estimate;
+			}
+		}
+
+		return null;
+	}
+
 	public function coin_nethash($coin , $coin_powlimit_bits = null , $coin_difficulty = null, $coin_reward = null, $coin_price = null) {
 
 		/*

@@ -148,7 +148,8 @@ foreach ($list as $coin) {
     $blocktime  = $coin->block_time ?: max(min($coin->actual_ttf, 60), 30);
 
     $network_hash     = $util->coin_nethash($coin);
-    $nethash_str      = $network_hash ? 'network hash ' . $conv->Itoa2($network_hash) . 'h/s' : '';
+    $network_display  = $util->display_network_hashrate($coin);
+    $nethash_str      = $network_display ? 'network hash ' . strtoupper($conv->Itoa2($network_display)) . 'H/s' : '';
     $total_pool_rate  = $util->pool_rate($coin->algo);
     $pool_total_rate  = $total_pool_rate ? $conv->Itoa2($total_pool_rate) . 'h/s' : '';
 

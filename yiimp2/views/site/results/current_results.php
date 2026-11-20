@@ -247,8 +247,8 @@ foreach ($algos as $item) {
         $pool_shared_sfx   = $pool_shared ? $conv->Itoa2($pool_shared) . 'h/s' : '0 h/s';
         $pool_solo_h       = Yii::$app->YiimpUtils->coin_solo_rate($coin->id);
         $pool_solo_sfx     = $pool_solo_h ? $conv->Itoa2($pool_solo_h) . 'h/s' : '0 h/s';
-        $nethash           = Yii::$app->YiimpUtils->coin_nethash($coin);
-        $nethash_sfx       = $nethash ? $conv->Itoa2($nethash) . 'h/s' : '';
+        $nethash           = Yii::$app->YiimpUtils->display_network_hashrate($coin);
+        $nethash_sfx       = $nethash ? strtoupper($conv->Itoa2($nethash)) . 'H/s' : '';
         $btcmhd            = $conv->mbitcoinvaluetoa(Yii::$app->YiimpUtils->yiimp_profitability($coin));
 
         $display_users   = $port_count >= 1 ? $users_coins : $users_total;
