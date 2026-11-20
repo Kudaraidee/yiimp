@@ -212,7 +212,8 @@ class WalletRPC {
 							'confirmations' => arraySafeVal($mapped, 'confirmations', 0),
 							'details' => array(array(
 								'category' => 'generate',
-								'amount' => (double) arraySafeVal($this->coin, 'reward', 0),
+								// Yii AR exposes columns via __get, so arraySafeVal() cannot see them.
+								'amount' => (double) ($this->coin ? $this->coin->reward : 0),
 							)),
 						);
 					}
