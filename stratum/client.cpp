@@ -736,27 +736,41 @@ void *client_thread(void *p)
 		{
 			// T-Rex uses ethproxy-style calls even for stratum+tcp:// on the
 			// ethash algorithm. Treat it as a first-class protocol here.
+			// A repeated login on the same socket must not rotate the prefix.
+			const bool first_ethproxy_login = !client->is_ethproxy;
 			client->is_ethproxy = true;
 
 			// ethproxy has no mining.subscribe, so allocate the session's
 			// 24-bit nonce prefix here. Claymore/GMiners include this prefix in
-			// eth_getWork and prepend it to the miner nonce on submit.
-			if (!client->extranonce1[0])
+			// eth_getWork and prepend it to the miner nonce on submit. If a
+			// generic mining.subscribe arrived first, keep that prefix instead
+			// of allocating a second one.
+			if (first_ethproxy_login)
 			{
-				// job_assign() copies extranonce1_default over extranonce1 on
-				// every new job, so normalize both here. Claymore/GMiners need
-				// a 24-bit (6 hex) prefix; get_nonce_prefix() emits 4 hex.
-				get_nonce_prefix(client->extranonce1_default);
-				snprintf(client->extranonce1_default, sizeof(client->extranonce1_default),
-					"%06x", (unsigned int) strtoul(client->extranonce1_default, NULL, 16) & 0xffffff);
-				strcpy(client->extranonce1, client->extranonce1_default);
+				if (client->extranonce1[0])
+				{
+					snprintf(client->extranonce1_default, sizeof(client->extranonce1_default),
+						"%06x", (unsigned int) strtoul(client->extranonce1, NULL, 16) & 0xffffff);
+				}
+				else
+				{
+					// get_nonce_prefix() emits 4 hex; ethproxy needs 6.
+					get_nonce_prefix(client->extranonce1_default);
+					snprintf(client->extranonce1_default, sizeof(client->extranonce1_default),
+						"%06x", (unsigned int) strtoul(client->extranonce1_default, NULL, 16) & 0xffffff);
+				}
 
-				// mining.subscribe normally records the starting prefix here.
-				// ethproxy has no subscribe, so seed it as well; otherwise the
-				// next job broadcast thinks the prefix changed and sends
-				// client.reconnect with the bind address (0.0.0.0).
+				strcpy(client->extranonce1, client->extranonce1_default);
 				strcpy(client->extranonce1_last, client->extranonce1);
-				client->extranonce2size = client->extranonce2size_last = 0;
+
+				// ethproxy has no extranonce2. Keep every baseline field in
+				// sync so job assignment never sees a change to reconnect on.
+				client->extranonce2size_default = 0;
+				client->extranonce2size = 0;
+				client->extranonce2size_last = 0;
+
+				debuglog("ethproxy login %s %s nonce %s\n",
+					client->username, client->sock->ip, client->extranonce1);
 			}
 
 			// ethproxy clients never send mining.subscribe, so the difficulty

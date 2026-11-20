@@ -11,6 +11,10 @@
 
 static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxhash)
 {
+	// Ethereum Stratum and ethproxy hand the miner a session nonce prefix at
+	// subscribe/login time. It is not a per-job value and must remain stable.
+	const bool eth_session = is_ethash || is_etchash;
+
 	RETURN_ON_CONDITION(client->deleted, true);
 	RETURN_ON_CONDITION(client->jobid_next, true);
 	RETURN_ON_CONDITION(job->coind->mining_disabled, true);
@@ -104,8 +108,14 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 
 	else
 	{
-		strcpy(client->extranonce1, client->extranonce1_default);
-		client->extranonce2size = client->extranonce2size_default;
+		// For ETH, extranonce1 was allocated when the session was established
+		// and is already present in the miner's work. Replacing it here makes
+		// the generic code below send client.reconnect with the bind address.
+		if (!eth_session)
+		{
+			strcpy(client->extranonce1, client->extranonce1_default);
+			client->extranonce2size = client->extranonce2size_default;
+		}
 
 		// decred uses an extradata field in block header, 2 first uint32 are set by the miner
 		if (g_current_algo->name && !strcmp(g_current_algo->name,"decred")) {
@@ -124,9 +134,22 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 	job->count++;
 
 //	debuglog(" assign %x, %f, %d, %s\n", job->id, client->speed, client->reconnecting, client->sock->ip);
-	if(strcmp(client->extranonce1, client->extranonce1_last) || client->extranonce2size != client->extranonce2size_last)
+	if(eth_session)
 	{
-//		debuglog("new nonce %x %s %s\n", job->id, client->extranonce1_last, client->extranonce1);
+		// Never reconnect an Ethereum miner because of a nonce-prefix change.
+		// Update the baseline instead; ethproxy work pushes carry the prefix
+		// again, and EthereumStratum prefixes are fixed for the session.
+		strcpy(client->extranonce1_last, client->extranonce1);
+		client->extranonce2size_last = client->extranonce2size;
+	}
+	else if(strcmp(client->extranonce1, client->extranonce1_last) || client->extranonce2size != client->extranonce2size_last)
+	{
+		debuglog("nonce change client %d %s: %s/%d -> %s/%d subscribe=%d reconnectable=%d\n",
+			client->userid, client->sock->ip,
+			client->extranonce1_last, client->extranonce2size_last,
+			client->extranonce1, client->extranonce2size,
+			client->extranonce_subscribe, client->reconnectable);
+
 		if(!client->extranonce_subscribe)
 		{
 			strcpy(client->extranonce1_reconnect, client->extranonce1);
