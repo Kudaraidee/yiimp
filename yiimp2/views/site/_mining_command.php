@@ -17,7 +17,7 @@ $activeAlgo = $activeAlgo ?? ($algoNav['active'] ?? 'all');
 $jsonFlags  = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP;
 
 if ($isLegacy): ?>
-    <div class="main-left-box">
+    <div class="main-left-box mc-card">
         <div class="main-left-title">
             <span class="mn-head-main">
                 <span>Mining command generator</span>
@@ -90,7 +90,18 @@ if ($isLegacy): ?>
 .mc-hint { margin-top: 6px; font-size: 10px; color: #94a3b8; }
 .mc-hint b { color: #64748b; }
 @media (max-width: 900px) { .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .mc-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+    .mc-grid { grid-template-columns: 1fr; }
+    .mc-card > .main-left-title { flex-wrap: wrap; align-items: flex-start; }
+    .mc-card > .main-left-title .mn-head-main { flex: 1 1 100%; }
+    .mc-card > .main-left-title .mc-badge { flex: 0 0 auto; margin-left: auto; }
+    .mc-top { align-items: flex-start; }
+    .mc-presets { flex: 1 1 auto; }
+    .mc-badge { max-width: 100%; white-space: normal; }
+    .mc-output { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+    .mc-output code { flex: 1 1 100%; min-width: 0; }
+    .mc-copy { position: static; margin-left: auto; flex: 0 0 auto; }
+}
 </style>
 
 <div class="mc-gen" id="mc-root">

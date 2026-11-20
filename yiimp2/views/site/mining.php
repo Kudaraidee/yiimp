@@ -401,6 +401,19 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
     font-weight: 700;
     color: #26385a;
 }
+
+/* ── Small screens: let card headers wrap and keep tables readable ─────────── */
+@media (max-width: 560px) {
+    #mining-cards .main-left-title { flex-wrap: wrap; align-items: flex-start; }
+    #mining-cards .mn-head-main,
+    #mining-cards .bf-head-main { flex: 1 1 100%; }
+    #mining-cards .mc-badge,
+    #mining-cards .mn-scope,
+    #mining-cards .bf-chips { flex: 0 0 auto; margin-left: auto; }
+    #mining-cards #pool_current_results .main-left-inner > div { min-width: 0; }
+    #maintable1.ps-table { min-width: 620px; }
+    #maintable1.ps-table .coin-sub { white-space: normal; overflow-wrap: anywhere; }
+}
 </style>
 
 <script>
