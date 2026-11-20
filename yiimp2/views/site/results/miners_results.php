@@ -174,7 +174,7 @@ echo <<<'CSS'
 #maintable2 .bar.alt i { background: linear-gradient(90deg, #6fc79a, #2fae5a); }
 #maintable2 .reject.bad { color: #d64545; }
 #maintable2 tr.total td { background: #f8fafc; font-weight: 700; color: #5b6675; }
-#maintable2 .mv-head {
+.mv-head {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -246,7 +246,10 @@ if ($isLegacy) {
 
 // ── Header strip ──────────────────────────────────────────────────────────────
 echo '<div class="mv-head">';
-echo '<span style="font-size:12px;font-weight:700;color:#1f467f">Miners Version</span>';
+// Legacy/adminlte wrappers already render the "Miners Version" card title.
+if ($isTailwind) {
+    echo '<span style="font-size:12px;font-weight:700;color:#1f467f">Miners Version</span>';
+}
 echo '<span class="pill">' . Html::encode($algoLabel) . '</span>';
 if ($showAlgo) {
     $displayAlgoCount = isset($algoCount) ? (int) $algoCount : count($algoSet);
@@ -264,8 +267,8 @@ echo '<table id="maintable2" class="mv-table">';
 echo '<thead><tr>';
 if ($showAlgo) {
     $w = $isAdmin
-        ? ['algo' => 9, 'ver' => 21, 'share' => 14, 'work' => 11, 'hash' => 18, 'avg' => 11, 'reject' => 16]
-        : ['algo' => 10, 'ver' => 26, 'share' => 17, 'work' => 13, 'hash' => 22, 'avg' => 12];
+        ? ['algo' => 9, 'ver' => 20, 'share' => 14, 'work' => 11, 'hash' => 18, 'avg' => 12, 'reject' => 16]
+        : ['algo' => 10, 'ver' => 25, 'share' => 17, 'work' => 13, 'hash' => 22, 'avg' => 13];
     echo '<th style="width:' . $w['algo'] . '%">Algo<span class="sort">↕</span></th>';
 } else {
     $w = $isAdmin
