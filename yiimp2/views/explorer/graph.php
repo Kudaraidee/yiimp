@@ -24,8 +24,11 @@ if (empty($json)) {
 		$block = $remote->getblock($hash);
 		if(!$block) continue;
 
-		// only graph PoW blocks
-		if (!Yii::$app->ConversionUtils->arraySafeval($block,'nonce',0) && 
+		// only graph PoW blocks; firopow reports nonce=0 in valid PoW blocks
+		$isPos = isset($block['mint']) ||
+			strstr((string) Yii::$app->ConversionUtils->arraySafeVal($block, 'flags', ''), 'proof-of-stake');
+		if ($isPos) continue;
+		if (!array_key_exists('nonce', $block) &&
 			!Yii::$app->ConversionUtils->arraySafeval($block,'auxpow',0)) continue;
 
 		$n++;
