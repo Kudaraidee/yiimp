@@ -237,7 +237,19 @@ function BackendBlockFind1($coinid = NULL)
 			if (!$tx || !isset($tx['details'])) continue;
 			debuglog("{$coin->symbol} {$db_block->height} confirmed after ".$block_age." seconds");
 		}
-		else if(!$block || !isset($block['tx']) || !isset($block['tx'][0]))
+		else if(!$block)
+		{
+			$db_block->amount = 0;
+			$db_block->save();
+			debuglog("{$coin->symbol} orphan {$db_block->height} after ".(time() - $db_block->time)." seconds");
+			continue;
+		}
+		else if($coin->rpcencoding == 'GETH')
+		{
+			// Ethereum PoW has no coinbase tx; WalletRPC synthesizes one from
+			// the coin reward when given the block hash.
+		}
+		else if(!isset($block['tx']) || !isset($block['tx'][0]))
 		{
 			$db_block->amount = 0;
 			$db_block->save();
@@ -250,7 +262,8 @@ function BackendBlockFind1($coinid = NULL)
 			continue;
 		}
 
-		$tx = $remote->gettransaction($block['tx'][0]);
+		$txid = ($coin->rpcencoding == 'GETH') ? $block['hash'] : $block['tx'][0];
+		$tx = $remote->gettransaction($txid);
 		if(!$tx || !isset($tx['details']) || !isset($tx['details'][0]))
 		{
 			$db_block->amount = 0;
@@ -258,7 +271,7 @@ function BackendBlockFind1($coinid = NULL)
 			continue;
 		}
 
-		$db_block->txhash = $block['tx'][0];
+		$db_block->txhash = $txid;
 		$db_block->category = 'immature';						//$tx['details'][0]['category'];
 		$db_block->amount = $tx['details'][0]['amount'];
 		$db_block->confirmations = $tx['confirmations'];
@@ -319,9 +332,13 @@ function BackendBlocksUpdate($coinid = NULL)
 				$block->save();
 			}
 
-			if(!$blockext || !isset($blockext['tx'][0])) continue;
-
-			$block->txhash = $blockext['tx'][0];
+			if ($coin->rpcencoding == 'GETH') {
+				if (!$blockext) continue;
+				$block->txhash = $blockext['hash'];
+			} else {
+				if(!$blockext || !isset($blockext['tx'][0])) continue;
+				$block->txhash = $blockext['tx'][0];
+			}
 
 			if(empty($block->txhash)) continue;
 		}

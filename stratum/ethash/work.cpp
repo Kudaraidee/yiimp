@@ -13,8 +13,8 @@
 #include <string.h>
 #include <strings.h>
 
-bool ethash_submit_work(YAAMP_COIND *coind, const char *nonce,
-	const char *header, const char *mix);
+bool ethash_submit_work(YAAMP_COIND *coind, int height, const char *nonce,
+	const char *header, const char *mix, char *blockhash, size_t blockhash_size);
 
 static bool ethash_parse_hex(const char *src, uint8_t be[32])
 {
@@ -427,7 +427,9 @@ bool ethash_ethproxy_submit_work(YAAMP_CLIENT *client, json_value *json_params)
 	if (final_hash <= network_target && !job->block_found)
 	{
 		YAAMP_COIND *coind = job->coind;
-		if (coind && ethash_submit_work(coind, nonce, templ->eth_header, mixhex))
+		char blockhash[67] = { 0 };
+		if (coind && ethash_submit_work(coind, templ->height, nonce,
+			templ->eth_header, mixhex, blockhash, sizeof(blockhash)))
 		{
 			job->block_found = true;
 			double network_diff = 0;
@@ -438,9 +440,14 @@ bool ethash_ethproxy_submit_work(YAAMP_CLIENT *client, json_value *json_params)
 			stratumlog("*** ACCEPTED %s %d by %s (id: %d)\n",
 				coind->name, templ->height, client->sock->ip, client->userid);
 
-			block_add(client->userid, client->workerid, coind->id, templ->height,
-				network_diff, block_share_diff, final_hash.ToString().c_str(),
-				final_hash.ToString().c_str(), 0, client->solo);
+			if (blockhash[0]) {
+				block_add(client->userid, client->workerid, coind->id, templ->height,
+					network_diff, block_share_diff, blockhash, blockhash, 0, client->solo);
+				block_confirm(coind->id, blockhash);
+			} else {
+				debuglog("*** ACCEPTED %s %d but no canonical block (uncle?)\n",
+					coind->symbol, templ->height);
+			}
 		}
 		else
 		{
@@ -468,8 +475,39 @@ bool ethash_ethproxy_submit_work(YAAMP_CLIENT *client, json_value *json_params)
 	return true;
 }
 
-bool ethash_submit_work(YAAMP_COIND *coind, const char *nonce,
-	const char *header, const char *mix)
+// After a successful submit, find our block at this height. eth_getBlockByNumber
+// only returns the canonical chain, so a mismatch means we lost the race and the
+// block became an uncle (which the pool must not account as a won block).
+static bool ethash_canonical_block_hash(YAAMP_COIND *coind, int height,
+	const char *nonce, char *out, size_t size)
+{
+	char height_hex[32];
+	char params[64];
+	snprintf(height_hex, sizeof(height_hex), "0x%x", height);
+	snprintf(params, sizeof(params), "[\"%s\",false]", height_hex);
+
+	json_value *json = rpc_call(&coind->rpc, "eth_getBlockByNumber", params, coind);
+	if (!json) return false;
+
+	bool found = false;
+	json_value *res = json_get_object(json, "result");
+	if (res && res->type == json_object)
+	{
+		const char *node_nonce = json_get_string(res, "nonce");
+		const char *hash = json_get_string(res, "hash");
+		if (node_nonce && hash && strlen(hash) < size &&
+			!strcasecmp(ethash_strip_prefix(node_nonce), ethash_strip_prefix(nonce)))
+		{
+			snprintf(out, size, "%s", hash);
+			found = true;
+		}
+	}
+	json_value_free(json);
+	return found;
+}
+
+bool ethash_submit_work(YAAMP_COIND *coind, int height, const char *nonce,
+	const char *header, const char *mix, char *blockhash, size_t blockhash_size)
 {
 	char nonce_hex[24], header_hex[68], mix_hex[68];
 	char params[512];
@@ -485,6 +523,10 @@ bool ethash_submit_work(YAAMP_COIND *coind, const char *nonce,
 	json_value *res = json_get_object(json, "result");
 	bool accepted = res && res->type == json_boolean && res->u.boolean;
 	json_value_free(json);
+
+	if (accepted && blockhash && blockhash_size)
+		ethash_canonical_block_hash(coind, height, nonce, blockhash, blockhash_size);
+
 	return accepted;
 }
 
@@ -602,7 +644,9 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 	if (final_hash <= network_target && !job->block_found)
 	{
 		YAAMP_COIND *coind = job->coind;
-		if (coind && ethash_submit_work(coind, nonce, templ->eth_header, mixhex))
+		char blockhash[67] = { 0 };
+		if (coind && ethash_submit_work(coind, templ->height, nonce,
+			templ->eth_header, mixhex, blockhash, sizeof(blockhash)))
 		{
 			job->block_found = true;
 			double network_diff = 0;
@@ -613,9 +657,14 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 			stratumlog("*** ACCEPTED %s %d by %s (id: %d)\n",
 				coind->name, templ->height, client->sock->ip, client->userid);
 
-			block_add(client->userid, client->workerid, coind->id, templ->height,
-				network_diff, share_diff, final_hash.ToString().c_str(),
-				final_hash.ToString().c_str(), 0, client->solo);
+			if (blockhash[0]) {
+				block_add(client->userid, client->workerid, coind->id, templ->height,
+					network_diff, share_diff, blockhash, blockhash, 0, client->solo);
+				block_confirm(coind->id, blockhash);
+			} else {
+				debuglog("*** ACCEPTED %s %d but no canonical block (uncle?)\n",
+					coind->symbol, templ->height);
+			}
 		}
 		else
 		{

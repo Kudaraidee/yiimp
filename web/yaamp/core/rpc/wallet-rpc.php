@@ -31,6 +31,7 @@ class WalletRPC {
 			switch ($coin->rpcencoding) {
 			case 'GETH':
 				$this->type = 'Ethereum';
+				$this->coin = $coin;
 				$this->account = empty($coin->account) ? $coin->master_wallet : $coin->account;
 				$this->rpc = new Ethereum($coin->rpchost, $coin->rpcport);
 				break;
@@ -196,6 +197,26 @@ class WalletRPC {
 			case 'getrawtransaction':
 				$txid = arraySafeVal($params,0,'');
 				$tx = $this->rpc->eth_getTransactionByHash($txid);
+				if (!$tx) {
+					// Ethereum has no coinbase transaction. Backend block accounting
+					// passes the block hash for PoW rewards, so synthesize the
+					// Bitcoin-like generated transaction from the coin's reward.
+					$block = $this->rpc->eth_getBlockByHash($txid, false);
+					if ($block) {
+						$mapped = $this->ethExplorerBlock($block);
+						$this->error = NULL;
+						return array(
+							'txid' => $txid,
+							'blockhash' => $txid,
+							'time' => arraySafeVal($mapped, 'time', 0),
+							'confirmations' => arraySafeVal($mapped, 'confirmations', 0),
+							'details' => array(array(
+								'category' => 'generate',
+								'amount' => (double) arraySafeVal($this->coin, 'reward', 0),
+							)),
+						);
+					}
+				}
 				$this->error = $this->rpc->error;
 				return $this->ethExplorerTx($tx);
 			case 'getwork':

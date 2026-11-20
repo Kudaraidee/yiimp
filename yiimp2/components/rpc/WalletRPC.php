@@ -63,6 +63,7 @@ class WalletRPC
             switch ($coin->rpcencoding) {
                 case 'GETH':
                     $this->type    = 'Ethereum';
+                    $this->coin    = $coin;
                     $this->account = empty($coin->account) ? $coin->master_wallet : $coin->account;
                     $this->rpc     = new EthereumRPC(
                         (string) ($coin->rpchost ?? 'localhost'),
@@ -300,8 +301,28 @@ class WalletRPC
 
                 case 'gettransaction':
                 case 'getrawtransaction':
-                    $txid        = (string) ($params[0] ?? '');
-                    $tx          = $eth->eth_getTransactionByHash($txid);
+                    $txid = (string) ($params[0] ?? '');
+                    $tx   = $eth->eth_getTransactionByHash($txid);
+                    if (!$tx) {
+                        // Ethereum has no coinbase transaction. Backend block
+                        // accounting passes the block hash for PoW rewards, so
+                        // synthesize a Bitcoin-like generated transaction.
+                        $block = $eth->eth_getBlockByHash($txid, false);
+                        if ($block) {
+                            $mapped = $this->ethExplorerBlock($block);
+                            $this->error = null;
+                            return [
+                                'txid'          => $txid,
+                                'blockhash'     => $txid,
+                                'time'          => (int) ($mapped['time'] ?? 0),
+                                'confirmations' => (int) ($mapped['confirmations'] ?? 0),
+                                'details'       => [[
+                                    'category' => 'generate',
+                                    'amount'   => (float) ($this->coin->reward ?? 0),
+                                ]],
+                            ];
+                        }
+                    }
                     $this->error = $eth->getError();
                     return $this->ethExplorerTx($tx);
 

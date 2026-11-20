@@ -304,7 +304,17 @@ class BlockService
                 }
                 Yii::info("{$coin->symbol} {$block->height} confirmed after {$blockAge}s", __CLASS__);
 
-            } elseif (!$blockExt || !isset($blockExt['tx'][0])) {
+            } elseif (!$blockExt) {
+                $block->amount = 0;
+                $block->save();
+                Yii::info("{$coin->symbol} orphan at height {$block->height} after " . (time() - $block->time) . 's', __CLASS__);
+                continue;
+
+            } elseif ($coin->rpcencoding === 'GETH') {
+                // Ethereum PoW has no coinbase tx; the reward is synthesized
+                // from the block hash by WalletRPC.
+
+            } elseif (!isset($blockExt['tx'][0])) {
                 $block->amount = 0;
                 $block->save();
                 Yii::info("{$coin->symbol} orphan at height {$block->height} after " . (time() - $block->time) . 's', __CLASS__);
@@ -316,14 +326,15 @@ class BlockService
                 continue;
             }
 
-            $tx = $remote->gettransaction($blockExt['tx'][0]);
+            $txid = $coin->rpcencoding === 'GETH' ? $blockExt['hash'] : $blockExt['tx'][0];
+            $tx = $remote->gettransaction($txid);
             if (!$tx || !isset($tx['details'][0])) {
                 $block->amount = 0;
                 $block->save();
                 continue;
             }
 
-            $block->txhash        = $blockExt['tx'][0];
+            $block->txhash        = $txid;
             $block->category      = 'immature';
             $block->amount        = $tx['details'][0]['amount'];
             $block->confirmations = $tx['confirmations'] ?? 0;
@@ -391,10 +402,17 @@ class BlockService
                     $block->save();
                 }
 
-                if (!$blockExt || empty($blockExt['tx'][0])) {
-                    continue;
+                if ($coin->rpcencoding === 'GETH') {
+                    if (!$blockExt) {
+                        continue;
+                    }
+                    $block->txhash = $blockExt['hash'];
+                } else {
+                    if (!$blockExt || empty($blockExt['tx'][0])) {
+                        continue;
+                    }
+                    $block->txhash = $blockExt['tx'][0];
                 }
-                $block->txhash = $blockExt['tx'][0];
                 if (empty($block->txhash)) {
                     continue;
                 }
