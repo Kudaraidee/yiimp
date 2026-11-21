@@ -78,6 +78,9 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
     width: 7px; height: 7px; border-radius: 50%; background: #2fae5a;
     box-shadow: 0 0 0 3px rgba(47,174,90,.15);
 }
+.mining-algo-live #mining-last-update {
+    color: #98a3b5; font-size: 10px; font-variant-numeric: tabular-nums;
+}
 .mining-algo-summary {
     background: #f8fbff; border: 1px solid #d8e2ef;
     border-left: 3px solid var(--algo-color, #2c5aa0);
@@ -122,7 +125,7 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
             </button>
         <?php endforeach; ?>
     </div>
-    <span class="mining-algo-live"><i></i> live · 60s</span>
+    <span class="mining-algo-live"><i></i> live · 60s <span id="mining-last-update">just now</span></span>
 </div>
 
 <div class="mining-algo-summary" id="mining_algo_summary"
@@ -462,12 +465,17 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 <script>
 var global_algo = <?= json_encode($algo) ?>;
 var querystring = global_algo ? '?algo=' + encodeURIComponent(global_algo) : '';
+var MINING_AUTO_MAX = 7 * 24 * 60 * 60 * 1000; // keep mining live far past the shared 1h pause
+var mining_last_refresh = Date.now();
 
 function select_algo(algo) {
     window.location.href = '<?= $homeUrl ?>site/algo?algo=' + encodeURIComponent(algo) + '&r=<?= $homeUrl ?>site/mining';
 }
 
 function page_refresh() {
+    mining_last_refresh = Date.now();
+    mining_tick();
+
     algo_summary_refresh();
     pool_current_refresh();
     mining_refresh();
@@ -547,5 +555,29 @@ function pool_hashrate_refresh() {
             });
         } catch(e) {}
     });
+}
+
+function mining_tick() {
+    // auto_refresh.js pauses after 1h by default; mining stays live indefinitely.
+    if (typeof window.auto_max_time !== 'undefined' && window.auto_max_time !== MINING_AUTO_MAX) {
+        window.auto_max_time = MINING_AUTO_MAX;
+        var resume = document.getElementById('resume_update_button');
+        if (resume) resume.style.display = 'none';
+    }
+    var age  = Math.floor((Date.now() - mining_last_refresh) / 1000);
+    var next = Math.max(0, 60 - age);
+    var label = document.getElementById('mining-last-update');
+    if (label) label.textContent = age < 2 ? 'just now' : age + 's ago · next ' + next + 's';
+}
+
+function mining_start() {
+    setInterval(mining_tick, 1000);
+    mining_tick();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mining_start);
+} else {
+    mining_start();
 }
 </script>
