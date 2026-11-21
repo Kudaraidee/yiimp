@@ -212,7 +212,8 @@ class WalletRPC
             $eth = $this->rpc;
 
             if (!isset($this->accounts)) {
-                $this->accounts = $eth->eth_accounts();
+                $accounts       = $eth->eth_accounts();
+                $this->accounts = is_array($accounts) ? $accounts : null;
                 $this->error    = $eth->getError();
             }
             if (!is_array($this->accounts)) {
