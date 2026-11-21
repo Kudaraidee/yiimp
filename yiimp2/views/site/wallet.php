@@ -189,9 +189,14 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
     margin-bottom: 14px;
 }
 #wallet-cards .wd-hero {
+    position: relative;
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
     padding: 14px 16px;
     background: linear-gradient(135deg, #f8fafc 0%, #eef4ff 100%);
+}
+#wallet-cards .wd-hero::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: linear-gradient(180deg, #4f79c8, #2c5aa0);
 }
 #wallet-cards .wd-hero-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
 #wallet-cards .wd-avatar {
@@ -229,7 +234,7 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
 #wallet-cards .wd-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
 #wallet-cards .wd-kpis {
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px;
 }
 #wallet-cards .wd-kpi {
     min-width: 0; padding: 10px 12px; border: 1px solid var(--wd-line);
@@ -247,12 +252,32 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
 #wallet-cards .wd-kpi.accent b { color: var(--wd-blue); }
 #wallet-cards .wd-kpi small { display: block; margin-top: 2px; font-size: 9px; color: #98a3b5; }
 
+/* ── Section dividers ─────────────────────────────────────────────────────── */
+#wallet-cards .wd-section {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    margin: 20px 0 10px; padding: 0 2px 6px;
+    border-bottom: 1px solid var(--wd-line);
+}
+#wallet-cards .wd-section-title {
+    font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--wd-blue);
+}
+#wallet-cards .wd-section-sub { font-size: 9px; color: #98a3b5; }
+
 #wallet-cards .wd-grid {
-    display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px; align-items: start;
+}
+#wallet-cards .wd-grid-single { grid-template-columns: 1fr; }
+/* Pair the two summary/payout cards inside the shared AJAX container */
+#wallet-cards #main_wallet_results {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px; align-items: start;
 }
 #wallet-cards .wd-col { min-width: 0; }
 #wallet-cards .wd-col > * { margin-bottom: 14px; }
+#wallet-cards .wd-grid > .ajax-placeholder,
+#wallet-cards .wd-grid-single > * { min-width: 0; }
 
 #wallet-cards .wd-switch-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -286,9 +311,10 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
 #wallet-cards .wd-chip-del:hover { opacity: 1; }
 #wallet-cards .wd-empty-recent { margin-top: 10px; font-size: 10px; color: #98a3b5; }
 
-@media(max-width:1000px){
-    #wallet-cards .wd-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    #wallet-cards .wd-grid { grid-template-columns: 1fr; }
+@media(max-width:900px){
+    #wallet-cards .wd-grid,
+    #wallet-cards #main_wallet_results { grid-template-columns: 1fr; }
+    #wallet-cards .wd-section { margin-top: 16px; }
 }
 @media(max-width:640px){
     #wallet-cards .wd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -447,6 +473,37 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
 #wallet-cards .wl-del { width: 14px; height: 14px; cursor: pointer; opacity: .7; }
 #wallet-cards .wl-del:hover { opacity: 1; }
 
+/* ── Miners card internals ──────────────────────────────────────────────── */
+#wallet-cards .wm-section-label {
+    padding: 8px 12px 3px; background: #fff;
+    font-size: 9px; font-weight: 800; letter-spacing: .1em;
+    text-transform: uppercase; color: #8a94a6;
+}
+#wallet-cards .wm-algo-strip {
+    display: flex; gap: 8px; flex-wrap: wrap; padding: 0 12px 10px; background: #fff;
+}
+#wallet-cards .wm-algo-pill {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px;
+    border: 1px solid #d7e5ff; border-radius: 7px; background: #f6f9ff;
+    font-size: 10px; font-weight: 700; color: var(--wd-blue);
+}
+#wallet-cards .wm-algo-bolt { font-size: 11px; }
+#wallet-cards .wm-algo-pill b { color: #475569; font-weight: 700; }
+#wallet-cards .wm-algo-pill span { color: #8a94a6; font-weight: 600; }
+#wallet-cards .wm-worker { display: inline-flex; align-items: flex-start; gap: 7px; }
+#wallet-cards .wm-worker-dot {
+    flex: 0 0 6px; height: 6px; margin-top: 5px; border-radius: 50%; background: #cbd5e1;
+}
+#wallet-cards .wm-worker-dot.active { background: #2fae5a; box-shadow: 0 0 0 3px rgba(47,174,90,.12); }
+#wallet-cards .wm-worker-main { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
+#wallet-cards .wm-worker-name { font-size: 11px; font-weight: 700; color: #334155; }
+#wallet-cards .wm-worker-sub { font-size: 9px; color: #98a3b5; line-height: 1.4; word-break: break-all; }
+#wallet-cards .wm-tag-es {
+    display: inline-block; margin-left: 4px; padding: 1px 5px; border-radius: 4px;
+    background: #e6fbfb; border: 1px solid #c7f0ee; color: #0f766e;
+    font-size: 8px; font-weight: 800; letter-spacing: .04em; vertical-align: 1px;
+}
+
 @media(max-width:820px){
     #wallet-cards table.dataGrid2,
     #wallet-cards .wm-table,
@@ -467,14 +524,17 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
     <?php $renderWalletHero(); ?>
     <?php if ($user): ?>
     <?php $renderWalletKpis(); ?>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Performance</span>
+        <span class="wd-section-sub">Last 24 hours · charts auto-refresh every 60s</span>
+    </div>
     <div class="wd-grid">
         <div class="wd-col">
-            <div id="main_wallet_results" class="ajax-placeholder"></div>
             <div id="wallet-balance-card" class="main-left-box">
                 <div class="main-left-title">
                     <span class="wl-head-main">
                         <span class="wl-title">Last 24 Hours Balance</span>
-                        <span class="wl-sub"><?= Html::encode($username) ?></span>
                     </span>
                     <span class="wl-chips"><span class="wl-pill blue">24h</span><span class="wl-pill">auto · 60s</span></span>
                 </div>
@@ -486,13 +546,26 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
                     </div>
                 </div>
             </div>
+        </div>
+        <div class="wd-col">
             <div id="main_graphs_results" class="ajax-placeholder"></div>
-            <div id="main_found_results"  class="ajax-placeholder"></div>
         </div>
-        <div class="wd-col" style="overflow-x:auto;">
-            <div id="main_miners_results" class="ajax-placeholder"></div>
-            <div id="found_results"       class="ajax-placeholder"></div>
-        </div>
+    </div>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Wallet &amp; Workers</span>
+        <span class="wd-section-sub">Summary, payouts &amp; connected miners · auto-refresh 60s</span>
+    </div>
+    <div id="main_wallet_results" class="ajax-placeholder"></div>
+    <div id="main_miners_results" class="ajax-placeholder"></div>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Activity</span>
+        <span class="wd-section-sub">Blocks &amp; earnings · newest first · auto-refresh 60s</span>
+    </div>
+    <div class="wd-grid wd-grid-single">
+        <div id="main_found_results" class="ajax-placeholder"></div>
+        <div id="found_results"       class="ajax-placeholder"></div>
     </div>
     <?php endif ?>
     <?php $renderWalletSwitch(); ?>
@@ -515,13 +588,16 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
     <?php $renderWalletHero(); ?>
     <?php if ($user): ?>
     <?php $renderWalletKpis(); ?>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Performance</span>
+        <span class="wd-section-sub">Last 24 hours · charts auto-refresh every 60s</span>
+    </div>
     <div class="wd-grid">
         <div class="wd-col">
-            <div id="main_wallet_results"></div>
-
             <div class="card shadow-sm">
                 <div class="card-header py-2 small fw-semibold">
-                    <i class="bi bi-graph-up me-1"></i>Last 24h Balance — <?= Html::encode($username) ?>
+                    <i class="bi bi-graph-up me-1"></i>Last 24h Balance
                 </div>
                 <div class="card-body">
                     <div id="graph_earnings_results" style="height:200px;"></div>
@@ -531,14 +607,26 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
                     </div>
                 </div>
             </div>
-
+        </div>
+        <div class="wd-col">
             <div id="main_graphs_results"></div>
-            <div id="main_found_results"></div>
         </div>
-        <div class="wd-col" style="overflow-x:auto;">
-            <div id="main_miners_results"></div>
-            <div id="found_results"></div>
-        </div>
+    </div>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Wallet &amp; Workers</span>
+        <span class="wd-section-sub">Summary, payouts &amp; connected miners · auto-refresh 60s</span>
+    </div>
+    <div id="main_wallet_results"></div>
+    <div id="main_miners_results"></div>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Activity</span>
+        <span class="wd-section-sub">Blocks &amp; earnings · newest first · auto-refresh 60s</span>
+    </div>
+    <div class="wd-grid wd-grid-single">
+        <div id="main_found_results"></div>
+        <div id="found_results"></div>
     </div>
     <?php endif ?>
     <?php $renderWalletSwitch(); ?>
@@ -564,10 +652,13 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
     <?php $renderWalletHero(); ?>
     <?php if ($user): ?>
     <?php $renderWalletKpis(); ?>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Performance</span>
+        <span class="wd-section-sub">Last 24 hours · charts auto-refresh every 60s</span>
+    </div>
     <div class="wd-grid">
         <div class="wd-col">
-            <div id="main_wallet_results"></div>
-
             <div class="rounded-xl border border-gray-200 dark:border-gray-700
                         bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
                 <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700
@@ -575,7 +666,6 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
                     <i data-lucide="trending-up" class="w-4 h-4 text-indigo-500 shrink-0"></i>
                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">
                         Last 24h Balance
-                        <span class="font-mono text-indigo-600 dark:text-indigo-400 ml-1"><?= Html::encode($username) ?></span>
                     </span>
                 </div>
                 <div class="p-4">
@@ -592,14 +682,26 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
                     </div>
                 </div>
             </div>
-
+        </div>
+        <div class="wd-col">
             <div id="main_graphs_results"></div>
-            <div id="main_found_results"></div>
         </div>
-        <div class="wd-col" style="overflow-x:auto;">
-            <div id="main_miners_results"></div>
-            <div id="found_results"></div>
-        </div>
+    </div>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Wallet &amp; Workers</span>
+        <span class="wd-section-sub">Summary, payouts &amp; connected miners · auto-refresh 60s</span>
+    </div>
+    <div id="main_wallet_results"></div>
+    <div id="main_miners_results"></div>
+
+    <div class="wd-section">
+        <span class="wd-section-title">Activity</span>
+        <span class="wd-section-sub">Blocks &amp; earnings · newest first · auto-refresh 60s</span>
+    </div>
+    <div class="wd-grid wd-grid-single">
+        <div id="main_found_results"></div>
+        <div id="found_results"></div>
     </div>
     <?php endif ?>
     <?php $renderWalletSwitch(); ?>

@@ -94,7 +94,7 @@ if ($isLegacy) {
 <div class="main-left-title">
     <span class="wl-head-main">
         <span class="wl-title">Last <?= $count ?> Earnings</span>
-        <span class="wl-sub"><?= Html::encode($user->username) ?> · newest first</span>
+        <span class="wl-sub">newest first</span>
     </span>
     <span class="wl-chips">
         <span class="wl-pill blue"><?= count($displayEarnings) ?> shown</span>
@@ -168,7 +168,7 @@ if ($isLegacy) {
 <div class="card shadow-sm mb-3">
     <div class="card-header py-2 d-flex align-items-center gap-2">
         <i class="bi bi-receipt text-secondary"></i>
-        <strong class="small">Last <?= $count ?> Earnings — <?= Html::encode($user->username) ?></strong>
+        <strong class="small">Last <?= $count ?> Earnings</strong>
         <span class="badge bg-secondary ms-1"><?= count($earnings) ?></span>
     </div>
     <div class="card-body p-0">

@@ -30,22 +30,19 @@ $workerConnections = Workers::find()->where(['userid' => $userid])->count();
 if ($isLegacy) {
 	echo "<div id='wallet-miners-card' class='main-left-box'>";
 	echo "<div class='main-left-title'><span class='wl-head-main'>"
-		. "<span class='wl-title'>Miners</span><span class='wl-sub'>" . htmlspecialchars($user->username) . "</span></span>"
+		. "<span class='wl-title'>Miners</span></span>"
 		. "<span class='wl-chips'><span class='wl-pill blue'>{$workerConnections} connections</span>"
 		. "<span class='wl-pill'>auto · 60s</span></span></div>";
 	echo "<div class='main-left-inner'><div style='overflow-x:auto'>";
 } else {
 	echo "<div class='main-left-box'>";
-	echo "<div class='main-left-title'>Miners: {$user->username}</div>";
+	echo "<div class='main-left-title'>Miners</div>";
 	echo "<div class='main-left-inner'>";
 }
 
-echo '<table class="dataGrid2 wm-table">';
-echo "<thead><tr>";
-echo "<th class='wl-left'>Algo</th><th>Workers</th><th>Hashrate</th><th>TTF</th>";
-echo "</tr></thead>";
-
+// Algo summary as a compact pill strip instead of a 4-column table.
 $summaryShown = false;
+$algoPills = array();
 foreach($utils->get_algos() as $algo)
 {
 	if (!YIIMP_ALLOW_EXCHANGE && isset($coin) && $coin->algo != $algo) continue;
@@ -56,20 +53,21 @@ foreach($utils->get_algos() as $algo)
 	if (!$minercount) continue;
 
 	$user_pool_rate = $utils->user_rate($userid, $algo);
-	$user_pool_rate = $user_pool_rate? $conv->Itoa2($user_pool_rate).'h/s': '-';
+	$user_pool_rate = $user_pool_rate ? $conv->Itoa2($user_pool_rate).'h/s' : '-';
 
-	echo '<tr>';
-	echo '<td class="wl-left"><span class="wl-pill blue">'.htmlspecialchars($algo).'</span></td>';
-	echo '<td><span class="wl-val">'.$minercount.'</span></td>';
-	echo '<td><span class="wl-val">'.$user_pool_rate.'</span></td>';
-	// algo-level TTF combines different coin difficulties, so point to the per-coin table
-	echo '<td title="See TTF per coin below"><span class="wl-val">—</span></td>';
-	echo '</tr>';
+	$algoPills[] = '<span class="wm-algo-pill"><span class="wm-algo-bolt">&#9889;</span>'
+		. htmlspecialchars($algo, ENT_QUOTES, 'UTF-8')
+		. '<b>' . $minercount . ' ' . ($minercount == 1 ? 'worker' : 'workers') . '</b>'
+		. '<span>' . htmlspecialchars($user_pool_rate, ENT_QUOTES, 'UTF-8') . '</span>'
+		. '</span>';
 	$summaryShown = true;
 }
-if (!$summaryShown) echo "<tr><td colspan='4' class='wl-empty'>No Miners Found</td></tr>";
-
-echo "</table>";
+if (!$summaryShown) {
+	echo "<div class='wl-empty'>No Miners Found</div>";
+} else {
+	echo "<div class='wm-section-label'>Algos</div>";
+	echo "<div class='wm-algo-strip'>" . implode('', $algoPills) . "</div>";
+}
 ////////////////////////////////////////////////////////////////////////////////
 
 // Coins this user has mined recently. db_workers only knows the algo, so coin
@@ -112,7 +110,9 @@ $workerStats = array();
 foreach($workers as $worker)
 {
 	$name = trim((string) $worker->worker);
-	if ($name === '') continue; // unnamed duplicate connections
+	// Some miners connect with an empty worker name. Keep them visible instead of
+	// dropping them, otherwise the per-coin and per-worker detail tables disappear.
+	if ($name === '') $name = 'worker-' . (int) $worker->id;
 	if (!isset($workerStats[$name]))
 		$workerStats[$name] = array('worker' => $worker, 'hashrate' => 0.0, 'shares' => 0);
 	$workerStats[$name]['hashrate'] += (float) $utils->worker_rate($worker->id, $worker->algo);
@@ -210,8 +210,9 @@ if(count($uniqueWorkers))
 {
 	echo "<div class='wl-summary'><span><i></i><b>" . count($uniqueWorkers) . " workers</b> connected</span>"
 		. "<span>Coin from c=SYMBOL in the password</span><span>Refresh <b>60s</b></span></div>";
+	echo "<div class='wm-section-label'>By coin</div>";
 	echo '<table class="dataGrid2 wm-table">';
-	echo "<thead><tr><th class='wl-left'>Coin</th><th>Mode</th><th>Workers</th><th>Shares</th><th>Hashrate</th><th>TTF</th></tr></thead>";
+	echo "<thead><tr><th class='wl-left'>Coin</th><th>Mode</th><th>Workers</th><th>Shares</th><th>Hashrate</th><th>Next block</th></tr></thead>";
 
 	$shown = false;
 	foreach($coins as $rowCoinid => $rowCoin)
@@ -282,40 +283,61 @@ if(count($uniqueWorkers))
 
 if(count($uniqueWorkers))
 {
+	echo "<div class='wm-section-label'>Connected workers</div>";
 	echo '<table class="dataGrid2 wm-table">';
 	echo "<thead><tr>";
 	echo "<th class='wl-left'>Worker</th>";
 	if (!is_null(Yii::$app->user->identity)) echo "<th>IP</th>";
-	echo "<th class='wl-left'>Password</th>";
 	echo "<th class='wl-left'>Algo</th>";
 	echo "<th>Diff</th>";
-	echo "<th title='extranonce.subscribe'>ES</th>";
 	echo "<th>Hashrate</th>";
-	echo "<th>Shares/Min</th>";
+	echo "<th>Shares/min</th>";
+	echo "<th>Coin</th>";
 	echo "</tr></thead>";
 
 	foreach($workerStats as $name => $stat)
 	{
 		$worker = $stat['worker'];
 
-		$user_rate1 = $stat['hashrate'] ? $conv->Itoa2($stat['hashrate']).'h/s' : '';
+		$user_rate1 = $stat['hashrate'] ? $conv->Itoa2($stat['hashrate']).'h/s' : '—';
 
-		$version = substr($worker->version, 0, 20);
-		$password = substr($worker->password, 0, 32);
-
-		$subscribe = $conv->Booltoa($worker->subscribe);
+		$version = trim((string) $worker->version);
+		$version = $version !== '' ? substr($version, 0, 24) : '';
+		$password = trim((string) $worker->password);
 
 		$shares_per_minute = $stat['shares'];
+		$active = $shares_per_minute > 0;
+
+		$workerCoinSymbol = '—';
+		if (preg_match('/(?:^|,)c=([A-Za-z0-9_.-]+)/i', $password, $matches))
+			$workerCoinSymbol = strtoupper($matches[1]);
+		elseif ($coin)
+			$workerCoinSymbol = strtoupper((string) $coin->symbol);
 
 		echo '<tr class="ssrow">';
-		echo '<td title="'.$worker->version.'"><b>Version:</b> '.$version.' <br> <b>Worker Name:</b> '.$name.' </td>';
-		if (!is_null(Yii::$app->user->identity)) echo "<td>{$worker->ip}</td>";
-		echo '<td title="'.$worker->password.'">'.$password.'</td>';
-		echo '<td>'.$worker->algo.'</td>';
-		echo '<td align="right">'.$worker->difficulty.'</td>';
-		echo '<td align="right">'.$subscribe.'</td>';
-		echo '<td align="right">'.$user_rate1.'</td>';
-		echo '<td align="center" title="">'.$shares_per_minute.'</td>';
+		echo '<td class="wl-left"><span class="wm-worker">'
+			. '<span class="wm-worker-dot' . ($active ? ' active' : '') . '"></span>'
+			. '<span class="wm-worker-main">'
+			. '<span class="wm-worker-name">' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8')
+			. ($worker->subscribe ? ' <span class="wm-tag-es" title="extranonce.subscribe">ES</span>' : '')
+			. '</span>';
+		if ($version !== '' || $password !== '') {
+			echo '<span class="wm-worker-sub">';
+			if ($version !== '') echo htmlspecialchars($version, ENT_QUOTES, 'UTF-8');
+			if ($version !== '' && $password !== '') echo ' · ';
+			if ($password !== '')
+				echo '<span title="' . htmlspecialchars((string) $worker->password, ENT_QUOTES, 'UTF-8') . '">&#9881; '
+					. htmlspecialchars(substr($password, 0, 24), ENT_QUOTES, 'UTF-8') . '</span>';
+			echo '</span>';
+		}
+		echo '</span></span></td>';
+		if (!is_null(Yii::$app->user->identity))
+			echo "<td>" . htmlspecialchars((string) $worker->ip, ENT_QUOTES, 'UTF-8') . "</td>";
+		echo '<td><span class="wl-pill blue">' . htmlspecialchars((string) $worker->algo, ENT_QUOTES, 'UTF-8') . '</span></td>';
+		echo '<td>' . htmlspecialchars((string) $worker->difficulty, ENT_QUOTES, 'UTF-8') . '</td>';
+		echo '<td><span class="wl-val">' . htmlspecialchars($user_rate1, ENT_QUOTES, 'UTF-8') . '</span></td>';
+		echo '<td><span class="wl-val">' . htmlspecialchars((string) $shares_per_minute, ENT_QUOTES, 'UTF-8') . '/min</span></td>';
+		echo '<td>' . htmlspecialchars($workerCoinSymbol, ENT_QUOTES, 'UTF-8') . '</td>';
 		echo '</tr>';
 	}
 
@@ -324,15 +346,15 @@ if(count($uniqueWorkers))
 
 if ($isLegacy) {
 	echo "</div>";
-	echo "<div class='wl-foot'><span>* approximate from the last 5 minutes submitted shares</span>"
-		. "<span>** extranonce.subscribe</span><span>Refresh 60s</span></div>";
+	echo "<div class='wl-foot'><span>* shares/min from the last 60 seconds</span>"
+		. "<span>ES = extranonce.subscribe</span><span>Refresh 60s</span></div>";
 	echo "</div></div>";
 } else {
 	echo "</div>";
 
 	echo "<p style='font-size: .8em'>
-		&nbsp;* approximate from the last 5 minutes submitted shares<br>
-		&nbsp;** extranonce.subscribe<br>
+		&nbsp;* shares/min from the last 60 seconds<br>
+		&nbsp;ES = extranonce.subscribe<br>
 		</p>";
 
 	echo "</div><br>";

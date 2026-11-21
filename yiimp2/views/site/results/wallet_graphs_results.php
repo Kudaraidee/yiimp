@@ -58,7 +58,6 @@ if (empty($activeAlgos)) return;
 <div class="main-left-title">
     <span class="wl-head-main">
         <span class="wl-title">Last 24h Hashrate</span>
-        <span class="wl-sub"><?= Html::encode($user->username) ?></span>
     </span>
     <span class="wl-chips"><span class="wl-pill blue"><?= count($activeAlgos) ?> algos</span><span class="wl-pill">auto · 60s</span></span>
 </div>
@@ -79,7 +78,7 @@ if (empty($activeAlgos)) return;
 <div class="card shadow-sm mb-3">
     <div class="card-header py-2 d-flex align-items-center gap-2">
         <i class="bi bi-activity text-secondary"></i>
-        <strong class="small">Last 24h Hashrate — <?= Html::encode($user->username) ?></strong>
+        <strong class="small">Last 24h Hashrate</strong>
     </div>
     <div class="card-body">
     <?php foreach ($activeAlgos as $algo): ?>

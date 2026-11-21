@@ -126,7 +126,7 @@ $fmtUsdt = function ($v) {
     <span class="wl-head-main">
         <span class="wl-ico"><?= Html::encode($coinInitials) ?><?php if (!empty($refcoin->image)): ?><img src="<?= Html::encode($refcoin->image) ?>" alt="" onerror="this.remove()"><?php endif ?></span>
         <span class="wl-title">Wallet</span>
-        <span class="wl-sub"><?= Html::encode($user->username . ' · ' . $sym) ?></span>
+        <span class="wl-sub"><?= Html::encode($sym) ?></span>
     </span>
     <span class="wl-chips">
         <?php if ($feesNotice): ?><span class="wl-pill amber"><?= Html::encode($feesNotice) ?></span><?php endif ?>
@@ -181,7 +181,6 @@ $fmtUsdt = function ($v) {
 <div class="main-left-title">
     <span class="wl-head-main">
         <span class="wl-title">Last 24h Payouts</span>
-        <span class="wl-sub"><?= Html::encode($user->username) ?></span>
     </span>
     <span class="wl-chips">
         <span class="wl-pill blue"><?= count($payouts) ?> payouts</span>
@@ -240,7 +239,7 @@ $fmtUsdt = function ($v) {
         <?php if ($refcoin && !empty($refcoin->image)): ?>
             <img src="<?= Html::encode($refcoin->image) ?>" width="20" alt="" style="object-fit:contain">
         <?php endif ?>
-        <strong class="small"><?= Html::encode($user->username) ?></strong>
+        <strong class="small">Wallet</strong>
         <?php if ($feesNotice): ?>
             <span class="badge bg-info text-dark ms-auto small"><?= Html::encode($feesNotice) ?></span>
         <?php endif ?>
@@ -355,8 +354,8 @@ $fmtUsdt = function ($v) {
             <img src="<?= Html::encode($refcoin->image) ?>" width="22" height="22"
                  class="rounded object-contain" onerror="this.style.display='none'" alt="">
         <?php endif ?>
-        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 font-mono">
-            <?= Html::encode($user->username) ?>
+        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+            Wallet
         </span>
         <?php if ($feesNotice): ?>
             <span class="px-2 py-0.5 text-xs rounded-full bg-blue-50 dark:bg-blue-900/30

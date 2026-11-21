@@ -85,7 +85,7 @@ if ($isLegacy) {
 <div class="main-left-title">
     <span class="wl-head-main">
         <span class="wl-title">Last <?= $count ?> Blocks</span>
-        <span class="wl-sub"><?= Html::encode($user->username) ?> · newest first</span>
+        <span class="wl-sub">newest first</span>
     </span>
     <span class="wl-chips">
         <span class="wl-pill blue"><?= count($displayBlocks) ?> shown</span>
@@ -98,7 +98,6 @@ if ($isLegacy) {
 <div class="main-left-inner">
 <div class="wl-summary">
     <span><i></i><b><?= count($displayBlocks) ?> blocks</b> found</span>
-    <span>Scope <b><?= Html::encode($user->username) ?></b></span>
     <span>Refresh <b>60s</b></span>
 </div>
 <div style="overflow-x:auto">
@@ -166,7 +165,7 @@ if ($isLegacy) {
 <div class="card shadow-sm mb-3">
     <div class="card-header py-2 d-flex align-items-center gap-2">
         <i class="bi bi-boxes text-secondary"></i>
-        <strong class="small">Last <?= $count ?> Blocks — <?= Html::encode($user->username) ?></strong>
+        <strong class="small">Last <?= $count ?> Blocks</strong>
         <span class="badge bg-secondary ms-1"><?= count($blocks) ?></span>
     </div>
     <div class="card-body p-0">
