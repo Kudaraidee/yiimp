@@ -616,10 +616,12 @@ void *monitor_thread(void *p)
 	{
 		sleep(120);
 
-		// A stratum instance with no configured coins is idle by design: it has
-		// no jobs to broadcast, so the stale-job watchdog must not kill it.
-		// Only treat a missing job as a deadlock when coins are actually loaded.
-		if(g_list_coind.count > 0 && g_last_broadcasted + YAAMP_MAXJOBDELAY < time(NULL))
+		// A stratum instance with no configured coins, or with no connected
+		// miners, is idle by design: it has nobody to broadcast jobs to, so the
+		// stale-job watchdog must not restart it. Only treat a missing job as a
+		// deadlock when coins are loaded and miners are actually connected.
+		if(g_list_coind.count > 0 && g_list_client.count > 0 &&
+		   g_last_broadcasted + YAAMP_MAXJOBDELAY < time(NULL))
 		{
 			g_exiting = true;
 			stratumlogdate("%s dead lock, exiting...\n", g_stratum_algo);
