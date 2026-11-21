@@ -80,13 +80,13 @@ void coind_sort()
 
 bool coind_can_mine(YAAMP_COIND *coind, bool isaux)
 {
-	if(coind->deleted) return false;
-	if(!coind->enable) return false;
-	if(!coind->auto_ready) return false;
-	if(!rpc_connected(&coind->rpc)) return false;
-	if(!coind->height) return false;
-	if(!coind->difficulty) return false;
-	if(coind->isaux != isaux) return false;
+	if(coind->deleted) { if(g_debuglog_client) debuglog("coind_can_mine %s deleted\n", coind->symbol); return false; }
+	if(!coind->enable) { if(g_debuglog_client) debuglog("coind_can_mine %s disabled\n", coind->symbol); return false; }
+	if(!coind->auto_ready) { if(g_debuglog_client) debuglog("coind_can_mine %s not auto_ready\n", coind->symbol); return false; }
+	if(!rpc_connected(&coind->rpc)) { if(g_debuglog_client) debuglog("coind_can_mine %s rpc disconnected\n", coind->symbol); return false; }
+	if(!coind->height) { if(g_debuglog_client) debuglog("coind_can_mine %s height 0\n", coind->symbol); return false; }
+	if(!coind->difficulty) { if(g_debuglog_client) debuglog("coind_can_mine %s difficulty 0\n", coind->symbol); return false; }
+	if(coind->isaux != isaux) { if(g_debuglog_client) debuglog("coind_can_mine %s isaux %d/%d\n", coind->symbol, coind->isaux, isaux); return false; }
 //	if(isaux && !coind->aux.chainid) return false;
 
 	return true;
