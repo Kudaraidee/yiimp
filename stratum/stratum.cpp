@@ -226,7 +226,11 @@ YAAMP_ALGO g_algos[] =
 	{"quark", quark_hash, 1, 0, 0},
 	{"qubit", qubit_hash, 1, 0, 0},
 	{"rainforest", rainforest_hash, 0x100, 0, 0},
-	{"randomscash", sha256_double_hash, 1, 0, 0},
+	// Scash/cpuminer-scash scale stratum difficulty by 65536 (the miner uses
+	// diff/65536 when building its target; MiningCore's coin template uses the
+	// same shareMultiplier). Without this, every valid CPU share is rejected
+	// as "low difficulty share" by the pool.
+	{"randomscash", sha256_double_hash, 65536, 0, 0},
 	{"renesis", renesis_hash, 1, 0, 0},
 	{"rinhash", rinhash_hash, 1, 0, 0},
 	{"scrypt", scrypt_hash, 0x10000, 0, 0},
