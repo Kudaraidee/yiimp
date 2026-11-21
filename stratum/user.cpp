@@ -190,10 +190,10 @@ void db_add_worker(YAAMP_DB *db, YAAMP_CLIENT *client)
 	strncpy(version, client->version, 64);
 	strncpy(worker, client->worker, 64);
 
-	db_query(db, "INSERT INTO workers (userid, ip, name, difficulty, version, password, worker, algo, time, pid) "\
-		"VALUES (%d, '%s', '%s', %f, '%s', '%s', '%s', '%s', %d, %d)",
+	db_query(db, "INSERT INTO workers (userid, ip, name, difficulty, version, password, worker, algo, tls, time, pid) "\
+		"VALUES (%d, '%s', '%s', %f, '%s', '%s', '%s', '%s', %d, %d, %d)",
 		client->userid, client->sock->ip, client->username, client->difficulty_actual,
-		version, password, worker, g_stratum_algo, now, getpid());
+		version, password, worker, g_stratum_algo, client->tls ? 1 : 0, now, getpid());
 
 	client->workerid = (int)mysql_insert_id(&db->mysql);
 }
@@ -219,8 +219,9 @@ void db_update_workers(YAAMP_DB *db)
 		client->speed *= 0.8;
 		if(client->difficulty_written == client->difficulty_actual) continue;
 
-		db_query(db, "UPDATE workers SET difficulty=%f, subscribe=%d WHERE id=%d",
-			client->difficulty_actual, client->extranonce_subscribe, client->workerid);
+		db_query(db, "UPDATE workers SET difficulty=%f, subscribe=%d, tls=%d WHERE id=%d",
+			client->difficulty_actual, client->extranonce_subscribe,
+			client->tls ? 1 : 0, client->workerid);
 		client->difficulty_written = client->difficulty_actual;
 	}
 

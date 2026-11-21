@@ -93,6 +93,10 @@ $workers = Workers::find()
 		->orderBy('password')
 		->all();
 
+// TLS status is written by the rebuilt stratum binary. Keep the page working
+// on older schemas: no column means no tag rather than an AR attribute error.
+$hasTlsColumn = count($workers) && $workers[0]->hasAttribute('tls');
+
 // One rig can open several stratum connections, creating duplicate worker rows
 // with the same name. Collapse them to one row per name and add up their rates.
 $sharesPerMinute = (new \yii\db\Query())
@@ -320,6 +324,7 @@ if(count($uniqueWorkers))
 			. '<span class="wm-worker-main">'
 			. '<span class="wm-worker-name">' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8')
 			. ($worker->subscribe ? ' <span class="wm-tag-es" title="extranonce.subscribe">ES</span>' : '')
+			. ($hasTlsColumn && $worker->tls ? ' <span class="wm-tag-tls" title="TLS connection">TLS</span>' : '')
 			. '</span>';
 		if ($version !== '' || $password !== '') {
 			echo '<span class="wm-worker-sub">';
@@ -347,14 +352,14 @@ if(count($uniqueWorkers))
 if ($isLegacy) {
 	echo "</div>";
 	echo "<div class='wl-foot'><span>* shares/min from the last 60 seconds</span>"
-		. "<span>ES = extranonce.subscribe</span><span>Refresh 60s</span></div>";
+		. "<span>ES = extranonce.subscribe · TLS = encrypted stratum</span><span>Refresh 60s</span></div>";
 	echo "</div></div>";
 } else {
 	echo "</div>";
 
 	echo "<p style='font-size: .8em'>
 		&nbsp;* shares/min from the last 60 seconds<br>
-		&nbsp;ES = extranonce.subscribe<br>
+		&nbsp;ES = extranonce.subscribe · TLS = encrypted stratum<br>
 		</p>";
 
 	echo "</div><br>";

@@ -641,6 +641,7 @@ void *client_thread(void *p)
 		if (!tls_ok)
 			clientlog(client, "TLS handshake failed");
 	}
+	client->tls = (tls_ok && client->sock->ssl != NULL);
 
 //	usleep(g_list_client.count * 5000);
 

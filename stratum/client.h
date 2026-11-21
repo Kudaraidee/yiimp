@@ -107,6 +107,9 @@ public:
 	int extranonce2size_reconnect;
 
 	bool extranonce_subscribe;
+	// Set after a successful TLS handshake and persisted in db_workers so the
+	// wallet page can tag workers that are actually connected over TLS.
+	bool tls;
 	int submit_bad;
 
 	double speed;

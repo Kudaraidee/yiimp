@@ -503,6 +503,11 @@ $renderWalletSwitch = function () use ($walletFormAction, $recents, $recentUsers
     background: #e6fbfb; border: 1px solid #c7f0ee; color: #0f766e;
     font-size: 8px; font-weight: 800; letter-spacing: .04em; vertical-align: 1px;
 }
+#wallet-cards .wm-tag-tls {
+    display: inline-block; margin-left: 4px; padding: 1px 5px; border-radius: 4px;
+    background: #eef2ff; border: 1px solid #dbe4ff; color: #3730a3;
+    font-size: 8px; font-weight: 800; letter-spacing: .04em; vertical-align: 1px;
+}
 
 @media(max-width:820px){
     #wallet-cards table.dataGrid2,
