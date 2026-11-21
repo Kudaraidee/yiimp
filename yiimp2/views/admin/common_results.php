@@ -19,8 +19,10 @@ $conv        = Yii::$app->ConversionUtils;
 $util        = Yii::$app->YiimpUtils;
 $showrental  = (bool) YIIMP_RENTAL;
 
-// ── Mining USD rate ───────────────────────────────────────────────────────────
-$mining = Mining::find()->one() ?? new Mining(['usdbtc' => 0]);
+// ── Mining USD rate + headline counts ────────────────────────────────────────
+$mining       = Mining::find()->one() ?? new Mining(['usdbtc' => 0]);
+$headWorkers  = Workers::find()->count();
+$headCoins    = Coins::find()->where(['enable' => 1, 'auto_ready' => 1])->count();
 
 // ── Build sorted algo list ────────────────────────────────────────────────────
 $t48 = time() - 48 * 3600;
@@ -29,7 +31,7 @@ foreach ($util->get_algos() as $algo) {
     $price = Yii::$app->cache->get("current_price-{$algo}") ?: (new \yii\db\Query())
         ->select(['price'])->from('hashrate')->where(['algo' => $algo])
         ->andWhere(['>', 'time', $t48])->orderBy(['time' => SORT_DESC])->scalar();
-    Yii::$app->cache->set("current_price-{$algo}", $price);
+    Yii::$app->cache->set("current_price-{$algo}", $price, 30); // match legacy get_database_scalar TTL
     $norm = $util->take_yiimp_fee($price * $util->get_algo_norm($algo), $algo);
     $algosSorted[] = [$norm, $algo];
 }
@@ -112,9 +114,30 @@ $statusBadge = function (string $cat, int $confs) use ($isTailwind, $isLegacy): 
     return '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ' . ($map[$cat] ?? 'bg-gray-100 text-gray-500') . '">' . ($labels[$cat] ?? ucfirst($cat)) . '</span>';
 };
 
-// ── Column layout open ────────────────────────────────────────────────────────
+// ── Layout open + full-width hero cards ────────────────────────────────────────
 if ($isLegacy) {
-    echo '<table width="100%"><tr><td valign="top" width="68%">';
+    echo '<div class="ad-grid">';
+
+    // ── Legacy headline KPIs (full width) ────────────────────────────────────
+    $adKpis = [
+        ['BTC / USD', '$' . number_format((float) $mining->usdbtc, 2), 'bitstamp', 'accent'],
+        ['BTC Wallet', $conv->bitcoinvaluetoa($btc->balance), 'live balance', ''],
+        ['Margin', $margin, 'after payables', ''],
+        ['Workers', (string) $headWorkers, 'connected', ''],
+        ['Coins', (string) $headCoins, 'ready to mine', ''],
+        ['Stale', (string) count($staleMarkets), 'markets', count($staleMarkets) ? 'warn' : ''],
+        ['Orders', (string) count($orders), 'open', ''],
+    ];
+    echo '<div class="main-left-box ad-card ad-span"><div class="main-left-title">';
+    echo '<span class="mn-head-main"><span>Overview</span><span class="mn-sub">live pool snapshot</span></span>';
+    echo '<span class="mc-badge">REFRESH 30s</span></div><div class="main-left-inner">';
+    echo '<div class="ad-kpis">';
+    foreach ($adKpis as [$label, $value, $sub, $cls]) {
+        echo '<div class="ad-kpi ' . $cls . '"><span class="k-label">' . Html::encode($label) . '</span>';
+        echo '<span class="k-value">' . Html::encode($value) . '</span>';
+        echo '<span class="k-sub">' . Html::encode($sub) . '</span></div>';
+    }
+    echo '</div></div></div>';
 } elseif (!$isTailwind) {
     echo '<div class="row gx-3"><div class="col-12 col-xl-8 d-flex flex-column gap-3">';
 } else {
@@ -128,6 +151,9 @@ $total_coins = $total_workers = 0;
 $total_hashrate = $total_hashrate_bad = 0;
 
 if ($isLegacy) {
+    echo '<div class="main-left-box ad-card ad-span"><div class="main-left-title">';
+    echo '<span class="mn-head-main"><span>Algo Status</span><span class="mn-sub">hashrate · rates · workers</span></span>';
+    echo '<span class="mc-badge">LIVE</span></div><div class="main-left-inner ad-card-inner">';
     Yii::$app->ViewUtils->showTableSorter('maintable', '{
         tableClass:"dataGrid",
         widgets:["Storage","saveSort"],
@@ -218,7 +244,7 @@ foreach ($algosSorted as [$normVal, $algo]) {
 
     $hashrate = Yii::$app->cache->get("current_hashrate-{$algo}") ?: (new \yii\db\Query())
         ->select(['hashrate'])->from('hashrate')->where(['algo' => $algo])->orderBy(['time' => SORT_DESC])->scalar();
-    Yii::$app->cache->set("current_hashrate-{$algo}", $hashrate);
+    Yii::$app->cache->set("current_hashrate-{$algo}", $hashrate, 30); // match legacy get_database_scalar TTL
 
     $hashrate_bad = (new \yii\db\Query())->select(['hashrate_bad'])->from('hashrate')
         ->where(['algo' => $algo])->orderBy(['time' => SORT_DESC])->scalar();
@@ -251,10 +277,17 @@ foreach ($algosSorted as [$normVal, $algo]) {
 
     $fees = $util->yiimp_fee($algo);
 
-    $stratum = Stratums::find()->where(['algo' => $algo])->orderBy(['started' => SORT_DESC])->one();
-    $isup    = $conv->Booltoa($stratum);
-    $uptime  = $stratum ? $conv->datetoa2($stratum->started) : '';
-    $ts      = $stratum ? $conv->datetoa2($stratum->started) : '';
+    $stratum   = Stratums::find()->where(['algo' => $algo])->orderBy(['started' => SORT_DESC])->one();
+    $isUp      = (bool) $stratum;
+    $startedAt = $stratum ? date('Y-m-d H:i:s', (int) $stratum->started) : '';
+    // datetoa2() returns an HTML <span title=...>; strip it to plain "2h" text
+    $uptime    = $stratum ? strip_tags((string) $conv->datetoa2($stratum->started)) : '';
+    $ts        = $stratum ? (int) $stratum->started : ''; // sortable epoch for tablesorter
+
+    // Up column: green/red live dot (+ uptime text, full timestamp on the dot)
+    $upTitle = $isUp ? 'Up since ' . $startedAt : 'Down';
+    $upIcon  = '<span class="ad-up-icon ' . ($isUp ? 'ad-up-yes' : 'ad-up-no') . '" title="' . Html::encode($upTitle) . '"></span>';
+    $upTime  = ($isUp && $uptime !== '') ? '<span class="ad-up-time">' . Html::encode($uptime) . '</span>' : '';
 
     // Bad hashrate cell style
     if ($bad > 10) {
@@ -307,7 +340,7 @@ foreach ($algosSorted as [$normVal, $algo]) {
         $rowStyle = "style='background-color:{$algoColor};'";
         echo "<tr class='ssrow' {$rowStyle}>";
         echo '<td><b>' . Html::a($algo, '/site/gomining?algo=' . $algo) . '</b></td>';
-        echo '<td align="left" style="font-size:.8em;" data="' . $ts . '">' . $isup . '&nbsp;' . $uptime . '</td>';
+        echo '<td align="left" style="font-size:.8em;" data="' . $ts . '">' . $upIcon . $upTime . '</td>';
         echo '<td align="right" style="font-size:.8em;">' . ($coins ?: '-') . '</td>';
         echo '<td align="right" style="font-size:.8em;">' . ($count ?: '-') . '</td>';
         echo '<td align="right" style="font-size:.8em;">' . ($fees ? "$fees%" : '-') . '</td>';
@@ -326,7 +359,7 @@ foreach ($algosSorted as [$normVal, $algo]) {
         $aClass = $actualStyles['adminlte'][$actualStyle] ?? '';
         echo "<tr {$rowBg}>";
         echo '<td class="small fw-bold"><a href="/site/gomining?algo=' . Html::encode($algo) . '" class="text-reset">' . Html::encode($algo) . '</a></td>';
-        echo '<td class="small text-muted" data="' . $ts . '">' . $isup . '&nbsp;' . $uptime . '</td>';
+        echo '<td class="small text-muted" data="' . $ts . '">' . $upIcon . $upTime . '</td>';
         echo '<td class="text-end small">' . ($coins ?: '-') . '</td>';
         echo '<td class="text-end small">' . ($count ?: '-') . '</td>';
         echo '<td class="text-end small">' . ($fees ? "$fees%" : '-') . '</td>';
@@ -346,7 +379,7 @@ foreach ($algosSorted as [$normVal, $algo]) {
         $tdM = 'px-2 py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400';
         echo "<tr class='hover:bg-gray-50/30 dark:hover:bg-gray-700/10 transition-colors' {$rowBg}>";
         echo '<td class="px-2 py-1.5 font-semibold"><a href="/site/gomining?algo=' . Html::encode($algo) . '" class="text-gray-800 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">' . Html::encode($algo) . '</a></td>';
-        echo '<td class="px-2 py-1.5 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap" data="' . $ts . '">' . $isup . '&nbsp;' . $uptime . '</td>';
+        echo '<td class="px-2 py-1.5 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap" data="' . $ts . '">' . $upIcon . $upTime . '</td>';
         echo '<td class="' . $tdM . '">' . ($coins ?: '-') . '</td>';
         echo '<td class="' . $tdM . '">' . ($count ?: '-') . '</td>';
         echo '<td class="' . $tdM . '">' . ($fees ? "$fees%" : '-') . '</td>';
@@ -377,7 +410,7 @@ if ($isLegacy) {
     if ($showrental) echo '<td></td>';
     echo '<td align="right" style="font-size:.8em;">' . ($totalBad ? $totalBad . '%' : '') . '</td>';
     echo '<td colspan="' . (4 + ($showrental ? 1 : 0)) . '"></td></tr>';
-    echo '</tbody></table><br>';
+    echo '</tbody></table></div></div>';
 } elseif (!$isTailwind) {
     echo '<tr class="table-secondary fw-bold">';
     echo '<td class="small" colspan="2">Totals</td>';
@@ -405,11 +438,18 @@ if ($isLegacy) {
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 2 — Exchange balances
 // ══════════════════════════════════════════════════════════════════════════════
+if ($isLegacy) {
+    echo '<div class="ad-col ad-col-main">';
+}
 $alt_balances  = [];
 $sale_balances = [];
 $total_balance = $total_onsell = $total_altcoins = $total_total = $total_usd = 0.0;
 
 if ($isLegacy) {
+    echo '<div class="main-left-box ad-card"><div class="main-left-title">';
+    echo '<span class="mn-head-main"><span>Exchange Balances</span><span class="mn-sub">BTC equivalent across markets</span></span>';
+    echo '<span class="mc-badge">' . count($markets) . ' MARKETS</span></div>';
+    echo '<div class="main-left-inner ad-card-inner">';
     echo '<table class="dataGrid"><thead><tr><th></th>';
     foreach ($markets as $market)
         echo '<th align="right"><a href="/admin/runExchange?id=' . $market->id . '">' . Html::encode($market->name) . '</a></th>';
@@ -570,7 +610,7 @@ foreach ($markets as $market) {
     $total_usd += $usd;
 }
 $usdFmt = round($total_usd, 2) . ' $';
-if ($isLegacy) echo '<td align="right">' . $usdFmt . '</td></tr></tfoot></table><br>';
+if ($isLegacy) echo '<td align="right">' . $usdFmt . '</td></tr></tfoot></table></div></div>';
 elseif (!$isTailwind) echo '<td class="text-end small">' . $usdFmt . '</td></tr></tbody></table></div></div></div>';
 else echo '<td class="px-3 py-1.5 text-right text-gray-500 dark:text-gray-400">' . $usdFmt . '</td></tr></tbody></table></div></div>';
 
@@ -579,6 +619,10 @@ else echo '<td class="px-3 py-1.5 text-right text-gray-500 dark:text-gray-400">'
 // ══════════════════════════════════════════════════════════════════════════════
 if (!empty($staleMarkets)) {
     if ($isLegacy) {
+        echo '<div class="main-left-box ad-card ad-card-warn"><div class="main-left-title">';
+        echo '<span class="mn-head-main"><span>Stale Markets</span><span class="mn-sub">sent but not traded &gt; 2h</span></span>';
+        echo '<span class="mc-badge ad-badge-warn">' . count($staleMarkets) . ' STALE</span></div>';
+        echo '<div class="main-left-inner ad-card-inner">';
         echo '<table class="dataGrid"><thead><tr>';
         echo '<th width="20px"></th><th>Name</th><th>Exchange</th><th>Sent</th><th>Traded</th><th></th>';
         echo '</tr></thead><tbody>';
@@ -638,7 +682,7 @@ if (!empty($staleMarkets)) {
         }
     }
 
-    if ($isLegacy) echo '</tbody></table><br>';
+    if ($isLegacy) echo '</tbody></table></div></div>';
     elseif (!$isTailwind) echo '</tbody></table></div></div></div>';
     else echo '</tbody></table></div></div>';
 }
@@ -648,6 +692,10 @@ if (!empty($staleMarkets)) {
 // ══════════════════════════════════════════════════════════════════════════════
 if (!empty($orders)) {
     if ($isLegacy) {
+        echo '<div class="main-left-box ad-card"><div class="main-left-title">';
+        echo '<span class="mn-head-main"><span>Open Orders</span><span class="mn-sub">awaiting fills</span></span>';
+        echo '<span class="mc-badge">' . count($orders) . ' ORDERS</span></div>';
+        echo '<div class="main-left-inner ad-card-inner">';
         echo '<table class="dataGrid"><thead><tr>';
         foreach (['', 'Name', 'Exchange', 'Created', 'Qty', 'Ask', 'Bid', 'Value', ''] as $h)
             echo '<th>' . Html::encode($h) . '</th>';
@@ -751,14 +799,14 @@ if (!empty($orders)) {
         }
     }
 
-    if ($isLegacy) echo '</tbody></table><br>';
+    if ($isLegacy) echo '</tbody></table></div></div>';
     elseif (!$isTailwind) echo '</tbody></table></div></div></div>';
     else echo '</tbody></table></div></div>';
 }
 
 // ── Column split ──────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo '</td><td>&nbsp;&nbsp;</td><td valign="top">';
+    echo '</div><div class="ad-col ad-col-side">';
 } elseif (!$isTailwind) {
     echo '</div><div class="col-12 col-xl-4 d-flex flex-column gap-3">';
 } else {
@@ -769,10 +817,18 @@ if ($isLegacy) {
 // SECTION 5 — BTC wallet summary
 // ══════════════════════════════════════════════════════════════════════════════
 if ($isLegacy) {
-    echo '<a href="https://www.bitstamp.net/markets/btc/usd/" target="_blank">Bitstamp ' . $mining->usdbtc . '</a>, ';
-    echo '<a href="https://blockchain.info/address/' . Html::encode($btcaddr) . '" target="_blank">wallet ' . Html::encode((string) $btc->balance) . '</a>, next payout ' . $topay2 . '<br>';
-    echo "pay {$topayFmt}, renter {$renterFmt}, marg {$margin}, {$margin2}<br>";
-    echo "mint {$mints} immature {$immature}<br><br>";
+    echo '<div class="main-left-box ad-card"><div class="main-left-title">';
+    echo '<span class="mn-head-main"><span>BTC Summary</span><span class="mn-sub">wallet · payables</span></span>';
+    echo '<a href="https://www.bitstamp.net/markets/btc/usd/" target="_blank" class="mc-badge">$' . Html::encode((string) $mining->usdbtc) . '</a></div>';
+    echo '<div class="main-left-inner ad-side-body">';
+    echo '<div class="ad-wallet-line"><span>Wallet</span><b>' . Html::encode((string) $btc->balance) . ' BTC</b>';
+    echo '<a href="https://blockchain.info/address/' . Html::encode($btcaddr) . '" target="_blank"> explorer ↗</a></div>';
+    echo '<div class="ad-wallet-sub">next payout &ge; <b>' . $topay2 . '</b> BTC</div>';
+    echo '<div class="ad-kv">';
+    foreach ([['Pay', $topayFmt], ['Renter', $renterFmt], ['Margin', $margin], ['Margin+', $margin2], ['Mint', $mints], ['Immature', $immature]] as [$l, $v]) {
+        echo '<span>' . $l . '</span><b>' . Html::encode((string) $v) . '</b>';
+    }
+    echo '</div></div></div>';
 } elseif (!$isTailwind) {
     echo '<div class="card shadow-sm"><div class="card-header py-2 d-flex align-items-center gap-2">';
     echo '<i class="bi bi-wallet2 text-secondary"></i><strong class="small">BTC Summary</strong></div>';
@@ -807,8 +863,14 @@ if ($isLegacy) {
 // SECTION 6 — Graphs (containers; filled by dashboard.php JS)
 // ══════════════════════════════════════════════════════════════════════════════
 if ($isLegacy) {
-    echo '<div style="height:160px;overflow:hidden;" id="graph_results_negative"></div>';
-    echo '<div style="height:200px;overflow:hidden;" id="graph_results_assets"></div><br>';
+    echo '<div class="main-left-box ad-card"><div class="main-left-title">';
+    echo '<span class="mn-head-main"><span>Liabilities</span><span class="mn-sub">waiting · immature</span></span>';
+    echo '<span class="mc-badge">30d</span></div>';
+    echo '<div class="main-left-inner ad-graph"><div id="graph_results_negative"></div></div></div>';
+    echo '<div class="main-left-box ad-card"><div class="main-left-title">';
+    echo '<span class="mn-head-main"><span>Assets</span><span class="mn-sub">margin · balances · wallets</span></span>';
+    echo '<span class="mc-badge">30d</span></div>';
+    echo '<div class="main-left-inner ad-graph"><div id="graph_results_assets"></div></div></div>';
 } elseif (!$isTailwind) {
     echo '<div class="card shadow-sm"><div class="card-header py-2 d-flex align-items-center gap-2">';
     echo '<i class="bi bi-graph-up text-secondary"></i><strong class="small">Liabilities</strong></div>';
@@ -829,11 +891,19 @@ if ($isLegacy) {
     echo '<div class="p-4"><div id="graph_results_assets" style="height:170px;"></div></div></div>';
 }
 
+if ($isLegacy) {
+    echo '</div>'; // close side column; grid stays open for the full-width blocks table
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 7 — Recent blocks
 // ══════════════════════════════════════════════════════════════════════════════
 if ($isLegacy) {
-    echo '<br><table class="dataGrid"><thead><tr>';
+    echo '<div class="main-left-box ad-card ad-span"><div class="main-left-title">';
+    echo '<span class="mn-head-main"><span>Recent Blocks</span><span class="mn-sub">last 50</span></span>';
+    echo '<span class="mc-badge">' . count($db_blocks) . ' BLOCKS</span></div>';
+    echo '<div class="main-left-inner ad-card-inner">';
+    echo '<table class="dataGrid"><thead><tr>';
     foreach (['', 'Name', 'Amount', 'Diff', 'Block', 'Time', 'Status'] as $h)
         echo '<th' . ($h !== '' && $h !== 'Name' ? ' align="right"' : '') . '>' . Html::encode($h) . '</th>';
     echo '</tr></thead><tbody>';
@@ -930,13 +1000,13 @@ foreach ($db_blocks as $db_block) {
     }
 }
 
-if ($isLegacy) echo '</tbody></table><br>';
+if ($isLegacy) echo '</tbody></table></div></div>';
 elseif (!$isTailwind) echo '</tbody></table></div></div></div>';
 else echo '</tbody></table></div></div>';
 
 // ── Column layout close ───────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo '</td></tr></table>';
+    echo '</div>'; // side column already closed; close grid
 } elseif (!$isTailwind) {
     echo '</div></div>';
 } else {
