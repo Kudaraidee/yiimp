@@ -84,12 +84,26 @@ COPY /yiimp2/components/      ./components/
 # Compile — writes to web/css/tailwind.css (relative to package.json)
 RUN mkdir -p web/css && npm run build
 
-# Build devel image
-FROM baseimage as image-devel
+# ── PHP dependencies (yiimp2) ────────────────────────────────────────────────
+# Own stage, cached unless composer.json/composer.lock change, so an Ubuntu
+# update in the runtime stages does not trigger a new composer install.
+FROM baseimage AS composer-deps
+WORKDIR /build
+ENV COMPOSER_ALLOW_SUPERUSER=1
+COPY /yiimp2/composer.json /yiimp2/composer.lock ./
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-RUN set -xe \
-    && : "---------- changes only on devel env e.g. enable xdebug ----------" \
-    && apt-get install -y php-xdebug
+# Build devel image
+FROM baseimage AS image-devel
+
+# OS upgrade, cache key = hash of the Ubuntu release indexes (see Makefile)
+ARG UBUNTU_STATE=unknown
+RUN echo "Ubuntu package state: ${UBUNTU_STATE}" && \
+    apt-get update -qq && \
+    apt-get upgrade -yqq --no-install-recommends && \
+    : "---------- changes only on devel env e.g. enable xdebug ----------" && \
+    apt-get install -yqq --no-install-recommends php-xdebug && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY /config/xdebug.ini /usr/local/etc/php/conf.d/
 
@@ -97,17 +111,25 @@ WORKDIR /var/www/
 CMD ["apache2-foreground"]
 
 # Build production image
-FROM baseimage as image-prod
+FROM baseimage AS image-prod
+
+# OS upgrade, cache key = hash of the Ubuntu release indexes (see Makefile).
+# Sits before the code copies: an Ubuntu update costs this upgrade and the
+# copies below, not a composer install (dependencies come from composer-deps).
+ARG UBUNTU_STATE=unknown
+RUN echo "Ubuntu package state: ${UBUNTU_STATE}" && \
+    apt-get update -qq && \
+    apt-get upgrade -yqq --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 
 # Deploy legacy web app
 COPY --chown=www-data:www-data /web/ /var/www/
 
-# Deploy yiimp2 app and install production PHP dependencies
+# Deploy yiimp2 app and its production PHP dependencies
 COPY --chown=www-data:www-data /yiimp2/ /var/yiimp2/
+COPY --from=composer-deps --chown=www-data:www-data /build/vendor/ /var/yiimp2/vendor/
 
 WORKDIR /var/yiimp2/
-ENV COMPOSER_ALLOW_SUPERUSER=1
-RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Copy pre-compiled Tailwind CSS from the build stage.
 # YIIMP_TAILWIND_CDN defaults to true (CDN mode) so this file is only used
