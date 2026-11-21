@@ -6,7 +6,6 @@
 #define RETURN_ON_CONDITION(condition, ret) \
 	if(condition) \
 	{ \
-		if(g_debuglog_client) debuglog("job_assign_client skip line %d: %s job=%x client=%s coinid=%d next=%x sent=%x locked=%x maxhash=%g\n", __LINE__, #condition, job->id, client->username, client->coinid, client->jobid_next, client->jobid_sent, client->jobid_locked, maxhash); \
 		return ret; \
 	}
 
@@ -30,27 +29,21 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 						  (std::find(client->coins_ignore_list.begin(), client->coins_ignore_list.end(), job->coind->symbol2) != client->coins_ignore_list.end());
 
 	if(!g_autoexchange && maxhash >= 0. && client->coinid != job->coind->id) {
-		if(g_debuglog_client) debuglog("job_assign_client skip coinid mismatch client=%s coinid=%d job coin=%s id=%d maxhash=%g\n", client->username, client->coinid, job->coind->symbol, job->coind->id, maxhash);
 		//debuglog("prevent client %c on %s, not the right coin\n",
 		//	client->username[0], job->coind->symbol);
 		return true;
 	}
 
 	if (coin_to_ignore) {
-		if(g_debuglog_client) debuglog("job_assign_client skip coin_to_ignore client=%s job coin=%s\n", client->username, job->coind->symbol);
 		return true;
 	}
 
 	if ((!job->coind->auto_exchange) && (!coin_to_mine)) {
-		if(g_debuglog_client) debuglog("job_assign_client skip no auto_exchange/coin_to_mine client=%s job coin=%s\n", client->username, job->coind->symbol);
 		return true;
 	}
 
 	if ( maxhash >= 0. ) {
-		if (( specific_mining ) && (!coin_to_mine)) {
-			if(g_debuglog_client) debuglog("job_assign_client skip specific_mining client=%s job coin=%s\n", client->username, job->coind->symbol);
-			return true;
-		}
+		if (( specific_mining ) && (!coin_to_mine)) return true;
 	}
 
 	if(job->remote)
@@ -136,7 +129,6 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 	}
 
 	client->jobid_next = job->id;
-	if(g_debuglog_client) debuglog("job_assign_client assigned job=%x client=%s coinid=%d\n", job->id, client->username, client->coinid);
 
 	job->speed += client->speed;
 	job->count++;

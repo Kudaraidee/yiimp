@@ -114,25 +114,15 @@ void job_unlock_clients(YAAMP_JOB *job)
 
 bool job_can_mine(YAAMP_JOB *job)
 {
-	if(job->deleted) {
-		if(g_debuglog_client) debuglog("job_can_mine job=%x deleted\n", job->id);
-		return false;
-	}
-	if(job->status != JOB_STATUS_ACTIVE) {
-		if(g_debuglog_client) debuglog("job_can_mine job=%x status=%d\n", job->id, job->status);
-		return false;
-	}
+	if(job->deleted) return false;
+	if(job->status != JOB_STATUS_ACTIVE) return false;
 
 	if(job->remote)
 		return remote_can_mine(job->remote);
 
-	else if(job->coind) {
-		bool can = coind_can_mine(job->coind);
-		if(g_debuglog_client && !can) debuglog("job_can_mine job=%x coind=%s cannot mine\n", job->id, job->coind->symbol);
-		return can;
-	}
+	else if(job->coind)
+		return coind_can_mine(job->coind);
 
-	if(g_debuglog_client) debuglog("job_can_mine job=%x no remote/coind\n", job->id);
 	return false;
 }
 
