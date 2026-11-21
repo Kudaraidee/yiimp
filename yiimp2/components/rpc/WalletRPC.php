@@ -212,9 +212,21 @@ class WalletRPC
             $eth = $this->rpc;
 
             if (!isset($this->accounts)) {
-                $accounts       = $eth->eth_accounts();
-                $this->accounts = is_array($accounts) ? $accounts : null;
-                $this->error    = $eth->getError();
+                $accounts    = $eth->eth_accounts();
+                $this->error = $eth->getError();
+                if (is_array($accounts)) {
+                    // A mining node may expose no local wallet accounts while
+                    // still paying rewards to the configured pool address.
+                    if (!empty($this->account)) {
+                        $known = array_map('strtolower', $accounts);
+                        if (!in_array(strtolower($this->account), $known, true)) {
+                            $accounts[] = $this->account;
+                        }
+                    }
+                    $this->accounts = $accounts;
+                } else {
+                    $this->accounts = null;
+                }
             }
             if (!is_array($this->accounts)) {
                 return false;

@@ -122,9 +122,19 @@ class WalletRPC {
 			// A mining node does not need to expose a local wallet. Use the
 			// configured pool address instead of eth_accounts() when present.
 			if (!isset($this->accounts)) {
-				$this->accounts = $this->rpc->eth_accounts();
+				$accounts = $this->rpc->eth_accounts();
 				$this->error = $this->rpc->error;
-				if (!is_array($this->accounts) && !empty($this->account)) {
+				if (is_array($accounts)) {
+					// A mining node can expose no local wallet accounts while
+					// still paying block rewards to the configured pool address.
+					if (!empty($this->account)) {
+						$known = array_map('strtolower', $accounts);
+						if (!in_array(strtolower($this->account), $known, true)) {
+							$accounts[] = $this->account;
+						}
+					}
+					$this->accounts = $accounts;
+				} elseif (!empty($this->account)) {
 					$this->accounts = array($this->account);
 					$this->error = '';
 				}
