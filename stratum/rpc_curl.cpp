@@ -14,7 +14,7 @@
 #include <mstcpip.h>
 #endif
 
-bool opt_timeout = CURL_RPC_TIMEOUT; // 30sec
+long opt_timeout = CURL_RPC_TIMEOUT; // 30sec
 bool opt_debug = false;
 bool opt_protocol = false;
 bool opt_proxy = false;
