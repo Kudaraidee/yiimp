@@ -2,9 +2,8 @@
 .vscode
 .settings
 
-# Large binary source tarballs — fetched at build time, not needed in context.
-# NOTE: web/depends/.dockerignore is ineffective; Docker only reads this root file.
-web/depends
+# Legacy Yii1 app — no longer part of the image.
+web
 
 # Local composer vendor (may hold dev packages); the image builds its own in composer-deps.
 yiimp2/vendor

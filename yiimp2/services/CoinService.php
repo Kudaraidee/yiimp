@@ -281,7 +281,7 @@ class CoinService
                 $data        = @file_get_contents($coin->image);
                 $localPath   = "/images/coin-{$coin->id}.png";
                 $coin->image = $localPath;
-                $htdocs      = defined('YIIMP_HTDOCS') ? YIIMP_HTDOCS : '';
+                $htdocs      = Yii::getAlias('@app/web');
                 if ($data && $htdocs) {
                     @unlink($htdocs . $localPath);
                     file_put_contents($htdocs . $localPath, $data);

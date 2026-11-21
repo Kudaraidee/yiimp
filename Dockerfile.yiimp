@@ -10,7 +10,7 @@ RUN set -xe \
     && : "---------- add build-tools ----------" \
     && apt-get install -y automake autotools-dev build-essential libtool libasan6 python3 python3-venv libaugeas0 \
     && : "---------- Persistent dependencies ----------" \
-    && apt-get install -y libgd-dev libicu-dev libmariadb-dev-compat libxml2-dev libonig-dev libcurl4-openssl-dev libssl-dev libxslt1-dev libzip-dev libz-dev libmemcached-dev libgmp-dev libsodium-dev libmcrypt-dev \
+    && apt-get install -y libgd-dev libicu-dev libmariadb-dev-compat libxml2-dev libonig-dev libcurl4-openssl-dev libssl-dev libxslt1-dev libzip-dev libz-dev libmemcached-dev libgmp-dev libsodium-dev \
     && : "---------- php extensions ----------" \
     && apt-get install -y \
         php-cli php-dev \
@@ -35,24 +35,13 @@ COPY config/ports.conf /etc/apache2/
 RUN echo "RemoteIPHeader x-forwarded-for" >> /etc/apache2/apache2.conf \
     && echo "RemoteIPInternalProxy 127.0.0.1" >> /etc/apache2/apache2.conf
 
-# enable yii2-port on alternate vhost
-COPY config/001-yiimp2.conf /etc/apache2/sites-available/
-RUN a2ensite 001-yiimp2
-
-# add php-mcrypt from pecl (required by legacy web/ app; not needed by yiimp2)
-# uses dynamic PHP version to avoid hardcoded path breakage on future PHP upgrades
-RUN pecl install mcrypt
-RUN PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;') && \
-    echo "extension=mcrypt.so" >> /etc/php/${PHP_VER}/apache2/php.ini && \
-    echo "extension=mcrypt.so" >> /etc/php/${PHP_VER}/cli/php.ini
-
 # add Let's Encrypt repository in /opt
 RUN python3 -m venv /opt/certbot/ && \
     /opt/certbot/bin/pip install --upgrade pip && \
     /opt/certbot/bin/pip install certbot && \
     ln -s /opt/certbot/bin/certbot /usr/bin/certbot
 
-COPY --chmod=755 /bin/letsencrypt-* /usr/local/bin/
+COPY --chmod=755 /bin/letsencrypt-* /bin/yiimp /usr/local/bin/
 
 # build stratum binary
 COPY /stratum /tmp/stratum
@@ -105,10 +94,17 @@ RUN echo "Ubuntu package state: ${UBUNTU_STATE}" && \
     apt-get install -yqq --no-install-recommends php-xdebug && \
     rm -rf /var/lib/apt/lists/*
 
-COPY /config/xdebug.ini /usr/local/etc/php/conf.d/
+# Ubuntu PHP reads /etc/php/<version>/<sapi>/conf.d, not /usr/local/etc/php
+COPY /config/xdebug.ini /tmp/xdebug.ini
+RUN PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;') && \
+    for sapi in apache2 cli; do \
+        cp /tmp/xdebug.ini /etc/php/${PHP_VER}/${sapi}/conf.d/99-yiimp-xdebug.ini; \
+    done && \
+    rm /tmp/xdebug.ini
 
-WORKDIR /var/www/
-CMD ["apache2-foreground"]
+WORKDIR /var/yiimp2/
+COPY /config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+CMD ["/usr/bin/dumb-init", "--", "/usr/bin/supervisord"]
 
 # Build production image
 FROM baseimage AS image-prod
@@ -121,9 +117,6 @@ RUN echo "Ubuntu package state: ${UBUNTU_STATE}" && \
     apt-get update -qq && \
     apt-get upgrade -yqq --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
-
-# Deploy legacy web app
-COPY --chown=www-data:www-data /web/ /var/www/
 
 # Deploy yiimp2 app and its production PHP dependencies
 COPY --chown=www-data:www-data /yiimp2/ /var/yiimp2/
@@ -140,8 +133,6 @@ COPY --from=tailwind-build --chown=www-data:www-data \
 # Ensure the Yii2 runtime and asset directories are writable by www-data
 RUN mkdir -p /var/yiimp2/runtime /var/yiimp2/web/assets \
     && chown -R www-data:www-data /var/yiimp2/runtime /var/yiimp2/web/assets
-
-WORKDIR /var/www/
 
 COPY /config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 

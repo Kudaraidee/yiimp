@@ -30,10 +30,12 @@ build-devel:
 push:
 	podman push $(image) ghcr.io/tpfuemp/$(image):$(version)
 
+# runtime/yiimp2: Yii2 runtime (file cache: paused jobs, locks) survives container recreation;
+# must be writable by www-data (uid 33) inside the container.
 run:
-	podman rm -i $(image) && podman run -dt --name=$(image) --network=host -v ./config/letsencrypt:/etc/letsencrypt -v ./config:/etc/yiimp -v ./log:/var/log/apache2 -v ./log:/var/log/yiimp -v ./log:/var/www/yaamp/runtime -v ./config/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf $(image)
+	mkdir -p runtime/yiimp2 && podman rm -i $(image) && podman run -dt --name=$(image) --network=host -v ./runtime/yiimp2:/var/yiimp2/runtime -v ./config/letsencrypt:/etc/letsencrypt -v ./config:/etc/yiimp -v ./log:/var/log/apache2 -v ./log:/var/log/yiimp -v ./config/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf $(image)
 run-init-letsencrypt:
-	podman rm -i $(image) && podman run -dt --name=$(image) --network=host -e MAILADDRESS=$(MAILADDRESS) -e DOMAINNAME=$(DOMAINNAME) -v ./config/letsencrypt:/etc/letsencrypt -v ./config:/etc/yiimp -v ./log:/var/log/apache2 -v ./log:/var/log/yiimp -v ./log:/var/www/yaamp/runtime -v ./config/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf $(image) /usr/local/bin/letsencrypt-yiimp-initial-cert.sh
+	mkdir -p runtime/yiimp2 && podman rm -i $(image) && podman run -dt --name=$(image) --network=host -v ./runtime/yiimp2:/var/yiimp2/runtime -e MAILADDRESS=$(MAILADDRESS) -e DOMAINNAME=$(DOMAINNAME) -v ./config/letsencrypt:/etc/letsencrypt -v ./config:/etc/yiimp -v ./log:/var/log/apache2 -v ./log:/var/log/yiimp -v ./config/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf $(image) /usr/local/bin/letsencrypt-yiimp-initial-cert.sh
 
 run-devel:
-	podman rm -i $(image) && podman run -dt --name=$(image) --network=host -v ./config/letsencrypt:/etc/letsencrypt -v ./config:/etc/yiimp -v ./yiimp/web:/var/www/ -v ./yiimp/yiimp2:/var/yiimp2/ -v ./log:/var/log/apache2 -v ./log:/var/log/yiimp -v ./log:/var/www/yaamp/runtime -v ./config/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf $(image) /usr/bin/supervisord
+	podman rm -i $(image) && podman run -dt --name=$(image) --network=host -v ./config/letsencrypt:/etc/letsencrypt -v ./config:/etc/yiimp -v ./yiimp2:/var/yiimp2/ -v ./log:/var/log/apache2 -v ./log:/var/log/yiimp -v ./config/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf $(image) /usr/bin/supervisord

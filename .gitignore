@@ -22,3 +22,4 @@ web/assets/
 web/yaamp/.idea/
 *.0
 .vscode/
+runtime/
