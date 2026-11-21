@@ -39,6 +39,7 @@ $navLink = fn(string $icon, string $label, string $url, bool $isActive = false) 
 $publicNav = [
     ['home',     'Home',      '/site/index'],
     ['pool',     'Pool',      '/site/mining'],
+    ['coins',    'Coins',     '/site/coins'],
     ['wallet',   'Wallet',    '/wallet'],
     ['graphs',   'Graphs',    '/stats'],
     ['api',      'API',       '/site/api'],

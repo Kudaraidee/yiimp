@@ -116,7 +116,8 @@ $config = [
                 'wallet' => 'site/wallet',
                 'wallet/<address:[^/]+>' => 'site/wallet',
 
-                // Canonical coin block page: /coins/LRS (old /site/block?id=N redirects here)
+                // Public coin catalog and canonical coin block pages
+                'coins' => 'site/coins',
                 'coins/<symbol:[A-Za-z0-9_.-]+>' => 'site/block',
 
                 // Market actions live under /admin/market/* for access-control clarity

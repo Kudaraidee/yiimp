@@ -122,6 +122,19 @@ class SiteController extends BaseController
     }
 
     /**
+     * Public coin catalog — searchable cards for every minable coin.
+     */
+    public function actionCoins(): string
+    {
+        $coins = Coins::find()
+            ->where(['enable' => 1, 'visible' => 1])
+            ->orderBy(['algo' => SORT_ASC, 'name' => SORT_ASC])
+            ->all();
+
+        return $this->render('coins', ['coins' => $coins]);
+    }
+
+    /**
      * JSON version of the mining algo scope bar, refreshed with the page.
      */
     public function actionMining_summary(): Response
