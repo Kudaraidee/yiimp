@@ -379,8 +379,9 @@ int main(int argc, char **argv)
 	g_stratum_min_diff = iniparser_getdouble(ini, "STRATUM:diff_min", g_stratum_difficulty/2);
 	g_stratum_max_diff = iniparser_getdouble(ini, "STRATUM:diff_max", g_stratum_difficulty*8192);
 
-	// Ethash vardiff uses a fixed window and a much lower target share rate
-	// than the Bitcoin-style algorithm. Both are tunable per pool.
+	// GPU vardiff (Ethash/Etchash and the Progpow family) uses a fixed window
+	// and a much lower target share rate than the Bitcoin-style algorithm.
+	// Both are tunable per pool.
 	g_stratum_eth_vardiff_window = iniparser_getint(ini, "STRATUM:eth_vardiff_window", 180);
 	if (g_stratum_eth_vardiff_window < 30) g_stratum_eth_vardiff_window = 30;
 	g_stratum_eth_vardiff_target = iniparser_getdouble(ini, "STRATUM:eth_vardiff_target", 1.0);

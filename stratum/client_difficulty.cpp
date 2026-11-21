@@ -10,13 +10,22 @@ static long long eth_vardiff_window_ms()
 	return (long long) g_stratum_eth_vardiff_window * 1000LL;
 }
 
+// Ethash/Etchash and the Progpow family all use a full 256-bit target via
+// mining.set_target (or EthereumStratum), so they share the same GPU-style
+// vardiff: fractional difficulties, fixed window, ~1 share/min.
+static bool is_gpu_vardiff()
+{
+	return is_ethash || is_etchash || is_kawpow || is_firopow || is_phihash || is_meowpow;
+}
+
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client)
 {
-	if (is_ethash || is_etchash)
+	if (is_gpu_vardiff())
 	{
-		// EthereumStratum/ethproxy miners accept fractional difficulty and
-		// derive their target from the exact value. Keep it instead of the
-		// even-integer rounding used by the Bitcoin-style algorithms.
+		// These miners accept fractional difficulty and derive their target
+		// from the exact value. Keep it instead of the even-integer rounding
+		// used by the Bitcoin-style algorithms (which also collapses 1<x<2
+		// to zero and makes vardiff stall).
 		if (difficulty < g_stratum_min_diff) difficulty = g_stratum_min_diff;
 		if (difficulty > g_stratum_max_diff) difficulty = g_stratum_max_diff;
 		return difficulty;
@@ -77,11 +86,11 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 		return;
 	}
 
-	if (is_ethash || is_etchash)
+	if (is_gpu_vardiff())
 	{
 		// Fixed-window rate is much more stable than the generic EMA here:
-		// the EMA is only refreshed when a share arrives, so a slow Ethash
-		// GPU either never triggered a change or took ~30 minutes to settle.
+		// the EMA is only refreshed when a share arrives, so a slow GPU
+		// either never triggered a change or took ~30 minutes to settle.
 		long long now = current_timestamp();
 		if (!client->vardiff_window_start) client->vardiff_window_start = now;
 		long long elapsed = now - client->vardiff_window_start;
@@ -144,7 +153,7 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 {
 //	debuglog("%s diff %f\n", client->sock->ip, difficulty);
-	if (is_ethash || is_etchash)
+	if (is_gpu_vardiff())
 	{
 		client->shares_per_minute = g_stratum_eth_vardiff_target;
 		client->vardiff_shares = 0;
@@ -249,24 +258,25 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 	}
 	if (!value) return;
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_gpu_vardiff())
 	{
-		client->difficulty_actual = g_stratum_difficulty;
-		diff_to_target(client->share_target, client->difficulty_actual);
-	}
-	else if (is_ethash || is_etchash)
-	{
-		// Ethash/ethproxy miners use the full 256-bit target. An explicit d=
-		// or sd= must be used as-is: client_normalize_difficulty() clamps to
-		// the Bitcoin-style g_stratum_min_diff (difficulty/2), which silently
+		// These miners use the full 256-bit target. An explicit d= or sd=
+		// must be used as-is: client_normalize_difficulty() clamps to the
+		// Bitcoin-style g_stratum_min_diff (difficulty/2), which silently
 		// turned d=2 into 8 on a pool configured with difficulty = 16.
 		double diff = atof(value);
 		if (diff > 0 && isfinite(diff))
 		{
-			uint8_t be[32];
-			ethash_diff_to_target(diff, be);
 			client->difficulty_actual = diff;
-			client->share_target = ethash_be_to_uint256(be);
+			if (is_ethash || is_etchash)
+			{
+				uint8_t be[32];
+				ethash_diff_to_target(diff, be);
+				client->share_target = ethash_be_to_uint256(be);
+			}
+			else
+				diff_to_target(client->share_target, diff);
+
 			client->difficulty_fixed = difficulty_fixed;
 		}
 	}
