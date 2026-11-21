@@ -106,17 +106,21 @@ function BackendBlockNew($coin, $db_block)
 
 			$user->last_earning = time();
 			$user->save();
-
-			$last_shared = dborow("SELECT height, time FROM blocks " . "WHERE coin_id=:id AND solo=0 AND category IN ('immature','generate') ORDER BY height DESC LIMIT 1", array(':id' => $coin->id));
-			$timelast_shared = (int) arraySafeVal($last_shared, 'time');
-      
-			$total_shared_difficulty = dboscalar("SELECT SUM(difficulty) FROM shares WHERE coinid=:coinid AND algo=:algo AND solo=0 AND time>=$timelast_shared", array(':algo'=>$coin->algo,':coinid'=>$coin->id));
-			$effort = round($total_shared_difficulty * 100 / $db_block->difficulty, 2);
-			$db_block->effort = $effort;
-			
-			$db_block->solo = 0;
-			$db_block->save();
 		}
+
+		// Effort must use the same share window as the reward distribution.
+		// A time-based "previous block" lookup is unreliable here: stratum
+		// inserts the current block row with solo=0 before the backend runs,
+		// so it would select itself and count only shares from the next round.
+		$total_shared_difficulty = dboscalar(
+			"SELECT SUM(difficulty) FROM shares WHERE algo=:algo AND solo=0 AND $sqlCond",
+			array(':algo'=>$coin->algo)
+		);
+		$db_block->effort = ($db_block->difficulty > 0 && $total_shared_difficulty)
+			? round($total_shared_difficulty * 100 / $db_block->difficulty, 2)
+			: 0;
+		$db_block->solo = 0;
+		$db_block->save();
 	}
 	else 
 	{
@@ -163,14 +167,15 @@ function BackendBlockNew($coin, $db_block)
 
 		$user->last_earning = time();
 		$user->save();
-		
-		$last_solo = dborow("SELECT height, time FROM blocks " . "WHERE coin_id=:id AND solo=1 AND category IN ('immature','generate') ORDER BY height DESC LIMIT 1", array(':id' => $coin->id));
-		$timelast_solo = (int) arraySafeVal($last_solo, 'time');
-      
-		$total_solo_difficulty = dboscalar("SELECT SUM(difficulty) FROM shares WHERE coinid=:coinid AND algo=:algo AND solo=1 AND time>=$timelast_solo", array(':algo'=>$coin->algo,':coinid'=>$coin->id));
-		$effort = round($total_solo_difficulty * 100 / $db_block->difficulty, 2);
-		$db_block->effort = $effort;
-		
+
+		// Same share window as the solo reward calculation (see above).
+		$total_solo_difficulty = dboscalar(
+			"SELECT SUM(difficulty) FROM shares WHERE algo=:algo AND solo=1 AND valid=1 AND $sqlCond",
+			array(':algo'=>$coin->algo)
+		);
+		$db_block->effort = ($db_block->difficulty > 0 && $total_solo_difficulty)
+			? round($total_solo_difficulty * 100 / $db_block->difficulty, 2)
+			: 0;
 		$db_block->solo = 1;
 		$db_block->save();
 	}

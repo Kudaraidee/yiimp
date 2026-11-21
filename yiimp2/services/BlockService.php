@@ -143,24 +143,19 @@ class BlockService
                 $account->save();
             }
 
-            // Calculate and store block effort (shared)
-            $lastShared    = $db->createCommand(
-                "SELECT height, time FROM blocks
-                 WHERE coin_id=:id AND solo=0 AND category IN ('immature','generate')
-                 ORDER BY height DESC LIMIT 1",
-                [':id' => $coin->id]
-            )->queryOne();
-            $timeLastShared = (int) ($lastShared['time'] ?? 0);
-
+            // Effort uses the same share window as the reward distribution.
+            // Looking up the previous block by height is unreliable because
+            // stratum has already inserted the current block row with solo=0;
+            // a time range from that row would only count the next round.
             $totalDiff = (float) $db->createCommand(
-                'SELECT SUM(difficulty) FROM shares
-                 WHERE coinid=:coin AND algo=:algo AND solo=0 AND time>=:since',
-                [':coin' => $coin->id, ':algo' => $coin->algo, ':since' => $timeLastShared]
+                "SELECT SUM(difficulty) FROM shares
+                 WHERE algo=:algo AND valid=1 AND solo=0 AND {$shareWhere}",
+                array_merge([':algo' => $coin->algo], $shareParams)
             )->queryScalar();
 
-            if ($block->difficulty) {
-                $block->effort = round($totalDiff * 100 / $block->difficulty, 2);
-            }
+            $block->effort = ($block->difficulty > 0 && $totalDiff)
+                ? round($totalDiff * 100 / $block->difficulty, 2)
+                : 0;
             $block->solo = 0;
             $block->save();
 
@@ -208,24 +203,16 @@ class BlockService
             $account->last_earning = time();
             $account->save();
 
-            // Calculate and store block effort (solo)
-            $lastSolo    = $db->createCommand(
-                "SELECT height, time FROM blocks
-                 WHERE coin_id=:id AND solo=1 AND category IN ('immature','generate')
-                 ORDER BY height DESC LIMIT 1",
-                [':id' => $coin->id]
-            )->queryOne();
-            $timeLastSolo = (int) ($lastSolo['time'] ?? 0);
-
+            // Same share window as the solo reward calculation (see above).
             $totalDiff = (float) $db->createCommand(
-                'SELECT SUM(difficulty) FROM shares
-                 WHERE coinid=:coin AND algo=:algo AND solo=1 AND time>=:since',
-                [':coin' => $coin->id, ':algo' => $coin->algo, ':since' => $timeLastSolo]
+                "SELECT SUM(difficulty) FROM shares
+                 WHERE algo=:algo AND valid=1 AND solo=1 AND {$shareWhere}",
+                array_merge([':algo' => $coin->algo], $shareParams)
             )->queryScalar();
 
-            if ($block->difficulty) {
-                $block->effort = round($totalDiff * 100 / $block->difficulty, 2);
-            }
+            $block->effort = ($block->difficulty > 0 && $totalDiff)
+                ? round($totalDiff * 100 / $block->difficulty, 2)
+                : 0;
             $block->solo = 1;
             $block->save();
         }
