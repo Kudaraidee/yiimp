@@ -25,7 +25,7 @@ bool client_suggest_target(YAAMP_CLIENT *client, json_value *json_params)
 bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 {
 	//if(client_find_my_ip(client->sock->ip)) return false;
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_ethash || is_etchash)
+	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_ethash || is_etchash)
 		get_nonce_prefix(client->extranonce1_default);
 	else
 		get_next_extraonce1(client->extranonce1_default);
@@ -188,7 +188,7 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 				jobid, seed, header, client->extranonce1);
 		}
 	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		kawpow_send_nonceprefix(client);
 	}

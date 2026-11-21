@@ -283,7 +283,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		// Scash Core rejects template requests that do not advertise segwit.
 		strcpy(params, "[{\"rules\":[\"segwit\"]}]");
 	}
-	else if (is_kawpow || is_phihash || is_meowpow) {
+	else if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow) {
 		sprintf(params, "[]");
 	}
 	else {
@@ -663,11 +663,11 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	string merkleroot = merkle_with_first(templ->txsteps, doublehash);
 	strcpy(templ->merkleroot, merkleroot.c_str());
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		update_epoch(coind->id, templ->height);
 		templ->header_seed = get_kawpow_seed(templ->height);
-		if (is_kawpow || is_phihash || is_meowpow) 
+		if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow)
 		{
 			templ->header_hash = build_header_hash(templ);
 		}

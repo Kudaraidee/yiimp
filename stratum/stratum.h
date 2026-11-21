@@ -77,6 +77,7 @@ extern bool is_kawpow;
 extern bool is_firopow;
 extern bool is_phihash;
 extern bool is_meowpow;
+extern bool is_evrprogpow;
 extern bool is_ethash;
 extern bool is_etchash;
 extern bool is_randomscash;

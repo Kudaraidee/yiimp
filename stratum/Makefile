@@ -18,7 +18,8 @@ SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/
 	kawpow/lib/ethash/ethash.cpp kawpow/lib/ethash/progpow.cpp kawpow/hash.cpp kawpow/kawpow.cpp \
 	firopow/lib/progpow.cpp firopow/overrides.cpp firopow/hash.cpp \
 	phihash/lib/progpow.cpp phihash/hash.cpp \
-	meowpow/lib/progpow.cpp meowpow/hash.cpp
+	meowpow/lib/progpow.cpp meowpow/hash.cpp \
+	evrprogpow/lib/progpow.cpp evrprogpow/hash.cpp
 SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/work.cpp
 SOURCES_RANDOMSCASH=randomscash/randomscash.cpp
 

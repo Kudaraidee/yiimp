@@ -229,7 +229,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	char script1[4*1024];
 	char script2[32];
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		// coinbase v_in only current height
 		sprintf(script1, "%s", eheight);
@@ -779,6 +779,55 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         strcat(templ->coinb2, devscript2);
         if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
         strcat(templ->coinb2, "00000000");
+        return;
+    }
+
+    else if (is_evrprogpow)
+    {
+        // Evrmore enforces a miner dev fund output in every coinbase. GBT's
+        // coinbasevalue already includes it, so pay the node-provided amount
+        // to the whitelisted address and keep the remainder for the pool.
+        json_value *coinbasetxn = json_get_object(json_result, "coinbasetxn");
+        json_value *minerdevfund = coinbasetxn ? json_get_object(coinbasetxn, "minerdevfund") : NULL;
+        json_value *addresses = minerdevfund ? json_get_array(minerdevfund, "addresses") : NULL;
+
+        const char *dev_address = NULL;
+        if (addresses && addresses->u.array.length &&
+            addresses->u.array.values[0] && addresses->u.array.values[0]->type == json_string)
+            dev_address = addresses->u.array.values[0]->u.string.ptr;
+
+        json_int_t dev_amount = minerdevfund ? json_get_int(minerdevfund, "minimumvalue") : 0;
+        if (!dev_address || !*dev_address)
+            dev_address = "eHNUGzw8ZG9PGC8gKtnneyMaQXQTtAUm98";
+        if (dev_amount <= 0 || dev_amount >= available)
+            dev_amount = available / 10;
+
+        char hash160[64] = { 0 };
+        char dev_script[128] = { 0 };
+        if (!base58_decode(dev_address, hash160) || !*hash160) {
+            debuglog("[%s] invalid minerdevfund address %s\n", coind->symbol, dev_address);
+            return;
+        }
+
+        // P2SH uses a9 14 <hash160> 87; P2PKH uses 76 a9 14 <hash160> 88 ac.
+        int version = base58_address_version(dev_address);
+        if (version == 92 || version == 122 || version == 196)
+            snprintf(dev_script, sizeof(dev_script), "a914%s87", hash160);
+        else
+            snprintf(dev_script, sizeof(dev_script), "76a914%s88ac", hash160);
+
+        unsigned int outputs = 2 + (templ->has_segwit_txs ? 1 : 0);
+        char outputs_count[4] = { 0 };
+        sprintf(outputs_count, "%02x", outputs);
+        strcat(templ->coinb2, outputs_count);
+
+        json_int_t miner_amount = available - dev_amount;
+        job_pack_tx(coind, templ->coinb2, miner_amount, NULL);
+        script_pack_tx(coind, templ->coinb2, dev_amount, dev_script);
+        if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
+        strcat(templ->coinb2, "00000000"); // locktime
+
+        coind->reward = (double)miner_amount / 100000000 * coind->reward_mul;
         return;
     }
 

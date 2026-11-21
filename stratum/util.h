@@ -78,6 +78,7 @@ void cbin2hex(char *out, const char *in, size_t len);
 char *bin2hex(const uchar *in, size_t len);
 
 bool base58_decode(const char *input, char *output);
+int base58_address_version(const char *input);
 bool is_base58(char *input);
 
 void base64_encode(char *base64, const char *normal);

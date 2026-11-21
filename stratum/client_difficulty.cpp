@@ -15,7 +15,7 @@ static long long eth_vardiff_window_ms()
 // vardiff: fractional difficulties, fixed window, ~1 share/min.
 static bool is_gpu_vardiff()
 {
-	return is_ethash || is_etchash || is_kawpow || is_firopow || is_phihash || is_meowpow;
+	return is_ethash || is_etchash || is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow;
 }
 
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client)
@@ -187,7 +187,7 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 		// the miner waiting for a job until it reconnects.
 		client_call(client, "mining.set_difficulty", "[%.8g]", difficulty);
 	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		uint256 share_target;
 		diff_to_target(share_target, difficulty);

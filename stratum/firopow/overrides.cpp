@@ -12,6 +12,8 @@ const int get_ethash_epoch_length()
 		return 7500;
 	if (is_meowpow)
 		return 7500;
+	if (is_evrprogpow)
+		return 12000;
 	if (is_phihash)
 		return 30000;
 	if (is_ethash)
@@ -29,6 +31,8 @@ const int get_ethash_period_length()
 		return 3;
 	if (is_meowpow)
 		return 6;
+	if (is_evrprogpow)
+		return 3;
 	if (is_phihash)
 		return 3;
 	if (is_ethash || is_etchash)
@@ -44,6 +48,8 @@ const unsigned int get_full_dataset_init_size()
 		return (1 << 30);
 	if (is_meowpow)
 		return (1U << 30);
+	if (is_evrprogpow)
+		return (1U << 30) * 3U;
 	if (is_phihash)
 		return (1 << 30);
 	if (is_ethash || is_etchash)

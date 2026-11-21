@@ -97,6 +97,15 @@ bool base58_decode(const char *input, char *output)
 	return true;
 }
 
+int base58_address_version(const char *input)
+{
+	unsigned char output_bin[32] = { 0 };
+	if (!_blkmk_b58tobin(output_bin, sizeof(output_bin), input, 0))
+		return -1;
+
+	return output_bin[0];
+}
+
 bool is_base58(char *input)
 {
 	// All alphanumeric characters except "0", "O", "I" and "l"

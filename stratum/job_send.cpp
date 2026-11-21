@@ -174,7 +174,7 @@ void job_send_last(YAAMP_CLIENT *client)
 	{
 		ethash_job_mining_notify_buffer(job, client, buffer);
 	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -203,7 +203,7 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 	{
 		ethash_job_mining_notify_buffer(job, client, buffer);
 	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -253,7 +253,7 @@ void job_broadcast(YAAMP_JOB *job)
 		{
 			ethash_job_mining_notify_buffer(job, client, buffer);
 		}
-		else if (is_kawpow || is_firopow || is_phihash || is_meowpow)
+		else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 		{
 			kawpow_job_mining_notify_buffer(job, client, buffer);
 		}

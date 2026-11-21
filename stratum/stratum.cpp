@@ -97,6 +97,7 @@ bool is_kawpow = false;
 bool is_firopow = false;
 bool is_phihash = false;
 bool is_meowpow = false;
+bool is_evrprogpow = false;
 bool is_ethash = false;
 bool is_etchash = false;
 bool is_randomscash = false;
@@ -174,6 +175,7 @@ YAAMP_ALGO g_algos[] =
 	{"equihash96", equi_hash, 0x100, 0, 0},
 	{"etchash", sha256_double_hash, 1, 0, 0},
 	{"ethash", sha256_double_hash, 1, 0, 0},
+	{"evrprogpow", sha256_double_hash, 1, 0, 0},
 	{"firopow", sha256_double_hash, 1, 0, 0},
 	{"flex", flex_hash, 1, 0, sha3d_hash_hex},
 	{"fresh", fresh_hash, 0x100, 0, 0},
@@ -449,6 +451,10 @@ int main(int argc, char **argv)
 	else if (!strcmp(g_current_algo->name,"meowpow"))
 	{
 		is_meowpow = true;
+	}
+	else if (!strcmp(g_current_algo->name,"evrprogpow"))
+	{
+		is_evrprogpow = true;
 	}
 	else if (!strcmp(g_current_algo->name,"ethash"))
 	{
