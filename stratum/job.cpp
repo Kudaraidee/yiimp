@@ -2,6 +2,7 @@
 #include "stratum.h"
 
 #define MAX_JOBAGE 120;
+#define EVR_JOB_KEEPAGE 600
 
 #define RETURN_ON_CONDITION(condition, ret) \
 	if(condition) \
@@ -304,7 +305,10 @@ void job_check_status() {
 		if (!job->templ) { job->deleted = true; continue; }
 		if (!job->coind) { job->deleted = true; continue; }
 
-		tmpjobage = time(NULL) - MAX_JOBAGE;
+		// EvrProgpow (slow GPUs) needs a longer grace period: keep old jobs
+		// around so shares found after a new block are still credited.
+		int maxjobage = is_evrprogpow ? EVR_JOB_KEEPAGE : MAX_JOBAGE;
+		tmpjobage = time(NULL) - maxjobage;
 		if (job->jobage <= tmpjobage) {
 //			debuglog("delete timeouted job %i from coin %s height %i\n",
 //					job->id, job->coind->symbol, job->templ->height);
@@ -313,7 +317,9 @@ void job_check_status() {
 		}
 
 
-		if (job->templ->height <= job->coind->height) {
+		// Do not drop EVR jobs just because the node advanced: a share mined
+		// on the previous height is still valid work and must be credited.
+		if (!is_evrprogpow && job->templ->height <= job->coind->height) {
 //			debuglog("delete job %i from coin %s height %i\n",
 //					job->id, job->coind->symbol, job->templ->height);
 			job->deleted = true;

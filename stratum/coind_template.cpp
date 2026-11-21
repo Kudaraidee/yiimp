@@ -772,6 +772,13 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 	if (job_last && job_last->templ && (templ->height == job_last->templ->height)) {
 		if (coind->job) coind->job->status = JOB_STATUS_WAITING;
 	}
+	else if (is_evrprogpow && coind->job) {
+		// EvrProgpow miners are slow GPUs; at IBD block rates the previous job
+		// can be replaced well before a share is found. Keep it in the job
+		// list (as WAITING) so late shares still validate against its template.
+		// job_check_status() prunes these after EVR_JOB_KEEPAGE seconds.
+		coind->job->status = JOB_STATUS_WAITING;
+	}
 	else {
 		object_delete(coind->job);
 	}
