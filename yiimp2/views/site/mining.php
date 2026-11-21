@@ -36,40 +36,55 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 .graph-wrap canvas { max-width: 100% !important; }
 .main-left-box { margin-bottom: 1rem; }
 
-/* ── Algo scope bar ───────────────────────────────────────────────────────── */
+/* ── Algo picker — wrapped searchable chips (no horizontal scroll) ─────────── */
 .mining-algo-bar {
-    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    display: flex; flex-direction: column; gap: 10px;
     background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
-    padding: 12px 14px; margin: 12px 0 10px;
+    padding: 11px 14px 12px; margin: 12px 0 10px;
     box-shadow: 0 1px 2px rgba(20,40,80,.04);
 }
+.mining-algo-bar-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .mining-algo-label {
     font-size: 10px; font-weight: 700; letter-spacing: .12em;
     color: #8a94a6; text-transform: uppercase; white-space: nowrap;
 }
-.mining-algo-tabs {
-    display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
-    flex: 1 1 420px;
+.mining-algo-search {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 9px; border: 1px solid #dfe5ec; border-radius: 7px;
+    background: #fafbfc; color: #8a94a6;
 }
-.mining-algo-tab {
-    border: 1px solid #dfe5ec; background: #fafbfc; border-radius: 7px;
-    padding: 6px 11px; min-width: 96px; text-align: left; cursor: pointer;
-    font-family: inherit; line-height: 1.15; transition: .15s;
+.mining-algo-search:focus-within { border-color: #a9c4ea; background: #fff; }
+.mining-algo-search input {
+    width: 180px; border: 0; outline: 0; background: transparent;
+    font: 11px/1.4 inherit; color: #26385a;
 }
-.mining-algo-tab:hover { border-color: var(--algo-color, #a9c4ea); background: #f7faff; }
-.mining-algo-tab b { display: block; font-size: 12px; color: #33405a; }
-.mining-algo-tab small { display: block; font-size: 10px; color: #8a94a6; margin-top: 2px; }
-.mining-algo-tab .dot {
-    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-    margin-right: 5px; vertical-align: 1px; background: var(--algo-color, #888);
+.mining-algo-search input::placeholder { color: #aab4c4; }
+.mining-algo-count { font-size: 10px; color: #8a94a6; font-variant-numeric: tabular-nums; }
+.mining-algo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mining-algo-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 9px; border: 1px solid #dfe5ec; background: #fafbfc;
+    border-radius: 999px; cursor: pointer; font-family: inherit;
+    line-height: 1.2; transition: .15s; white-space: nowrap;
 }
-.mining-algo-tab.active {
-    border-color: var(--algo-color, #2c5aa0);
-    background: #eef4ff;
+.mining-algo-chip:hover { border-color: var(--algo-color, #a9c4ea); background: #f7faff; }
+.mining-algo-chip b { font-size: 11px; color: #33405a; font-weight: 700; }
+.mining-algo-chip small {
+    font-size: 9px; color: #98a3b5; font-variant-numeric: tabular-nums;
+}
+.mining-algo-chip .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
+    background: var(--algo-color, #888);
+}
+.mining-algo-chip.active {
+    border-color: var(--algo-color, #2c5aa0); background: #eef4ff;
     box-shadow: inset 0 0 0 1px var(--algo-color, #2c5aa0);
 }
-.mining-algo-tab.active b { color: #1f467f; }
-.mining-algo-tab.active small { color: #4f74ad; }
+.mining-algo-chip.active b { color: #1f467f; }
+.mining-algo-chip.active small { color: #4f74ad; }
+.mining-algo-empty {
+    display: none; padding: 6px 2px; font-size: 11px; color: #98a3b5;
+}
 .mining-algo-live {
     margin-left: auto; white-space: nowrap; font-size: 11px; color: #5b6675;
     display: flex; align-items: center; gap: 6px;
@@ -105,27 +120,36 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
 </div>
 
 <div class="mining-algo-bar" style="--algo-color: <?= Html::encode($activeItem['color'] ?? '#2c5aa0') ?>">
-    <span class="mining-algo-label">Algorithm</span>
-    <div class="mining-algo-tabs" title="กดเพื่อเลือกอัลกอริทึม">
+    <div class="mining-algo-bar-head">
+        <span class="mining-algo-label">Algorithm</span>
+        <label class="mining-algo-search">
+            <span aria-hidden="true">⌕</span>
+            <input type="search" id="algo-filter" placeholder="Filter algos…" autocomplete="off"
+                   aria-label="Filter algorithms">
+        </label>
+        <span class="mining-algo-count" id="algo-count"><?= count($algoItems) - 1 ?> algos</span>
+        <span class="mining-algo-live"><i></i> live · 60s <span id="mining-last-update">just now</span></span>
+    </div>
+    <div class="mining-algo-chips" id="algo-chips">
         <?php foreach ($algoItems as $key => $item): ?>
             <?php $color = Html::encode($item['color'] ?? '#888888'); ?>
-            <button type="button" class="mining-algo-tab <?= $key === $activeAlgo ? 'active' : '' ?>"
+            <button type="button" class="mining-algo-chip <?= $key === $activeAlgo ? 'active' : '' ?>"
                     style="--algo-color: <?= $color ?>" data-algo="<?= Html::encode($key) ?>"
+                    title="<?= Html::encode($key === 'all' ? 'All algorithms' : (!empty($item['port']) ? 'port ' . (int) $item['port'] . ' · ' . (int) $item['workers'] . ' workers' : 'no stratum')) ?>"
                     onclick='select_algo(<?= json_encode($key) ?>)'>
-                <b><i class="dot"></i><?= Html::encode($item['label'] ?? $key) ?></b>
-                <small data-algo-sub>
-                    <?php if ($key === 'all'): ?>
-                        <?= count($algoItems) - 1 ?> algos
-                    <?php elseif (!empty($item['port'])): ?>
-                        port <?= (int) $item['port'] ?> · <?= (int) $item['workers'] ?> workers
-                    <?php else: ?>
-                        no stratum
-                    <?php endif ?>
-                </small>
+                <i class="dot"></i>
+                <b><?= Html::encode($item['label'] ?? $key) ?></b>
+                <small data-algo-sub><?php if ($key === 'all'): ?>
+                    <?= count($algoItems) - 1 ?>
+                <?php elseif (!empty($item['port'])): ?>
+                    <?= (int) $item['port'] ?>
+                <?php else: ?>
+                    —
+                <?php endif ?></small>
             </button>
         <?php endforeach; ?>
     </div>
-    <span class="mining-algo-live"><i></i> live · 60s <span id="mining-last-update">just now</span></span>
+    <div class="mining-algo-empty" id="algo-empty">No algorithm matches that filter.</div>
 </div>
 
 <div class="mining-algo-summary" id="mining_algo_summary"
@@ -441,6 +465,27 @@ $graphLabel = ($algo === 'all') ? 'all algos' : $algo;
     color: #26385a;
 }
 
+/* ── Keep long data tables contained (50 algos / 100+ coins) ─────────────────── */
+#mining-cards #pool_current_results .main-left-inner > div[style*="overflow"],
+#mining-cards #mining_results .main-left-inner > div[style*="overflow"],
+#mining-cards #found_results .main-left-inner > div[style*="overflow"],
+#mining-cards #miners_results .main-left-inner > div[style*="overflow"] {
+    max-height: 420px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+#mining-cards #pool_current_results thead th,
+#mining-cards #mining_results thead th,
+#mining-cards #found_results thead th,
+#mining-cards #miners_results thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff !important;
+    box-shadow: 0 1px 0 #e8eef6;
+}
+
 /* ── Small screens: let card headers wrap and keep tables readable ─────────── */
 @media (max-width: 560px) {
     #mining-cards .main-left-title { flex-wrap: wrap; align-items: flex-start; }
@@ -499,14 +544,17 @@ function algo_summary_refresh() {
         $('#mining_algo_summary').css('--algo-color', item.color || '#2c5aa0');
         $('.mining-algo-bar').css('--algo-color', item.color || '#2c5aa0');
 
-        $('.mining-algo-tab').each(function () {
-            var sub = $(this).find('[data-algo-sub]');
-            var it = d.items[$(this).data('algo')];
+        $('.mining-algo-chip').each(function () {
+            var $chip = $(this), sub = $chip.find('[data-algo-sub]');
+            var it = d.items[$chip.data('algo')];
             if (!sub.length || !it) return;
-            if ($(this).data('algo') === 'all') {
-                sub.text(Object.keys(d.items).length - 1 + ' algos');
+            if ($chip.data('algo') === 'all') {
+                var total = Object.keys(d.items).length - 1;
+                sub.text(total);
+                $chip.attr('title', total + ' algorithms');
             } else {
-                sub.text(it.port ? 'port ' + it.port + ' · ' + it.workers + ' workers' : 'no stratum');
+                sub.text(it.port ? it.port : '—');
+                $chip.attr('title', it.port ? 'port ' + it.port + ' · ' + it.workers + ' workers' : 'no stratum');
             }
         });
     });
@@ -570,7 +618,22 @@ function mining_tick() {
     if (label) label.textContent = age < 2 ? 'just now' : age + 's ago · next ' + next + 's';
 }
 
+function algo_filter_apply() {
+    var q = ($('#algo-filter').val() || '').toLowerCase().trim();
+    var shown = 0;
+    $('.mining-algo-chip').each(function () {
+        var key = String($(this).data('algo') || '').toLowerCase();
+        var label = String($(this).find('b').text() || '').toLowerCase();
+        var ok = !q || key.indexOf(q) !== -1 || label.indexOf(q) !== -1;
+        $(this).toggle(ok);
+        if (ok && $(this).data('algo') !== 'all') shown++;
+    });
+    $('#algo-count').text(shown + ' algos');
+    $('#algo-empty').toggle(shown === 0 && q !== '');
+}
+
 function mining_start() {
+    $('#algo-filter').on('input search', algo_filter_apply);
     setInterval(mining_tick, 1000);
     mining_tick();
 }
