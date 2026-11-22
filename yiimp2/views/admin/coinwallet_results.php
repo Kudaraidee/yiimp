@@ -14,6 +14,9 @@ $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $conv       = Yii::$app->ConversionUtils;
 $utils      = Yii::$app->YiimpUtils;
 
+$server      = (string) Yii::$app->getRequest()->getQueryParam('server');
+$serverLabel = $server !== '' ? $server : 'all servers';
+
 // ── Shared per-coin computation ───────────────────────────────────────────────
 // Runs regardless of scheme; each branch renders from these variables.
 
@@ -82,7 +85,17 @@ span.eov { opacity: .45; }
 }
 #cw-title { display: block; font-size: 13px; font-weight: 800; color: #26385a; line-height: 1.2; }
 #cw-subtitle { display: block; font-size: 10px; color: #8a94a6; font-weight: 500; }
-#cw-pill {
+#cw-summary {
+    display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 13px;
+    background: #fcfdff; border-bottom: 1px solid #eef2f7;
+    font-size: 10px; color: #8a94a6;
+}
+#cw-summary b { color: #33405a; font-weight: 700; }
+#cw-summary i {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #2fae5a; box-shadow: 0 0 0 3px rgba(47,174,90,.12); margin-right: 5px;
+}
+#cw-card .cw-pill {
     display: inline-block; border: 1px solid #d7e5ff; background: #eef4ff;
     color: #2c5aa0; border-radius: 999px; padding: 2px 9px;
     font-size: 9px; font-weight: 800; line-height: 15px; white-space: nowrap;
@@ -94,7 +107,7 @@ span.eov { opacity: .45; }
 }
 #cw-card table#maintable th {
     position: sticky; top: 0; z-index: 2;
-    background: #f8fafc !important; padding: 8px 9px !important;
+    background: #fff !important; padding: 8px 9px !important;
     font-size: 9px !important; font-weight: 800 !important; letter-spacing: .05em;
     text-transform: uppercase; color: #8a94a6; text-align: right;
     border-bottom: 1px solid #e2e8f0 !important; white-space: nowrap;
@@ -166,6 +179,11 @@ span.eov { opacity: .45; }
         <span><span id="cw-title">Coin Wallets</span><span id="cw-subtitle">node status · balances · markets</span></span>
     </span>
     <span class="cw-pill"><?= count($coins) ?> coins</span>
+</div>
+<div id="cw-summary">
+    <span><i></i><b><?= count($coins) ?> wallets</b> in scope</span>
+    <span>Server <b><?= Html::encode($serverLabel) ?></b></span>
+    <span>Refresh <b>30s</b></span>
 </div>
 <div id="cw-scroll">
 <?php Yii::$app->ViewUtils->showTableSorter('maintable', '{
