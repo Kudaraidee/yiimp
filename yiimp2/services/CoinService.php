@@ -284,7 +284,8 @@ class CoinService
             // Download remote coin image once and store locally
             if (str_contains((string) $coin->image, 'http')) {
                 $data        = @file_get_contents($coin->image);
-                $localPath   = "/images/coin-{$coin->id}.png";
+                $localPath   = Coins::imagePathFor($coin->symbol, $coin->symbol2);
+                if ($localPath === '') $localPath = "/images/coin-{$coin->id}.png";
                 $coin->image = $localPath;
                 $htdocs      = defined('YIIMP_HTDOCS') ? YIIMP_HTDOCS : '';
                 if ($data && $htdocs) {

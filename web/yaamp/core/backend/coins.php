@@ -443,7 +443,8 @@ function BackendCoinsUpdate()
 		if(strstr($coin->image, 'http'))
 		{
 			$data = file_get_contents($coin->image);
-			$coin->image = "/images/coin-$coin->id.png";
+			$coin->image = yaamp_coin_image_symbol($coin);
+			if (empty($coin->image)) $coin->image = "/images/coin-$coin->id.png";
 
 			@unlink(YAAMP_HTDOCS.$coin->image);
 			file_put_contents(YAAMP_HTDOCS.$coin->image, $data);

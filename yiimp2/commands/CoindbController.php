@@ -131,13 +131,14 @@ class CoindbController extends Controller
             $coin   = Coins::findOne($row['id']);
             if (!$coin) continue;
             $symbol = $coin->getOfficialSymbol();
-            $local  = "{$root}/images/coin-{$symbol}.png";
+            $canonical = Coins::imagePathFor($coin->symbol, $coin->symbol2);
+            $local  = $root . $canonical;
             $data   = @file_get_contents($base . $symbol . '.png');
             if (!$data || strlen($data) < 2048) continue;
             $this->stdout("{$symbol} icon found\n");
             file_put_contents($local, $data);
             if (filesize($local) > 0) {
-                $coin->image = "/images/coin-{$symbol}.png";
+                $coin->image = $canonical;
                 $updated    += (int) $coin->save(false);
             }
         }

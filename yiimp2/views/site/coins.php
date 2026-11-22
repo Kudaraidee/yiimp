@@ -48,8 +48,9 @@ foreach ($coins as $coin) {
     $port    = (int) $util->getAlgoPort($algo);
     $color   = Html::encode((string) $util->getAlgoColors($algo));
     $initial = strtoupper(substr($symbol !== '' ? $symbol : $name, 0, 3));
-    $img     = !empty($coin->image)
-        ? "<img src='" . Html::encode($coin->image) . "' alt='' loading='lazy' onerror=\"this.remove()\">"
+    $icon    = $coin->imageUrl();
+    $img     = $icon !== ''
+        ? "<img src='" . Html::encode($icon) . "' alt='' loading='lazy' onerror=\"this.remove()\">"
         : '';
 
     $reward     = round((float) $coin->reward, 4);

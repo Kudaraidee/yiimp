@@ -268,6 +268,66 @@ function yaamp_rpc_hex_number($value)
 	return (float) hexdec($value);
 }
 
+/**
+ * Canonical local icon path for a coin, based on symbol2 (official symbol)
+ * first and symbol second. Writers use this so id-based paths stop being
+ * persisted; the resolver below still accepts old/custom paths.
+ */
+function yaamp_coin_image_symbol($coin)
+{
+	if (is_array($coin)) {
+		$symbol = !empty($coin['symbol2']) ? $coin['symbol2'] : (isset($coin['symbol']) ? $coin['symbol'] : '');
+	} elseif (is_object($coin)) {
+		if (method_exists($coin, 'getOfficialSymbol')) {
+			$symbol = $coin->getOfficialSymbol();
+		} else {
+			$symbol = !empty($coin->symbol2) ? $coin->symbol2 : (isset($coin->symbol) ? $coin->symbol : '');
+		}
+	} else {
+		$symbol = (string) $coin;
+	}
+
+	$symbol = preg_replace('/[^A-Z0-9_-]/', '', strtoupper(trim((string) $symbol)));
+	if ($symbol === '') return '';
+
+	return "/images/coin-{$symbol}.png";
+}
+
+/**
+ * Resolve the best available coin icon URL.
+ *
+ * Priority: canonical symbol path -> existing local path -> legacy id path.
+ * External URLs are passed through untouched.
+ */
+function yaamp_coin_image_url($coin)
+{
+	if (empty($coin)) return '';
+
+	if (is_array($coin)) {
+		$image = isset($coin['image']) ? $coin['image'] : '';
+		$id    = isset($coin['id']) ? (int) $coin['id'] : 0;
+	} elseif (is_object($coin)) {
+		$image = isset($coin->image) ? $coin->image : '';
+		$id    = isset($coin->id) ? (int) $coin->id : 0;
+	} else {
+		return '';
+	}
+
+	if ($image !== '' && stripos($image, 'http') === 0) return $image;
+
+	$root      = defined('YAAMP_HTDOCS') ? YAAMP_HTDOCS : dirname(dirname(dirname(__DIR__)));
+	$canonical = yaamp_coin_image_symbol($coin);
+	if ($canonical !== '' && is_file($root . $canonical)) return $canonical;
+	if ($image !== '' && is_file($root . $image)) return $image;
+
+	if ($id > 0) {
+		$legacy = "/images/coin-{$id}.png";
+		if (is_file($root . $legacy)) return $legacy;
+	}
+
+	return (string) $image;
+}
+
 function yaamp_geth_network_hashrate(WalletRPC $remote)
 {
 	$latest = $remote->eth_getBlockByNumber('latest', false);

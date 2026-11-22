@@ -212,7 +212,8 @@ class CoindbCommand extends CConsoleCommand
 		foreach ($coins as $coin) {
 			$coin = getdbo('db_coins', $coin["id"]);
 			$symbol = $coin->getOfficialSymbol();
-			$local = $this->basePath."/images/coin-{$symbol}.png";
+			$canonical = yaamp_coin_image_symbol($coin);
+			$local = $this->basePath.$canonical;
 			try {
 				$data = @ file_get_contents($url.$symbol.'.png');
 			} catch (Exception $e) {
@@ -222,7 +223,7 @@ class CoindbCommand extends CConsoleCommand
 			echo $symbol." icon found\n";
 			file_put_contents($local, $data);
 			if (filesize($local) > 0) {
-				$coin->image = "/images/coin-{$symbol}.png";
+				$coin->image = $canonical;
 				$nbUpdated += $coin->save();
 			}
 		}

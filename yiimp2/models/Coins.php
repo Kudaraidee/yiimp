@@ -232,6 +232,44 @@ class Coins extends ActiveRecord
 	}
 
 	/**
+	 * Canonical local icon path: symbol2 (official symbol) first, then symbol.
+	 * This is what all writers should persist instead of /images/coin-<id>.png.
+	 */
+	public static function imagePathFor($symbol, $symbol2 = null): string
+	{
+		$symbol = preg_replace('/[^A-Z0-9_-]/', '', strtoupper(trim((string) ($symbol2 ?: $symbol))));
+		return $symbol === '' ? '' : "/images/coin-{$symbol}.png";
+	}
+
+	/**
+	 * Resolve the best available icon path for a coin row.
+	 * Canonical symbol path wins; existing local and legacy id paths still work.
+	 */
+	public static function imageUrlFor(array $coin): string
+	{
+		$image = (string) ($coin['image'] ?? '');
+		if ($image !== '' && stripos($image, 'http') === 0) return $image;
+
+		$root      = defined('YIIMP_HTDOCS') ? YIIMP_HTDOCS : dirname(__DIR__) . '/web';
+		$canonical = self::imagePathFor($coin['symbol'] ?? '', $coin['symbol2'] ?? null);
+		if ($canonical !== '' && is_file($root . $canonical)) return $canonical;
+		if ($image !== '' && is_file($root . $image)) return $image;
+
+		$id = (int) ($coin['id'] ?? 0);
+		if ($id > 0) {
+			$legacy = "/images/coin-{$id}.png";
+			if (is_file($root . $legacy)) return $legacy;
+		}
+
+		return $image;
+	}
+
+	public function imageUrl(): string
+	{
+		return self::imageUrlFor($this->attributes);
+	}
+
+	/**
 	 * Canonical public block page URL: /coins/SYMBOL.
 	 *
 	 * Keep this in one place so every listing (mining, history, admin) agrees.

@@ -16,6 +16,7 @@ $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $conv       = Yii::$app->ConversionUtils;
 
 $symbol = $coin->getOfficialSymbol() ?: $coin->symbol;
+$icon   = $coin->imageUrl();
 
 // Only allow plain http(s) URLs coming from admin-editable fields.
 $safeUrl = static function ($value): ?string {
@@ -188,7 +189,7 @@ if ($isLegacy): ?>
 <div id='coin-details-card' class='main-left-box'>
     <div class='main-left-title'>
         <span class='cd-head-main'>
-            <span class='cd-ico'><?= Html::encode(strtoupper(substr((string) $symbol, 0, 3))) ?><?php if ($coin->image): ?><img src="<?= Html::encode($coin->image) ?>" alt="" onerror="this.remove()"><?php endif ?></span>
+            <span class='cd-ico'><?= Html::encode(strtoupper(substr((string) $symbol, 0, 3))) ?><?php if ($icon !== ''): ?><img src="<?= Html::encode($icon) ?>" alt="" onerror="this.remove()"><?php endif ?></span>
             <span><span class='cd-title'><?= Html::encode($coin->name) ?></span> <span class='cd-symbol'>(<?= Html::encode($symbol) ?>)</span></span>
         </span>
         <span class='cd-chips'>
@@ -232,8 +233,8 @@ if ($isLegacy): ?>
 <div class="card shadow-sm mb-3" id="coin-details-card">
     <div class="card-header py-2 d-flex align-items-center justify-content-between gap-2">
         <div class="d-flex align-items-center gap-2 min-w-0">
-            <?php if ($coin->image): ?>
-                <img src="<?= Html::encode($coin->image) ?>" width="24" height="24" class="rounded" style="object-fit:contain" onerror="this.style.display='none'" alt="">
+            <?php if ($icon !== ''): ?>
+                <img src="<?= Html::encode($icon) ?>" width="24" height="24" class="rounded" style="object-fit:contain" onerror="this.style.display='none'" alt="">
             <?php endif ?>
             <strong class="small text-truncate"><?= Html::encode($coin->name) ?></strong>
             <span class="text-muted small">(<?= Html::encode($symbol) ?>)</span>
@@ -284,8 +285,8 @@ if ($isLegacy): ?>
 <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm overflow-hidden mb-4" id="coin-details-card">
     <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2 min-w-0">
-            <?php if ($coin->image): ?>
-                <img src="<?= Html::encode($coin->image) ?>" width="24" height="24" class="rounded object-contain shrink-0" onerror="this.style.display='none'" alt="">
+            <?php if ($icon !== ''): ?>
+                <img src="<?= Html::encode($icon) ?>" width="24" height="24" class="rounded object-contain shrink-0" onerror="this.style.display='none'" alt="">
             <?php endif ?>
             <span class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate"><?= Html::encode($coin->name) ?></span>
             <span class="text-xs text-gray-400">(<?= Html::encode($symbol) ?>)</span>

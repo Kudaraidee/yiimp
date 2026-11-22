@@ -185,6 +185,7 @@ class CheckupCommand extends CConsoleCommand
 
 			$nbUpdated = 0; $nbDropped = 0;
 			foreach ($coins->findAll() as $coin) {
+				$canonical = yaamp_coin_image_symbol($coin);
 				if (!empty($coin->image)) {
 					if (file_exists($this->basePath.$coin->image)) {
 						$data = file_get_contents($this->basePath.$coin->image);
@@ -192,20 +193,22 @@ class CheckupCommand extends CConsoleCommand
 							unlink($this->basePath.$coin->image);
 							$coin->image = NULL;
 							$nbDropped += $coin->save();
+						} elseif ($canonical && $canonical != $coin->image && file_exists($this->basePath.$canonical)) {
+							$coin->image = $canonical;
+							$nbUpdated += $coin->save();
 						}
 						continue;
 					}
-					if (file_exists($this->basePath."/images/coin-$coin->symbol.png")) {
-						$coin->image = "/images/coin-$coin->symbol.png";
+					if ($canonical && file_exists($this->basePath.$canonical)) {
+						$coin->image = $canonical;
 						$nbUpdated += $coin->save();
+						continue;
 					}
-					if (!file_exists($this->basePath.$coin->image)) {
-						$coin->image = NULL;
-						$nbDropped += $coin->save();
-					}
+					$coin->image = NULL;
+					$nbDropped += $coin->save();
 				}
-				if (empty($coin->image) && file_exists($this->basePath."/images/coin-$coin->symbol.png")) {
-					$coin->image = "/images/coin-$coin->symbol.png";
+				if (empty($coin->image) && $canonical && file_exists($this->basePath.$canonical)) {
+					$coin->image = $canonical;
 					$nbUpdated += $coin->save();
 				}
 			}

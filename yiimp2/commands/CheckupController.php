@@ -74,6 +74,7 @@ class CheckupController extends Controller
         $dropped = 0;
 
         foreach ($coins as $coin) {
+            $canonical = Coins::imagePathFor($coin->symbol, $coin->symbol2);
             if (!empty($coin->image)) {
                 $path = $root . $coin->image;
                 if (file_exists($path)) {
@@ -82,19 +83,21 @@ class CheckupController extends Controller
                         unlink($path);
                         $coin->image = null;
                         $dropped += (int) $coin->save(false);
+                    } elseif ($canonical !== '' && $canonical !== $coin->image && file_exists($root . $canonical)) {
+                        $coin->image = $canonical;
+                        $updated += (int) $coin->save(false);
                     }
                     continue;
                 }
-                $auto = "/images/coin-{$coin->symbol}.png";
-                if (file_exists($root . $auto)) {
-                    $coin->image = $auto;
+                if ($canonical !== '' && file_exists($root . $canonical)) {
+                    $coin->image = $canonical;
                     $updated += (int) $coin->save(false);
-                } else {
-                    $coin->image = null;
-                    $dropped += (int) $coin->save(false);
+                    continue;
                 }
-            } elseif (file_exists($root . "/images/coin-{$coin->symbol}.png")) {
-                $coin->image = "/images/coin-{$coin->symbol}.png";
+                $coin->image = null;
+                $dropped += (int) $coin->save(false);
+            } elseif ($canonical !== '' && file_exists($root . $canonical)) {
+                $coin->image = $canonical;
                 $updated += (int) $coin->save(false);
             }
         }
