@@ -22,9 +22,11 @@ foreach ($blocks as $block) {
         $diffUser = (float) $conv->hash_to_difficulty($coin, $block->blockhash);
     }
 
-    $finder = '';
+    $finderFull = '';
+    $finder     = '';
     if (!empty($block->userid) && isset($accounts[$block->userid])) {
-        $finder = substr($accounts[$block->userid]->username, 0, 7) . '…';
+        $finderFull = (string) $accounts[$block->userid]->username;
+        $finder     = substr($finderFull, 0, 7) . '…' . substr($finderFull, -6);
     }
 
     $maturityEta = '';
@@ -38,6 +40,7 @@ foreach ($blocks as $block) {
         'diffBlock'   => $conv->round_difficulty($block->difficulty),
         'diffUser'    => $conv->round_difficulty($diffUser),
         'finder'      => $finder,
+        'finderFull'  => $finderFull,
         'maturityEta' => $maturityEta,
         'segwit'      => (bool) $block->segwit,
         'solo'        => $block->solo == 1,
@@ -269,7 +272,7 @@ CSS;
                     <span class='bk-cap'>share diff <?= Html::encode($r['diffUser']) ?></span>
                 </td>
                 <td>
-                    <span class='bk-finder'><?= Html::encode($finder) ?></span>
+                    <span class='bk-finder'<?= $r['finderFull'] !== '' ? ' title="' . Html::encode($r['finderFull']) . '"' : '' ?>><?= Html::encode($finder) ?></span>
                     <span class='bk-type <?= $typeClass ?>'><?= $typeLabel ?></span><?= $segwit ?>
                 </td>
                 <td>
@@ -355,7 +358,7 @@ CSS;
     </td>
     <td class="small text-end font-monospace"><?= Html::encode($r['diffBlock']) ?></td>
     <td class="small text-end font-monospace"><?= Html::encode($r['diffUser']) ?></td>
-    <td class="small"><?= Html::encode($r['finder']) ?></td>
+    <td class="small"<?= $r['finderFull'] !== '' ? ' title="' . Html::encode($r['finderFull']) . '"' : '' ?>><?= Html::encode($r['finder']) ?></td>
     <td class="small font-monospace" style="font-size:.78em;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
         <?= $coin->createExplorerLink($block->blockhash, ['hash' => $block->blockhash]) ?>
     </td>
@@ -457,7 +460,7 @@ CSS;
     <td class="px-3 py-1.5 text-right font-mono tabular-nums text-gray-500 dark:text-gray-400">
         <?= Html::encode($r['diffUser']) ?>
     </td>
-    <td class="px-3 py-1.5 text-gray-500 dark:text-gray-400"><?= Html::encode($r['finder']) ?></td>
+    <td class="px-3 py-1.5 text-gray-500 dark:text-gray-400"<?= $r['finderFull'] !== '' ? ' title="' . Html::encode($r['finderFull']) . '"' : '' ?>><?= Html::encode($r['finder']) ?></td>
     <td class="px-3 py-1.5 font-mono text-gray-400 dark:text-gray-500"
         style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
         <?= $coin->createExplorerLink($block->blockhash, ['hash' => $block->blockhash]) ?>

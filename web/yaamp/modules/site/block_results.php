@@ -139,13 +139,17 @@ foreach($db_blocks as $db_block)
 		$diff_user = hash_to_difficulty($coin, $db_block->blockhash);
 	echo '<td>'.round_difficulty($diff_user).'</td>';
 
+	$finderFull = '';
 	$finder = '';
 	if (!empty($db_block->userid)) {
 		$user = getdbo('db_accounts', $db_block->userid);
-		$finder = $user ? substr($user->username, 0, 7).'...' : '';
+		if ($user) {
+			$finderFull = $user->username;
+			$finder = substr($finderFull, 0, 7).'…'.substr($finderFull, -6);
+		}
 	}
-	
-	echo '<td>'.$finder.'</td>';
+
+	echo '<td'.($finderFull !== '' ? ' title="'.htmlspecialchars($finderFull, ENT_QUOTES, 'UTF-8').'"' : '').'>'.htmlspecialchars($finder, ENT_QUOTES, 'UTF-8').'</td>';
 	echo '<td style="font-size: .8em; font-family: monospace;">';
 	echo $coin->createExplorerLink($db_block->blockhash, array('hash'=>$db_block->blockhash));
 	echo "</td>";
