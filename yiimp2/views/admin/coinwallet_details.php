@@ -81,7 +81,10 @@ $catRowCls = function (string $cat) use ($isTailwind, $isLegacy): string {
 
 $catBadge = function (string $cat, string $title = '') use ($isTailwind, $isLegacy): string {
     $titleAttr = $title ? ' title="' . Html::encode($title) . '"' : '';
-    if ($isLegacy) return '<span' . $titleAttr . '>' . Html::encode($cat) . '</span>';
+    if ($isLegacy) {
+        $catCls = preg_replace('/[^a-z0-9_-]/i', '', $cat);
+        return '<span class="cwd-cat cwd-cat-' . $catCls . '"' . $titleAttr . '>' . Html::encode($cat) . '</span>';
+    }
     if (!$isTailwind) {
         $bs = ['orphan' => 'bg-danger', 'immature' => 'bg-warning text-dark',
                'generate' => 'bg-success', 'generated' => 'bg-success',
@@ -101,6 +104,113 @@ $catBadge = function (string $cat, string $title = '') use ($isTailwind, $isLega
     return '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ' . $tw . '"' . $titleAttr . '>' . Html::encode($cat) . '</span>';
 };
 
+if ($isLegacy) {
+    // Styles live inside the AJAX fragment: #main_results is replaced every 30s.
+    echo <<<'HTML'
+<div id="cwd">
+<style>
+#cwd { color: #334155; font-size: 11px; }
+#cwd a { color: #2c5aa0; text-decoration: none; }
+#cwd a:hover { color: #1f467f; text-decoration: underline; }
+#cwd a.red, #cwd a.red:visited { color: #b91c1c; }
+
+/* Balance strip */
+#cwd .cwd-balance {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
+    padding: 9px 12px; margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+}
+#cwd .cwd-bal { display: inline-flex; align-items: baseline; gap: 6px; padding-right: 12px; border-right: 1px solid #eef2f7; }
+#cwd .cwd-bal:last-child { border-right: 0; padding-right: 0; }
+#cwd .cwd-bal em {
+    font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #8a94a6; white-space: nowrap;
+}
+#cwd .cwd-bal b { color: #26385a; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+#cwd .cwd-bal small { color: #98a3b5; font-size: 9px; white-space: nowrap; }
+
+/* Cards */
+#cwd .cwd-card {
+    background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04); overflow: hidden; margin-bottom: 12px;
+}
+#cwd .cwd-card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 40px; padding: 9px 13px;
+    background: #f8fafc; border-bottom: 1px solid #e8eef6;
+}
+#cwd .cwd-title { color: #26385a; font-size: 13px; font-weight: 800; }
+#cwd .cwd-sub { color: #8a94a6; font-size: 10px; font-weight: 500; }
+#cwd .cwd-scope {
+    display: inline-block; border: 1px solid #d7e5ff; background: #eef4ff; color: #2c5aa0;
+    border-radius: 999px; padding: 2px 9px; line-height: 15px;
+    font-size: 9px; font-weight: 800; white-space: nowrap;
+}
+#cwd .cwd-scope.muted { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
+#cwd .cwd-scroll { overflow: auto; }
+#cwd #markets { max-height: 190px; }
+#cwd #transactions { max-height: 380px; }
+#cwd #sums { max-height: 420px; }
+
+/* Tables */
+#cwd .cwd-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+#cwd .cwd-table th {
+    position: sticky; top: 0; z-index: 1; background: #fff !important;
+    padding: 8px 9px !important; color: #8a94a6;
+    font-size: 9px !important; font-weight: 800 !important;
+    letter-spacing: .05em; text-transform: uppercase;
+    border-bottom: 1px solid #e2e8f0 !important; white-space: nowrap;
+}
+#cwd .cwd-table td {
+    padding: 7px 9px !important; border-bottom: 1px solid #eef2f7 !important;
+    vertical-align: middle;
+}
+#cwd .cwd-table tbody tr:last-child td { border-bottom: 0 !important; }
+#cwd .cwd-table tbody tr:hover td { background: #f7faff !important; }
+#cwd .cwd-table tbody tr.disabled td,
+#cwd .cwd-table tbody tr.orphan td { background: #fff8f8 !important; }
+#cwd .cwd-table tbody tr.disabled td:first-child,
+#cwd .cwd-table tbody tr.orphan td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
+#cwd .cwd-table td[align="right"] { text-align: right; }
+#cwd .cwd-table td[align="center"] { text-align: center; }
+#cwd #markets .cwd-table { min-width: 920px; }
+#cwd #infos .cwd-table { min-width: 980px; }
+#cwd #transactions .cwd-table { min-width: 720px; }
+#cwd #sums .cwd-table { min-width: 240px; }
+#cwd #infos img { border: 1px solid #e8eef6; border-radius: 6px; padding: 1px; background: #fff; }
+
+/* Category pills */
+#cwd .cwd-cat {
+    display: inline-block; border-radius: 999px; padding: 2px 8px;
+    border: 1px solid #e2e8f0; background: #f1f5f9; color: #64748b;
+    font-size: 9px; font-weight: 800; line-height: 14px;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+}
+#cwd .cwd-cat-orphan { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+#cwd .cwd-cat-immature { background: #fff5e6; border-color: #fde3b8; color: #b45309; }
+#cwd .cwd-cat-generate, #cwd .cwd-cat-generated { background: #e8f7ee; border-color: #ccebd8; color: #187d46; }
+#cwd .cwd-cat-receive { background: #eef4ff; border-color: #d7e5ff; color: #2c5aa0; }
+#cwd .cwd-cat-send, #cwd .cwd-cat-spent { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
+#cwd .cwd-cat-ticket { background: #ecfeff; border-color: #cffafe; color: #0e7490; }
+#cwd .cwd-cat-stake, #cwd .cwd-cat-unlock { background: #f5f3ff; border-color: #e9d5ff; color: #7c3aed; }
+
+/* Transactions + daily sums */
+#cwd .cwd-split { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 12px; align-items: start; }
+#cwd .cwd-main-col, #cwd .cwd-side-col { min-width: 0; }
+#cwd .loadfooter { background: #fcfdff; border-top: 1px solid #eef2f7; padding: 8px 13px; }
+#cwd .loadfooter a {
+    display: inline-block; border: 1px solid #dfe5ec; background: #fafbfc; color: #64748b;
+    border-radius: 999px; padding: 3px 10px; font-size: 10px; font-weight: 700;
+    line-height: 1.6; text-decoration: none;
+}
+#cwd .loadfooter a:hover { border-color: #b9d4ff; color: #2c5aa0; background: #f7faff; }
+#cwd .cwd-empty { color: #98a3b5; text-align: center; padding: 14px 9px; }
+@media (max-width: 1100px) { #cwd .cwd-split { grid-template-columns: 1fr; } }
+</style>
+HTML;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 1 — Balance summary
 // ══════════════════════════════════════════════════════════════════════════════
@@ -109,12 +219,14 @@ $owedLink = Html::a($owed, '/admin/earning?id=' . $coin->id);
 $clrLink  = Html::a($reserved1, '/admin/payments?id=' . $coin->id);
 
 if ($isLegacy) {
-    echo '<br>';
-    if (YIIMP_ALLOW_EXCHANGE && $reserved2 !== null) echo "Earnings {$reserved2} BTC, ";
-    echo "Balance (db) {$balance} {$symbol}";
-    echo ", Owned {$ownedFmt} {$symbol}";
-    echo ", Owed {$owedLink} {$symbol} ({$owed_btc} BTC)";
-    echo ", {$clrLink} {$symbol} cleared<br><br>";
+    echo '<div class="cwd-balance">';
+    if (YIIMP_ALLOW_EXCHANGE && $reserved2 !== null)
+        echo '<span class="cwd-bal"><em>Earnings</em><b>' . Html::encode($reserved2) . ' BTC</b></span>';
+    echo '<span class="cwd-bal"><em>Balance (db)</em><b>' . Html::encode($balance) . ' ' . Html::encode($symbol) . '</b></span>';
+    echo '<span class="cwd-bal"><em>Owned</em><b>' . Html::encode($ownedFmt) . ' ' . Html::encode($symbol) . '</b></span>';
+    echo '<span class="cwd-bal"><em>Owed</em><b>' . $owedLink . ' ' . Html::encode($symbol) . '</b><small>(' . Html::encode($owed_btc) . ' BTC)</small></span>';
+    echo '<span class="cwd-bal"><em>Cleared</em><b>' . $clrLink . ' ' . Html::encode($symbol) . '</b></span>';
+    echo '</div>';
 } elseif (!$isTailwind) {
     echo '<div class="d-flex flex-wrap gap-3 mb-3 small">';
     if (YIIMP_ALLOW_EXCHANGE && $reserved2 !== null)
@@ -151,7 +263,12 @@ $bookmarkAdd = Html::a('+', '/admin/bookmark-add?id=' . $coin->id, ['title' => '
 $mktHeaders = ['Market', 'Bid', 'Ask', 'Deposit / Send', 'Balance', 'Locked', 'Sent', 'Traded', 'Late', 'Message', $bookmarkAdd . ' Actions'];
 
 if ($isLegacy) {
-    echo '<div id="markets"><table class="dataGrid"><thead><tr>';
+    echo '<div class="cwd-card">';
+    echo '<div class="cwd-card-head"><span><span class="cwd-title">Markets &amp; Bookmarks</span>'
+       . '<span class="cwd-sub"> · exchange routes · deposit addresses</span></span>'
+       . '<span class="cwd-scope">' . count($markets) . (count($markets) === 1 ? ' market' : ' markets')
+       . ' · ' . count($bookmarks) . ' bookmarks</span></div>';
+    echo '<div id="markets" class="cwd-scroll"><table class="dataGrid cwd-table"><thead><tr>';
     foreach ($mktHeaders as $h) echo '<th>' . $h . '</th>';
     echo '</tr></thead><tbody>';
 } elseif (!$isTailwind) {
@@ -206,8 +323,8 @@ foreach ($markets as $market) {
 
     if ($isLegacy) {
         $actCell = $disabled
-            ? '<a href="/admin/market/enable?id=' . $market->id . '&en=1" title="Enable">enable</a>'
-            : '<a href="/admin/market/enable?id=' . $market->id . '&en=0" title="Disable">disable</a>';
+            ? '<a href="/admin/market/enable?id=' . $market->id . '&amp;en=1" title="Enable">enable</a>'
+            : '<a href="/admin/market/enable?id=' . $market->id . '&amp;en=0" title="Disable">disable</a>';
         $actCell .= ' &nbsp;<a href="/admin/market/delete?id=' . $market->id . '" title="Remove" class="red">delete</a>';
     } elseif (!$isTailwind) {
         $actCell = $disabled
@@ -313,7 +430,7 @@ foreach ($bookmarks as $bookmark) {
     }
 }
 
-if ($isLegacy) echo '</tbody></table></div>';
+if ($isLegacy) echo '</tbody></table></div></div>';
 elseif (!$isTailwind) echo '</tbody></table></div></div></div>';
 else echo '</tbody></table></div></div>';
 
@@ -323,7 +440,12 @@ else echo '</tbody></table></div></div>';
 $extraCols = ($PoS || $DCR ? 1 : 0) + ($DCR ? 1 : 0);
 
 if ($isLegacy) {
-    echo '<table id="infos" class="dataGrid"><thead><tr>';
+    echo '<div class="cwd-card">';
+    echo '<div class="cwd-card-head"><span><span class="cwd-title">Coin Info</span>'
+       . '<span class="cwd-sub"> · ' . Html::encode($coin->symbol) . ' · ' . Html::encode($coin->algo) . '</span></span>'
+       . '<span class="cwd-scope' . ($rpcAvailable ? '' : ' muted') . '">'
+       . ($rpcAvailable ? 'RPC online' : 'RPC offline') . '</span></div>';
+    echo '<div class="cwd-scroll"><table id="infos" class="dataGrid cwd-table"><thead><tr>';
     foreach (['', '', 'Name', 'Symbol', 'Algo', 'Difficulty', 'Blocks', 'Balance', 'BTC'] as $h)
         echo '<th>' . $h . '</th>';
     if ($PoS || $DCR) echo '<th>Stake</th>';
@@ -428,7 +550,8 @@ if (!$rpcAvailable) {
     echo "<td class='{$tdR}'>" . Html::encode((string) $index) . "</td>";
 }
 echo '</tr></tbody></table>';
-if (!$isLegacy) echo '</div></div></div>';
+if ($isLegacy) echo '</div></div>';
+else echo '</div></div></div>';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 4 — Transactions + Daily sums (side-by-side for AdminLTE/Tailwind)
@@ -524,7 +647,7 @@ foreach ($txs_array as $tx) {
 
 // ── Layout split ──────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    // legacy: transactions div first, sums float left (legacy CSS in coinwallet.php)
+    echo '<div class="cwd-split"><div class="cwd-main-col">';
 } elseif (!$isTailwind) {
     echo '<div class="row gx-3">';
     echo '<div class="col-12 col-xl-7">';
@@ -538,7 +661,11 @@ $moreUrl = '/admin/coinwallet?id=' . $coin->id . '&since=' . (time() - 31 * 8640
 $moreLink = Html::a('Show more transactions…', $moreUrl);
 
 if ($isLegacy) {
-    echo '<div id="transactions"><table class="dataGrid"><thead><tr>';
+    echo '<div class="cwd-card">';
+    echo '<div class="cwd-card-head"><span><span class="cwd-title">Transactions</span>'
+       . '<span class="cwd-sub"> · last ' . $maxrows . ' entries</span></span>'
+       . '<span class="cwd-scope">' . count($txs_array) . ' entries</span></div>';
+    echo '<div id="transactions" class="cwd-scroll"><table class="dataGrid cwd-table"><thead><tr>';
     foreach (['Time', 'Category', 'Amount', 'Height', 'Difficulty', 'Confirm', 'Address', 'Tx'] as $h)
         echo '<th>' . $h . '</th>';
     echo '</tr></thead><tbody>';
@@ -650,9 +777,11 @@ foreach ($txs_array as $tx) {
 }
 
 if ($isLegacy) {
-    echo '</tbody></table>';
-    echo '<div class="loadfooter" style="margin-top:4px;">' . $moreLink . '</div>';
-    echo '</div>'; // #transactions
+    echo '</tbody></table></div>'; // #transactions
+    echo '<div class="loadfooter">' . $moreLink . '</div>';
+    echo '</div>'; // card
+    echo '</div>'; // main column
+    echo '<div class="cwd-side-col">';
 } elseif (!$isTailwind) {
     echo '</tbody></table></div></div>';
     echo '<div class="card-footer small py-1">' . $moreLink . '</div></div>';
@@ -668,7 +797,10 @@ if ($isLegacy) {
 
 // ── Daily sums ────────────────────────────────────────────────────────────────
 if ($isLegacy) {
-    echo '<div id="sums"><table class="dataGrid"><thead><tr>';
+    echo '<div class="cwd-card">';
+    echo '<div class="cwd-card-head"><span><span class="cwd-title">Daily Summary</span>'
+       . '<span class="cwd-sub"> · by category</span></span></div>';
+    echo '<div id="sums" class="cwd-scroll"><table class="dataGrid cwd-table"><thead><tr>';
     foreach (['Day', 'Category', 'Sum', 'BTC'] as $h) echo '<th>' . $h . '</th>';
     echo '</tr></thead><tbody>';
 } elseif (!$isTailwind) {
@@ -693,7 +825,7 @@ if ($isLegacy) {
 
 if (empty($sums)) {
     $msg = '<i>No activity in the last 7 days</i>';
-    if ($isLegacy) echo '<tr class="ssrow"><td colspan="4">' . $msg . '</td></tr>';
+    if ($isLegacy) echo '<tr class="ssrow"><td colspan="4" class="cwd-empty">' . $msg . '</td></tr>';
     elseif (!$isTailwind) echo '<tr><td colspan="4" class="small text-muted p-2">' . $msg . '</td></tr>';
     else echo '<tr><td colspan="4" class="px-3 py-4 text-center text-gray-400 dark:text-gray-500">' . $msg . '</td></tr>';
 } else {
@@ -728,6 +860,9 @@ if (empty($sums)) {
 
 if ($isLegacy) {
     echo '</tbody></table></div>'; // #sums
+    echo '</div>'; // card
+    echo '</div></div>'; // side column + split
+    echo '</div>'; // #cwd
 } elseif (!$isTailwind) {
     echo '</tbody></table></div></div></div>';
     echo '</div></div>'; // col + row
