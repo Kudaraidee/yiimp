@@ -187,6 +187,11 @@ function BackendCoinsUpdate()
         else if ($coin->algo == 'randomscash') {
             $template = $remote->getblocktemplate('{"rules":["segwit"]}');
         }
+        // Lumenite Core v1.2 requires both rule sets even though segwit is
+        // active from height 1 and no mweb template fields are currently sent.
+        else if ($coin->algo == 'homescrypt') {
+            $template = $remote->getblocktemplate('{"rules":["segwit","mweb"]}');
+        }
         // Change for segwit
 		else if ($coin->usemweb) {
 			$template = $remote->getblocktemplate('{"rules":["segwit","mweb"]}');
