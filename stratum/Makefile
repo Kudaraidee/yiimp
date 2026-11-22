@@ -74,8 +74,8 @@ $(SOURCES_HOMESCRYPT): stratum.h homescrypt/homescrypt.h
 
 # HomeScrypt v1.2 consensus requires exact IEEE-754 fmaf rounding. Never build
 # this translation unit with fast-math or FP contraction.
-homescrypt/homescrypt.o: stratum.h homescrypt/homescrypt.h
-	$(CC) $(CFLAGS) $(SQLFLAGS) -ffp-contract=off -fno-fast-math -c $< -o $@
+homescrypt/homescrypt.o: homescrypt/homescrypt.cpp stratum.h homescrypt/homescrypt.h
+	$(CC) $(CFLAGS) $(SQLFLAGS) -ffp-contract=off -fno-fast-math -c homescrypt/homescrypt.cpp -o $@
 
 $(OUTPUT): $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDLIBS) $(LDFLAGS) -o $@
