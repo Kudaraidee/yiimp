@@ -169,24 +169,8 @@ class Coins extends ActiveRecord
             return [];
         }
 
-        if ($this->rpcencoding === 'GETH') {
-            // Geth usually disables admin_peers over the public RPC port; show
-            // the peer count and client string instead of an empty node list.
-            $lines = [];
-            $count = $remote->net_peerCount();
-            if (is_string($count) && preg_match('/^0x[0-9a-f]+$/i', $count)) {
-                $count = hexdec($count);
-            }
-            if ($count !== false && $count !== null) {
-                $lines[] = 'Peer count: ' . (int) $count;
-            }
-            $version = $remote->web3_clientVersion();
-            if (is_string($version) && $version !== '') {
-                $lines[] = 'Client: ' . $version;
-            }
-            return $lines;
-        }
-
+        // Geth now goes through the same path: WalletRPC maps admin_peers (or
+        // falls back to a synthetic peer-count row when admin is disabled).
         $list = $remote->getpeerinfo();
         if (!is_array($list)) {
             return [];
@@ -199,7 +183,24 @@ class Coins extends ActiveRecord
             if ($addr === '' || $this->isLocalPeerAddress($addr)) {
                 continue;
             }
+            if (is_array($peer) && !empty($peer['synthetic'])) {
+                continue; // informational "Peer count: N", not an address
+            }
             $lines[] = $prefix . $addr;
+        }
+
+        if (empty($lines) && $this->rpcencoding === 'GETH') {
+            $count = $remote->net_peerCount();
+            if (is_string($count) && preg_match('/^0x[0-9a-f]+$/i', $count)) {
+                $count = hexdec($count);
+            }
+            if ($count !== false && $count !== null) {
+                $lines[] = 'Peer count: ' . (int) $count;
+            }
+            $version = $remote->web3_clientVersion();
+            if (is_string($version) && $version !== '') {
+                $lines[] = 'Client: ' . $version;
+            }
         }
 
         sort($lines, SORT_STRING);

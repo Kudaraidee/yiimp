@@ -15,6 +15,14 @@ $conv       = Yii::$app->ConversionUtils;
 // Geth mining nodes disable the admin namespace: addnode/removenode do not
 // apply, and getpeerinfo returns a peer-count summary row instead of addresses.
 $isGeth     = $coin->rpcencoding === 'GETH';
+// Geth has no per-peer P2P byte counters; admin peers shows the bytes of the
+// local RPC probe instead. Ping is that probe's round-trip time.
+$rxTxTitle  = $isGeth
+    ? 'Geth has no per-peer P2P counters; values are bytes of the local RPC probe'
+    : 'Bytes received / sent';
+$pingTitle  = $isGeth
+    ? 'RPC request round-trip time, or TCP handshake time to the p2p port'
+    : 'Peer ping';
 
 $localHeight   = $info['blocks'] ?? 0;
 $addnodeLines  = [];
@@ -93,11 +101,11 @@ div.form { text-align:right; height:30px; width:350px; float:right;
     <th>Address</th>
     <th>Version</th>
     <th>Height</th>
-    <th>Ping</th>
+    <th title="<?= Html::encode($pingTitle) ?>">Ping</th>
     <th>Services</th>
     <th>Since</th>
     <th>Last</th>
-    <th>Rx / Tx (kB)</th>
+    <th title="<?= Html::encode($rxTxTitle) ?>">Rx / Tx (kB)</th>
     <th width="30"></th>
 </tr></thead>
 <tbody>
@@ -171,11 +179,11 @@ $this->registerJs("
         <th class="small">Address</th>
         <th class="small">Version</th>
         <th class="small text-end">Height</th>
-        <th class="small text-end">Ping</th>
+        <th class="small text-end" title="<?= Html::encode($pingTitle) ?>">Ping</th>
         <th class="small">Services</th>
         <th class="small">Since</th>
         <th class="small">Last</th>
-        <th class="small text-end">Rx / Tx (kB)</th>
+        <th class="small text-end" title="<?= Html::encode($rxTxTitle) ?>">Rx / Tx (kB)</th>
         <th data-sorter="false"></th>
     </tr></thead>
     <tbody>
@@ -288,11 +296,11 @@ Yii::$app->ViewUtils->JavascriptReady("
         <th class="px-3 py-2.5 text-left">Address</th>
         <th class="px-3 py-2.5 text-left">Version</th>
         <th class="px-3 py-2.5 text-right">Height</th>
-        <th class="px-3 py-2.5 text-right">Ping</th>
+        <th class="px-3 py-2.5 text-right" title="<?= Html::encode($pingTitle) ?>">Ping</th>
         <th class="px-3 py-2.5 text-left">Services</th>
         <th class="px-3 py-2.5 text-left">Since</th>
         <th class="px-3 py-2.5 text-left">Last</th>
-        <th class="px-3 py-2.5 text-right">Rx / Tx (kB)</th>
+        <th class="px-3 py-2.5 text-right" title="<?= Html::encode($rxTxTitle) ?>">Rx / Tx (kB)</th>
         <th class="px-3 py-2.5 w-12" data-sorter="false"></th>
     </tr>
     </thead>

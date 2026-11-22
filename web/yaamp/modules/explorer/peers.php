@@ -32,6 +32,7 @@ if(!empty($list))
 foreach($list as $peer)
 {
 	$node = arraySafeVal($peer,'addr');
+	if (!empty($peer['synthetic'])) continue; // "Peer count: N" is not an address
 	if (strstr($node,'127.0.0.1')) continue;
 	if (strstr($node,'192.168.')) continue;
 	if (strstr($node,'yiimp')) continue;

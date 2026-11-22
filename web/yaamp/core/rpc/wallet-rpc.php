@@ -110,12 +110,35 @@ class WalletRPC {
 		return $result;
 	}
 
-	/**
-	 * Geth's admin_peers does not report the remote peer height. Public nodes
-	 * usually answer eth_blockNumber on their RPC port, so query it directly.
-	 */
-	protected function ethPeerHeight($addr, $localChain, $deadline)
+	/** Time the TCP handshake to the peer's advertised devp2p address. */
+	protected function ethPeerTcpPing($addr, $deadline)
 	{
+		if (microtime(true) >= $deadline) return null;
+		$host = ''; $port = 0;
+		if (preg_match('/^(\d{1,3}(?:\.\d{1,3}){3}):(\d+)$/', $addr, $m)) {
+			$host = $m[1]; $port = (int) $m[2];
+		} elseif (preg_match('/^\[([^\]]+)\]:(\d+)$/', $addr, $m)) {
+			$host = $m[1]; $port = (int) $m[2];
+		}
+		if ($host === '' || $port < 1 || $port > 65535) return null;
+		if (filter_var($host, FILTER_VALIDATE_IP,
+				FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) return null;
+		$url = strpos($host, ':') === false ? "tcp://{$host}:{$port}" : "tcp://[{$host}]:{$port}";
+		$t0 = microtime(true);
+		$sock = @stream_socket_client($url, $errno, $errstr, 0.35, STREAM_CLIENT_CONNECT);
+		$rtt = microtime(true) - $t0;
+		if (!$sock) return null;
+		fclose($sock);
+		return $rtt;
+	}
+
+	/**
+	 * Probe a Geth peer's public JSON-RPC port for height, round-trip time and
+	 * the bytes exchanged (admin_peers exposes none of these).
+	 */
+	protected function ethPeerStats($addr, $localChain, $deadline)
+	{
+		$empty = array('height' => null, 'ping' => null, 'rx' => 0, 'tx' => 0);
 		$host = '';
 		if (preg_match('/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/', $addr, $m)) {
 			$host = $m[1];
@@ -124,9 +147,9 @@ class WalletRPC {
 		}
 		if ($host === '' || filter_var($host, FILTER_VALIDATE_IP,
 				FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-			return null;
+			return $empty;
 		}
-		if (!function_exists('curl_init') || microtime(true) >= $deadline) return null;
+		if (!function_exists('curl_init') || microtime(true) >= $deadline) return $empty;
 
 		$payload = json_encode(array(
 			array('jsonrpc' => '2.0', 'id' => 1, 'method' => 'eth_blockNumber', 'params' => array()),
@@ -141,11 +164,20 @@ class WalletRPC {
 			CURLOPT_CONNECTTIMEOUT_MS => 700,
 			CURLOPT_TIMEOUT_MS => 1500,
 		));
+		$t0 = microtime(true);
 		$resp = curl_exec($ch);
+		$rtt = microtime(true) - $t0;
 		curl_close($ch);
-		if (!is_string($resp)) return null;
+		if (!is_string($resp)) return $empty;
+		$stats = array(
+			'height' => null,
+			'ping' => $rtt,
+			'rx' => strlen($resp),
+			'tx' => strlen((string) $payload),
+		);
+
 		$data = json_decode($resp, true);
-		if (!is_array($data)) return null;
+		if (!is_array($data)) return $stats;
 
 		$block = null; $chain = null;
 		foreach ($data as $row) {
@@ -153,7 +185,7 @@ class WalletRPC {
 			if (isset($row['id']) && $row['id'] == 1) $block = isset($row['result']) ? $row['result'] : null;
 			if (isset($row['id']) && $row['id'] == 2) $chain = isset($row['result']) ? $row['result'] : null;
 		}
-		if (!is_string($block) || !preg_match('/^0x[0-9a-f]+$/i', $block)) return null;
+		if (!is_string($block) || !preg_match('/^0x[0-9a-f]+$/i', $block)) return $stats;
 		$expected = null;
 		if (is_string($localChain) && preg_match('/^0x[0-9a-f]+$/i', $localChain)) {
 			$expected = (int) hexdec($localChain);
@@ -161,9 +193,10 @@ class WalletRPC {
 			$expected = (int) $localChain;
 		}
 		if ($expected !== null && is_string($chain) && preg_match('/^0x[0-9a-f]+$/i', $chain)) {
-			if (hexdec($chain) !== $expected) return null;
+			if (hexdec($chain) !== $expected) return $stats;
 		}
-		return (int) hexdec($block);
+		$stats['height'] = (int) hexdec($block);
+		return $stats;
 	}
 
 	function __call($method, $params)
@@ -309,13 +342,16 @@ class WalletRPC {
 						$node = isset($network['remoteAddress']) ? $network['remoteAddress'] :
 							(isset($p['listenAddr']) ? $p['listenAddr'] :
 							(isset($p['ip']) ? $p['ip'] : (isset($p['enode']) ? $p['enode'] : '')));
-						$height = $this->ethPeerHeight($node, $localChain, $deadline);
+						$stats = $this->ethPeerStats($node, $localChain, $deadline);
+						$ping = $stats['ping'] !== null ? $stats['ping'] : $this->ethPeerTcpPing($node, $deadline);
 						$peers[] = array(
 							'addr' => $node, 'subver' => isset($p['name']) ? $p['name'] : '',
-							'currentheight' => $height !== null ? $height : 0, 'pingtime' => '', 'services' => $caps,
+							'currentheight' => $stats['height'] !== null ? $stats['height'] : 0,
+							'pingtime' => $ping !== null ? round($ping * 1000, 1).' ms' : '',
+							'services' => $caps,
 							'conntime' => time(), 'startingheight' => '',
 							'lastrecv' => time(), 'lastsend' => time(),
-							'bytesrecv' => 0, 'bytessent' => 0, 'synthetic' => false,
+							'bytesrecv' => $stats['rx'], 'bytessent' => $stats['tx'], 'synthetic' => false,
 						);
 					}
 				}

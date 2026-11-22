@@ -203,12 +203,16 @@ class WalletRPC
     }
 
     /**
-     * Query a peer's public JSON-RPC port for its current block height.
-     * Geth's admin_peers omits the remote peer height, but public bootnodes
-     * usually answer eth_blockNumber on their HTTP RPC port (8545).
+     * Probe a Geth peer's public JSON-RPC port. Geth's admin_peers has no
+     * height, ping or byte counters, so use the round-trip time and payload
+     * sizes of a real eth_blockNumber/eth_chainId request instead. Public
+     * bootnodes normally answer on port 8545.
+     *
+     * @return array{height:?int,ping:?float,rx:int,tx:int}
      */
-    private function ethPeerHeight(string $addr, mixed $localChain, float $deadline): ?int
+    private function ethPeerStats(string $addr, mixed $localChain, float $deadline): array
     {
+        $empty = ['height' => null, 'ping' => null, 'rx' => 0, 'tx' => 0];
         $host = '';
         if (preg_match('/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/', $addr, $m)) {
             $host = $m[1];
@@ -217,10 +221,10 @@ class WalletRPC
         }
         if ($host === '' || filter_var($host, FILTER_VALIDATE_IP,
                 FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-            return null;
+            return $empty;
         }
         if (!function_exists('curl_init') || microtime(true) >= $deadline) {
-            return null;
+            return $empty;
         }
 
         $payload = json_encode([
@@ -236,14 +240,23 @@ class WalletRPC
             CURLOPT_CONNECTTIMEOUT_MS => 700,
             CURLOPT_TIMEOUT_MS     => 1500,
         ]);
+        $t0   = microtime(true);
         $resp = curl_exec($ch);
+        $rtt  = microtime(true) - $t0;
         curl_close($ch);
         if (!is_string($resp)) {
-            return null;
+            return $empty;
         }
+        $stats = [
+            'height' => null,
+            'ping'   => $rtt,
+            'rx'     => strlen($resp),
+            'tx'     => strlen((string) $payload),
+        ];
+
         $data = json_decode($resp, true);
         if (!is_array($data)) {
-            return null;
+            return $stats;
         }
         $block = null;
         $chain = null;
@@ -258,7 +271,7 @@ class WalletRPC
             }
         }
         if (!is_string($block) || !preg_match('/^0x[0-9a-f]+$/i', $block)) {
-            return null;
+            return $stats;
         }
         // eth_chainId() on the local node is decoded to int; a raw hex string is
         // also accepted here for callers using etherRequest() directly.
@@ -270,10 +283,47 @@ class WalletRPC
         }
         if ($expected !== null && is_string($chain) && preg_match('/^0x[0-9a-f]+$/i', $chain)) {
             if (hexdec($chain) !== $expected) {
-                return null;
+                return $stats;
             }
         }
-        return (int) hexdec($block);
+        $stats['height'] = (int) hexdec($block);
+        return $stats;
+    }
+
+    /**
+     * Fallback ping for peers that do not expose an HTTP RPC port: time the TCP
+     * handshake to the advertised devp2p address. Only public IPs are probed.
+     */
+    private function ethPeerTcpPing(string $addr, float $deadline): ?float
+    {
+        if (microtime(true) >= $deadline) {
+            return null;
+        }
+        $host = '';
+        $port = 0;
+        if (preg_match('/^(\d{1,3}(?:\.\d{1,3}){3}):(\d+)$/', $addr, $m)) {
+            $host = $m[1];
+            $port = (int) $m[2];
+        } elseif (preg_match('/^\[([^\]]+)\]:(\d+)$/', $addr, $m)) {
+            $host = $m[1];
+            $port = (int) $m[2];
+        }
+        if ($host === '' || $port < 1 || $port > 65535) {
+            return null;
+        }
+        if (filter_var($host, FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return null;
+        }
+        $url = strpos($host, ':') === false ? "tcp://{$host}:{$port}" : "tcp://[{$host}]:{$port}";
+        $t0  = microtime(true);
+        $sock = @stream_socket_client($url, $errno, $errstr, 0.35, STREAM_CLIENT_CONNECT);
+        $rtt = microtime(true) - $t0;
+        if (!$sock) {
+            return null;
+        }
+        fclose($sock);
+        return $rtt;
     }
 
     /**
@@ -306,19 +356,20 @@ class WalletRPC
                 $caps = $p['caps'] ?? [];
                 $addr = (string) ($network['remoteAddress']
                     ?? ($p['listenAddr'] ?? ($p['ip'] ?? ($p['enode'] ?? ''))));
-                $height = $this->ethPeerHeight($addr, $localChain, $deadline);
+                $stats  = $this->ethPeerStats($addr, $localChain, $deadline);
+                $ping   = $stats['ping'] ?? $this->ethPeerTcpPing($addr, $deadline);
                 $peers[] = [
                     'addr'           => $addr,
                     'subver'         => (string) ($p['name'] ?? ''),
-                    'currentheight'  => $height ?? 0,
-                    'pingtime'       => '',
+                    'currentheight'  => $stats['height'] ?? 0,
+                    'pingtime'       => $ping !== null ? round($ping * 1000, 1) . ' ms' : '',
                     'services'       => is_array($caps) ? implode(' ', $caps) : (string) $caps,
                     'conntime'       => time(),
                     'startingheight' => '',
                     'lastrecv'       => time(),
                     'lastsend'       => time(),
-                    'bytesrecv'      => 0,
-                    'bytessent'      => 0,
+                    'bytesrecv'      => $stats['rx'],
+                    'bytessent'      => $stats['tx'],
                     'synthetic'      => false,
                 ];
             }

@@ -63,11 +63,11 @@ echo <<<end
 <th>Address</th>
 <th>Version</th>
 <th>Height</th>
-<th>Ping</th>
+<th title="<?= $isGeth ? 'RPC request round-trip time, or TCP handshake time to the p2p port' : 'Peer ping' ?>">Ping</th>
 <th>Services</th>
 <th>Since</th>
 <th>Last</th>
-<th>Rx / Tx (kB)</th>
+<th title="<?= $isGeth ? 'Geth has no per-peer P2P counters; values are bytes of the local RPC probe' : 'Bytes received / sent' ?>">Rx / Tx (kB)</th>
 <th width="30"></th>
 </tr>
 </thead><tbody>
