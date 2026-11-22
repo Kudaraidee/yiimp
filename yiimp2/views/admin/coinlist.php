@@ -18,6 +18,7 @@ $totalCoins      = $provider->totalCount;
 $coins           = $provider->models;
 $pageSizeOptions = [25, 50, 100, 250];
 $isTailwind      = Yii::$app->LayoutManager->isTailwind();
+$isLegacy        = Yii::$app->LayoutManager->isLegacy();
 
 // Keep long coin names, versions and error messages inside their cells.
 // The wrapper below scrolls horizontally on narrow screens.
@@ -39,6 +40,154 @@ $this->registerCss(<<<'CSS'
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* ── Legacy: same card language as /site/mining ───────────────────────────── */
+#cl-admin-bar {
+    background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
+    padding: 11px 14px 12px; margin: 12px 0 10px;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+    color: #334155; font-size: 11px;
+}
+#cl-bar-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+#cl-bar-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .12em;
+    color: #8a94a6; text-transform: uppercase; white-space: nowrap;
+}
+.cl-search {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 9px; border: 1px solid #dfe5ec; border-radius: 7px;
+    background: #fafbfc; color: #8a94a6;
+}
+.cl-search:focus-within { border-color: #a9c4ea; background: #fff; }
+.cl-search input {
+    width: 190px; border: 0; outline: 0; background: transparent;
+    font: 11px/1.4 inherit; color: #26385a;
+}
+.cl-search input::placeholder { color: #aab4c4; }
+.cl-btn {
+    border: 1px solid #dfe5ec; background: #fafbfc; color: #64748b;
+    border-radius: 999px; padding: 3px 10px; font-size: 10px;
+    font-weight: 700; line-height: 1.6; cursor: pointer; text-decoration: none;
+}
+.cl-btn:hover { border-color: #b9d4ff; color: #2c5aa0; background: #f7faff; }
+.cl-counts { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.cl-pill {
+    display: inline-block; border-radius: 999px; padding: 2px 9px;
+    font-size: 9px; font-weight: 800; line-height: 15px; white-space: nowrap;
+    border: 1px solid transparent;
+}
+.cl-pill.all { background: #eef4ff; color: #2c5aa0; border-color: #d7e5ff; }
+.cl-pill.run { background: #e8f7ee; color: #187d46; border-color: #ccebd8; }
+.cl-pill.installed { background: #fff5e6; color: #b45309; border-color: #fde3b8; }
+.cl-live {
+    display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    font-size: 11px; color: #5b6675;
+}
+.cl-live i {
+    width: 7px; height: 7px; border-radius: 50%; background: #2fae5a;
+    box-shadow: 0 0 0 3px rgba(47,174,90,.15);
+}
+#cl-bar-links {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    border-top: 1px solid #eef2f7; margin-top: 10px; padding-top: 9px;
+}
+#cl-bar-links .cl-bar-label { margin-right: 2px; }
+.cl-page {
+    display: inline-block; border: 1px solid #dfe5ec; background: #fafbfc;
+    color: #64748b; border-radius: 999px; padding: 3px 10px;
+    font-size: 10px; font-weight: 700; line-height: 1.6; text-decoration: none;
+}
+.cl-page:hover { border-color: #b9d4ff; color: #2c5aa0; }
+.cl-page.active { background: #2c5aa0; border-color: #2c5aa0; color: #fff; }
+.cl-add {
+    margin-left: auto; display: inline-block; background: #2c5aa0;
+    border: 1px solid #2c5aa0; color: #fff; border-radius: 999px;
+    padding: 3px 12px; font-size: 10px; font-weight: 800;
+    line-height: 1.6; text-decoration: none;
+}
+.cl-add:hover { background: #1f467f; border-color: #1f467f; color: #fff; }
+
+.cl-legacy.card {
+    border: 1px solid #d8e2ef !important; border-radius: 8px !important;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04) !important;
+    overflow: hidden; background: #fff; color: #334155; font-size: 11px;
+}
+.cl-legacy .cl-card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 40px; padding: 9px 13px;
+    background: #f8fafc; border-bottom: 1px solid #e8eef6;
+}
+.cl-legacy .cl-title { font-size: 13px; font-weight: 800; color: #26385a; }
+.cl-legacy .cl-sub { font-size: 10px; color: #8a94a6; font-weight: 500; }
+.cl-legacy .cl-scope {
+    font-size: 9px; font-weight: 800; color: #2c5aa0; background: #eef4ff;
+    border: 1px solid #d7e5ff; border-radius: 999px; padding: 2px 9px;
+    line-height: 15px; white-space: nowrap;
+}
+.cl-legacy .cl-summary {
+    display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 13px;
+    background: #fcfdff; border-bottom: 1px solid #eef2f7;
+    font-size: 10px; color: #8a94a6;
+}
+.cl-legacy .cl-summary b { color: #33405a; font-weight: 700; }
+.cl-legacy .cl-summary i {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: #2fae5a; box-shadow: 0 0 0 3px rgba(47,174,90,.12); margin-right: 5px;
+}
+.cl-legacy table#maintable {
+    width: 100% !important; min-width: 820px; margin: 0 !important;
+    border-collapse: collapse; table-layout: fixed;
+    font-size: 11px; color: #334155;
+}
+.cl-legacy table#maintable th {
+    background: #fff !important; padding: 8px 9px !important;
+    font-size: 9px !important; font-weight: 800 !important;
+    letter-spacing: .05em; text-transform: uppercase; color: #8a94a6;
+    border-bottom: 1px solid #e2e8f0 !important; white-space: nowrap;
+}
+.cl-legacy table#maintable td {
+    padding: 8px 9px !important; border-bottom: 1px solid #eef2f7 !important;
+    vertical-align: middle; font-size: 11px;
+}
+.cl-legacy table#maintable tbody tr:last-child td { border-bottom: 0; }
+.cl-legacy table#maintable tbody tr:hover td { background: #f7faff !important; }
+.cl-legacy table#maintable tbody tr.table-danger td { background: #fff8f8 !important; }
+.cl-legacy table#maintable tbody tr.table-danger td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
+.cl-legacy table#maintable td:first-child > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cl-legacy table#maintable td:first-child img {
+    width: 26px !important; height: 26px !important; object-fit: contain;
+    border: 1px solid #e8eef6; border-radius: 6px; background: #fff; padding: 2px;
+}
+.cl-legacy table#maintable td:first-child a:first-child {
+    color: #26385a; font-weight: 800; font-size: 11px; text-decoration: none;
+}
+.cl-legacy table#maintable td:first-child a:first-child:hover { color: #2c5aa0; }
+.cl-legacy table#maintable td:first-child a:last-child {
+    color: #94a3b8; font-size: 9px; font-family: ui-monospace, monospace; text-decoration: none;
+}
+.cl-legacy .badge {
+    border-radius: 999px !important; font-size: 9px !important;
+    font-weight: 800 !important; line-height: 15px; padding: 2px 8px !important;
+}
+.cl-legacy .badge.bg-success { background: #e8f7ee !important; color: #187d46 !important; border: 1px solid #ccebd8; }
+.cl-legacy .badge.bg-warning { background: #fff5e6 !important; color: #b45309 !important; border: 1px solid #fde3b8; }
+.cl-legacy .badge.bg-secondary { background: #f1f5f9 !important; color: #94a3b8 !important; border: 1px solid #e2e8f0; }
+.cl-legacy .badge.bg-light { background: #eef4ff !important; color: #2c5aa0 !important; border: 1px solid #d7e5ff; }
+.cl-legacy .card-footer {
+    background: #fcfdff !important; border-top: 1px solid #eef2f7 !important;
+    color: #98a3b5; font-size: 10px;
+}
+.cl-legacy .pagination { gap: 4px; margin: 0; }
+.cl-legacy .page-link {
+    border: 1px solid #dfe5ec !important; border-radius: 6px !important;
+    color: #64748b; font-size: 10px; padding: 3px 8px;
+}
+.cl-legacy .page-item.active .page-link { background: #2c5aa0; border-color: #2c5aa0; color: #fff; }
+@media (max-width: 720px) {
+    #cl-bar-head { align-items: flex-start; }
+    .cl-counts, .cl-live { margin-left: 0; }
+    .cl-search input { width: 140px; }
 }
 CSS);
 
@@ -326,8 +475,63 @@ document.addEventListener('DOMContentLoaded', function () {
      BOOTSTRAP 5 version  (legacy + AdminLTE)
      ══════════════════════════════════════════════════════════════════════════ -->
 
-<div class="card shadow-sm">
+<?php if ($isLegacy): ?>
+<div id="cl-admin-bar">
+    <div id="cl-bar-head">
+        <span id="cl-bar-label">Coins</span>
 
+        <?= Html::beginForm(['admin/coinlist'], 'get', ['class' => 'd-flex align-items-center gap-1']) ?>
+        <?= Html::hiddenInput('pageSize', $pageSize) ?>
+        <label class="cl-search">
+            <span aria-hidden="true">⌕</span>
+            <?= Html::textInput('q', $searchQuery, [
+                'placeholder'  => 'Search coins…',
+                'autocomplete' => 'off',
+                'aria-label'   => 'Search coins',
+            ]) ?>
+        </label>
+        <?= Html::submitButton('Search', ['class' => 'cl-btn']) ?>
+        <?php if ($searchQuery !== ''): ?>
+            <?= Html::a('✕', ['admin/coinlist', 'pageSize' => $pageSize],
+                ['class' => 'cl-btn', 'title' => 'Clear']) ?>
+        <?php endif ?>
+        <?= Html::endForm() ?>
+
+        <div class="cl-counts">
+            <span class="cl-pill all"><?= $totalCoins ?> coins</span>
+            <span class="cl-pill run"><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#187d46;margin-right:4px;"></i><?= $totalActive ?> running</span>
+            <span class="cl-pill installed"><?= $totalInstalled ?> installed</span>
+        </div>
+        <span class="cl-live"><i></i> pool db</span>
+    </div>
+    <div id="cl-bar-links">
+        <span class="cl-bar-label">Rows</span>
+        <?php foreach ($pageSizeOptions as $n): ?>
+            <?= Html::a($n, ['admin/coinlist', 'q' => $searchQuery, 'pageSize' => $n, 'page' => 1], [
+                'class' => 'cl-page' . ($n === $pageSize ? ' active' : ''),
+            ]) ?>
+        <?php endforeach ?>
+        <?= Html::a('+ Add coin', ['/admin/coin_create'], ['class' => 'cl-add']) ?>
+    </div>
+</div>
+<?php endif ?>
+
+<div class="card shadow-sm cl-card<?= $isLegacy ? ' cl-legacy' : '' ?>">
+
+<?php if ($isLegacy): ?>
+    <div class="cl-card-head">
+        <span><span class="cl-title">Coin list</span><span class="cl-sub"> · catalog · node status · markets</span></span>
+        <span class="cl-scope"><?= $totalCoins ?> coins</span>
+    </div>
+    <div class="cl-summary">
+        <span><i></i><b><?= $totalCoins ?> coins</b> in catalog</span>
+        <span>Running <b><?= $totalActive ?></b></span>
+        <span>Installed <b><?= $totalInstalled ?></b></span>
+        <?php if ($searchQuery !== ''): ?>
+            <span>Filter <b><?= Html::encode($searchQuery) ?></b></span>
+        <?php endif ?>
+    </div>
+<?php else: ?>
     <div class="card-header d-flex align-items-center gap-2 flex-wrap py-2">
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-secondary"><?= $totalCoins ?> coins</span>
@@ -361,6 +565,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         <?= Html::a('+ Add coin', ['/admin/coin_create'], ['class' => 'btn btn-sm btn-success']) ?>
     </div>
+<?php endif ?>
 
     <?php if ($totalCoins === 0): ?>
     <div class="card-body">
