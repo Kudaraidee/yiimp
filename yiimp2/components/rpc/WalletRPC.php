@@ -202,6 +202,73 @@ class WalletRPC
         return $result;
     }
 
+    /**
+     * Bitcoin-style getpeerinfo for Ethereum nodes.
+     *
+     * Geth only exposes the detailed peer list through the optional `admin`
+     * namespace, which mining nodes normally leave disabled. Try it first, then
+     * fall back to a single informational row built from net_peerCount() and
+     * web3_clientVersion() so the admin peers page is never blank.
+     */
+    private function ethPeerInfo(): array
+    {
+        /** @var EthereumRPC $eth */
+        $eth   = $this->rpc;
+        $saved = $this->error;
+        $peers = [];
+
+        $raw = $eth->etherRequest('admin_peers', []);
+        if (is_array($raw)) {
+            foreach ($raw as $p) {
+                if (!is_array($p)) {
+                    continue;
+                }
+                $caps = $p['caps'] ?? [];
+                $peers[] = [
+                    'addr'           => (string) ($p['listenAddr'] ?? ($p['ip'] ?? ($p['enode'] ?? ''))),
+                    'subver'         => (string) ($p['name'] ?? ''),
+                    'currentheight'  => 0,
+                    'pingtime'       => '',
+                    'services'       => is_array($caps) ? implode(' ', $caps) : (string) $caps,
+                    'conntime'       => time(),
+                    'startingheight' => '',
+                    'lastrecv'       => time(),
+                    'lastsend'       => time(),
+                    'bytesrecv'      => 0,
+                    'bytessent'      => 0,
+                    'synthetic'      => false,
+                ];
+            }
+        }
+
+        if (empty($peers)) {
+            $count   = $eth->net_peerCount();
+            $version = $eth->web3_clientVersion();
+            if (is_string($count) && preg_match('/^0x[0-9a-f]+$/i', $count)) {
+                $count = hexdec($count);
+            }
+            $peers[] = [
+                'addr'           => 'Peer count: ' . (int) $count,
+                'subver'         => is_string($version) ? $version : '',
+                'currentheight'  => 0,
+                'pingtime'       => '',
+                'services'       => '',
+                'conntime'       => time(),
+                'startingheight' => '',
+                'lastrecv'       => time(),
+                'lastsend'       => time(),
+                'bytesrecv'      => 0,
+                'bytessent'      => 0,
+                'synthetic'      => true,
+            ];
+        }
+
+        // admin_peers is unavailable on most mining nodes; do not surface that
+        // failed probe as a page-level RPC error.
+        $this->error = $saved;
+        return $peers;
+    }
+
     // -------------------------------------------------------------------------
     // Unified API (called by pool backend logic)
     // -------------------------------------------------------------------------
@@ -351,6 +418,8 @@ class WalletRPC
                     return false;
 
                 case 'getpeerinfo':
+                    return $this->ethPeerInfo();
+
                 case 'listsinceblock':
                     return [];
 

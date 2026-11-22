@@ -15,6 +15,10 @@ echo getAdminWalletLinks($coin, $info, 'peers').'<br/><br/>';
 JavascriptFile("/yaamp/ui/js/jquery.metadata.js");
 JavascriptFile("/yaamp/ui/js/jquery.tablesorter.widgets.js");
 
+// Geth mining nodes hide their peer list behind the admin RPC namespace; the
+// fallback row is informational and addnode/removenode do not apply.
+$isGeth = $coin->rpcencoding == 'GETH';
+
 echo <<<end
 <style type="text/css">
 td.red { color: darkred; }
@@ -23,6 +27,9 @@ div.form { text-align: right; height: 30px; width: 350px; float: right; margin-t
 .main-submit-button { cursor: pointer; }
 </style>
 
+end;
+
+if (!$isGeth) echo <<<end
 <div class="form">
 <form action="/admin/coinpeerAdd?id={$coin->id}" method="post" style="padding: 8px;">
 <input type="text" name="node" class="main-text-input" placeholder="addr[:port]" autocomplete="off" style="width: 150px; margin-right: 4px;">
@@ -79,7 +86,7 @@ foreach($list as $peer)
 
 	$node = arraySafeVal($peer,'addr');
 	echo '<td>'.$node.'</td>';
-	$addnode[] = ($coin->rpcencoding=='DCR' ? 'addpeer=' : 'addnode=') . $node;
+	if (!$isGeth) $addnode[] = ($coin->rpcencoding=='DCR' ? 'addpeer=' : 'addnode=') . $node;
 
 	$peerver = trim(arraySafeVal($peer,'subver'),'/');
 	$version = max($version, $peerver);
@@ -109,8 +116,10 @@ foreach($list as $peer)
 		echo '<td></td>';
 
 	echo '<td>';
-	$options = array('class'=>'red', 'title'=>'Disconnect from node');
-	echo CHtml::link('remove','/admin/coinpeerRemove?id='.$coin->id.'&node='.$node, $options);
+	if (!$isGeth) {
+		$options = array('class'=>'red', 'title'=>'Disconnect from node');
+		echo CHtml::link('remove','/admin/coinpeerRemove?id='.$coin->id.'&node='.$node, $options);
+	}
 	echo '</td>';
 
 	echo '</tr>';

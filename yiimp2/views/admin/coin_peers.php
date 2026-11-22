@@ -12,6 +12,9 @@ $this->title = 'Peers — ' . $coin->symbol;
 $isTailwind = Yii::$app->LayoutManager->isTailwind();
 $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $conv       = Yii::$app->ConversionUtils;
+// Geth mining nodes disable the admin namespace: addnode/removenode do not
+// apply, and getpeerinfo returns a peer-count summary row instead of addresses.
+$isGeth     = $coin->rpcencoding === 'GETH';
 
 $localHeight   = $info['blocks'] ?? 0;
 $addnodeLines  = [];
@@ -22,7 +25,9 @@ $peers = [];
 foreach ($list as $peer) {
     $node    = $peer['addr'] ?? '';
     $prefix  = $coin->rpcencoding === 'DCR' ? 'addpeer=' : 'addnode=';
-    $addnodeLines[] = $prefix . $node;
+    if (!$isGeth) {
+        $addnodeLines[] = $prefix . $node;
+    }
 
     $peerVer = trim($peer['subver'] ?? '', '/');
     if ($peerVer > $latestVersion) $latestVersion = $peerVer;
@@ -65,6 +70,7 @@ div.form { text-align:right; height:30px; width:350px; float:right;
 .main-submit-button { cursor:pointer; }
 </style>
 
+<?php if (!$isGeth): ?>
 <div class="form">
     <form action="<?= Html::encode($addNodeAction) ?>" method="post" style="padding:8px;">
         <?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
@@ -73,6 +79,7 @@ div.form { text-align:right; height:30px; width:350px; float:right;
         <input type="submit" value="Add node" class="main-submit-button">
     </form>
 </div>
+<?php endif ?>
 
 <?php foreach (['error', 'success'] as $t): ?>
 <?php if (Yii::$app->session->hasFlash($t)): ?>
@@ -103,7 +110,7 @@ div.form { text-align:right; height:30px; width:350px; float:right;
     <td><?= $conv->datetoa2($p['connTime']) ?> (<?= (int) $p['startHeight'] ?>)</td>
     <td><?= $conv->datetoa2(max($p['lastRecv'], $p['lastSend'])) ?></td>
     <td><?= ($p['bytesRecv'] + $p['bytesSent']) ? Html::encode("{$p['bytesRecv']} / {$p['bytesSent']}") : '' ?></td>
-    <td><?= Html::a('remove', $p['removeUrl'], ['class' => 'red', 'title' => 'Disconnect']) ?></td>
+    <td><?php if (!$isGeth) echo Html::a('remove', $p['removeUrl'], ['class' => 'red', 'title' => 'Disconnect']); ?></td>
 </tr>
 <?php endforeach ?>
 </tbody>
@@ -136,6 +143,7 @@ $this->registerJs("
      ══════════════════════════════════════════════════════════════════════════ -->
 <div class="d-flex align-items-start justify-content-between gap-3 mb-3 flex-wrap">
     <div><?= Yii::$app->ViewUtils->getAdminWalletLinks($coin, $info, 'peers') ?></div>
+    <?php if (!$isGeth): ?>
     <form action="<?= Html::encode($addNodeAction) ?>" method="post"
           class="d-flex gap-2 align-items-center shrink-0">
         <?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
@@ -145,6 +153,7 @@ $this->registerJs("
             <i class="bi bi-plus-circle me-1"></i>Add node
         </button>
     </form>
+    <?php endif ?>
 </div>
 
 <?= \app\widgets\Alert::widget() ?>
@@ -189,10 +198,10 @@ $this->registerJs("
             <?= ($p['bytesRecv'] + $p['bytesSent']) ? Html::encode("{$p['bytesRecv']} / {$p['bytesSent']}") : '' ?>
         </td>
         <td class="text-center">
-            <?= Html::a('remove', $p['removeUrl'], [
+            <?php if (!$isGeth) echo Html::a('remove', $p['removeUrl'], [
                 'class' => 'text-danger small',
                 'title' => 'Disconnect from node',
-            ]) ?>
+            ]); ?>
         </td>
     </tr>
     <?php endforeach ?>
@@ -236,6 +245,7 @@ Yii::$app->ViewUtils->JavascriptReady("
      ══════════════════════════════════════════════════════════════════════════ -->
 <div class="flex items-start justify-between gap-3 mb-4 flex-wrap">
     <div><?= Yii::$app->ViewUtils->getAdminWalletLinks($coin, $info, 'peers') ?></div>
+    <?php if (!$isGeth): ?>
     <form action="<?= Html::encode($addNodeAction) ?>" method="post"
           class="flex gap-2 items-center shrink-0">
         <?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
@@ -252,6 +262,7 @@ Yii::$app->ViewUtils->JavascriptReady("
             <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>Add node
         </button>
     </form>
+    <?php endif ?>
 </div>
 
 <?= \app\widgets\Alert::widget() ?>
@@ -321,10 +332,10 @@ Yii::$app->ViewUtils->JavascriptReady("
             <?= ($p['bytesRecv'] + $p['bytesSent']) ? Html::encode("{$p['bytesRecv']} / {$p['bytesSent']}") : '' ?>
         </td>
         <td class="px-3 py-2 text-center">
-            <?= Html::a('remove', $p['removeUrl'], [
+            <?php if (!$isGeth) echo Html::a('remove', $p['removeUrl'], [
                 'class' => 'text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-400 transition-colors',
                 'title' => 'Disconnect from node',
-            ]) ?>
+            ]); ?>
         </td>
     </tr>
     <?php endforeach ?>

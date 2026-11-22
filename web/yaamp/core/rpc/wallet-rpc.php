@@ -234,7 +234,40 @@ class WalletRPC {
 				return false; //$this->rpc->eth_getWork(); auto enable miner!
 			// todo...
 			case 'getpeerinfo':
+				// Geth hides its peer list behind the optional admin namespace. Try
+				// admin_peers, then fall back to the peer count + client string so
+				// the admin peers page is not blank on mining nodes.
+				$saved = $this->error;
 				$peers = array();
+				$raw = $this->rpc->ether_request('admin_peers', array());
+				if (is_array($raw)) {
+					foreach ($raw as $p) {
+						if (!is_array($p)) continue;
+						$caps = isset($p['caps']) && is_array($p['caps']) ? implode(' ', $p['caps']) : '';
+						$node = isset($p['listenAddr']) ? $p['listenAddr'] :
+							(isset($p['ip']) ? $p['ip'] : (isset($p['enode']) ? $p['enode'] : ''));
+						$peers[] = array(
+							'addr' => $node, 'subver' => isset($p['name']) ? $p['name'] : '',
+							'currentheight' => 0, 'pingtime' => '', 'services' => $caps,
+							'conntime' => time(), 'startingheight' => '',
+							'lastrecv' => time(), 'lastsend' => time(),
+							'bytesrecv' => 0, 'bytessent' => 0, 'synthetic' => false,
+						);
+					}
+				}
+				if (empty($peers)) {
+					$count = $this->rpc->net_peerCount();
+					$version = $this->rpc->web3_clientVersion();
+					$peers[] = array(
+						'addr' => 'Peer count: '.(int)$count,
+						'subver' => is_string($version) ? $version : '',
+						'currentheight' => 0, 'pingtime' => '', 'services' => '',
+						'conntime' => time(), 'startingheight' => '',
+						'lastrecv' => time(), 'lastsend' => time(),
+						'bytesrecv' => 0, 'bytessent' => 0, 'synthetic' => true,
+					);
+				}
+				$this->error = $saved;
 				return $peers;
 			case 'listtransactions':
 				$txs = array();
