@@ -40,6 +40,14 @@ class WalletRPC
     private mixed   $height   = 0;
     private mixed   $ethHead  = null;
 
+    /**
+     * Geth has no Bitcoin-style listtransactions RPC and native transfers do
+     * not appear in eth_getLogs. Bound the block scan used to reconstruct the
+     * admin wallet transaction list so the page stays responsive.
+     */
+    private const ETH_TX_MIN_SCAN_BLOCKS = 1000;
+    private const ETH_TX_MAX_SCAN_BLOCKS = 5000;
+
     /** Monero: full coin model (needed for master_wallet in getblocktemplate) */
     private mixed $coin = null;
 
@@ -343,9 +351,11 @@ class WalletRPC
                     return false;
 
                 case 'getpeerinfo':
-                case 'listtransactions':
                 case 'listsinceblock':
                     return [];
+
+                case 'listtransactions':
+                    return $this->ethListTransactions($params);
 
                 default:
                     $res         = $eth->etherRequest($method, $params);
@@ -560,6 +570,106 @@ class WalletRPC
 
         $this->error = $this->rpc->getError();
         return $res;
+    }
+
+    /**
+     * Reconstruct a Bitcoin-like transaction list for Ethereum wallets.
+     *
+     * Geth has no listtransactions RPC and native transfers are not exposed by
+     * eth_getLogs, so scan a bounded number of recent blocks for transactions
+     * involving the requested account (or all known accounts for '*'). Block
+     * rewards mined to a wallet address are included as `generate` rows.
+     */
+    private function ethListTransactions(array $params): array
+    {
+        /** @var EthereumRPC $eth */
+        $eth     = $this->rpc;
+        $account = strtolower((string) ($params[0] ?? ''));
+        $count   = max(1, min(2500, (int) ($params[1] ?? 500)));
+
+        $wanted = [];
+        if ($account !== '' && $account !== '*') {
+            $wanted = [$account];
+        } else {
+            foreach ($this->accounts ?? [] as $addr) {
+                $wanted[] = strtolower((string) $addr);
+            }
+        }
+        $wanted = array_values(array_unique(array_filter($wanted)));
+        if (empty($wanted)) {
+            return [];
+        }
+
+        $head = (int) $eth->eth_blockNumber();
+        if ($head <= 0) {
+            $this->error = $eth->getError();
+            return [];
+        }
+
+        // More requested rows => scan more history, within a hard cap.
+        $scan = max(self::ETH_TX_MIN_SCAN_BLOCKS, min(self::ETH_TX_MAX_SCAN_BLOCKS, $count * 4));
+        $from = max(0, $head - $scan + 1);
+        $rows = [];
+
+        for ($n = $head; $n >= $from && count($rows) < $count; $n--) {
+            $block = $eth->eth_getBlockByNumber('0x' . dechex($n), true);
+            if (!is_object($block)) {
+                continue;
+            }
+
+            $blockHash = (string) ($block->hash ?? '');
+            $time      = (int) $eth->decodeHex((string) ($block->timestamp ?? '0x0'));
+            $confs     = $head - $n + 1;
+            $miner     = strtolower((string) ($block->miner ?? ''));
+
+            if (in_array($miner, $wanted, true)) {
+                $rows[] = [
+                    'blockhash'     => $blockHash,
+                    'time'          => $time,
+                    'category'      => 'generate',
+                    'amount'        => (float) ($this->coin->reward ?? 0),
+                    'address'       => (string) ($block->miner ?? ''),
+                    'confirmations' => $confs,
+                ];
+                if (count($rows) >= $count) {
+                    break;
+                }
+            }
+
+            $txs = $block->transactions ?? [];
+            if (!is_array($txs)) {
+                continue;
+            }
+            foreach ($txs as $tx) {
+                if (!is_object($tx)) {
+                    continue;
+                }
+                $fromAddr = strtolower((string) ($tx->from ?? ''));
+                $toAddr   = strtolower((string) ($tx->to   ?? ''));
+                $receive  = in_array($toAddr, $wanted, true);
+                $send     = in_array($fromAddr, $wanted, true);
+                if (!$receive && !$send) {
+                    continue;
+                }
+
+                $value = (float) $eth->decodeHex((string) ($tx->value ?? '0x0')) / 1e18;
+                $rows[] = [
+                    'txid'          => (string) ($tx->hash ?? ''),
+                    'blockhash'     => $blockHash,
+                    'time'          => $time,
+                    'category'      => $receive ? 'receive' : 'send',
+                    'amount'        => $receive ? $value : -$value,
+                    'address'       => $receive ? (string) ($tx->from ?? '') : (string) ($tx->to ?? ''),
+                    'confirmations' => $confs,
+                ];
+                if (count($rows) >= $count) {
+                    break 2;
+                }
+            }
+        }
+
+        $this->error = $eth->getError();
+        return $rows;
     }
 
     // Passthrough property access to the underlying connector
