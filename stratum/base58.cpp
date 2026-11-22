@@ -100,7 +100,10 @@ bool base58_decode(const char *input, char *output)
 int base58_address_version(const char *input)
 {
 	unsigned char output_bin[32] = { 0 };
-	if (!_blkmk_b58tobin(output_bin, sizeof(output_bin), input, 0))
+	// Decode exactly one Base58Check payload (25 bytes). Decoding into a
+	// larger buffer left the version byte at a higher offset and returned 0
+	// for every address, so P2SH dev-fund addresses were paid to P2PKH.
+	if (!_blkmk_b58tobin(output_bin, 25, input, 0))
 		return -1;
 
 	return output_bin[0];
