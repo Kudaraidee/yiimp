@@ -93,7 +93,8 @@ foreach($list as $peer)
 	echo '<td>'.$peerver.'</td>';
 
 	$height = arraySafeVal($peer,'currentheight');
-	$class = abs($height - $localheight) > 5 ? 'red' : '';
+	// Geth peers without a public RPC report 0 = unknown, not out of sync.
+	$class = $height > 0 && abs($height - $localheight) > 5 ? 'red' : '';
 	if (!$height) $height = arraySafeVal($peer,'synced_blocks');
 	echo '<td class="'.$class.'">'.$height.'</td>';
 

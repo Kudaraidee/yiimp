@@ -110,6 +110,62 @@ class WalletRPC {
 		return $result;
 	}
 
+	/**
+	 * Geth's admin_peers does not report the remote peer height. Public nodes
+	 * usually answer eth_blockNumber on their RPC port, so query it directly.
+	 */
+	protected function ethPeerHeight($addr, $localChain, $deadline)
+	{
+		$host = '';
+		if (preg_match('/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/', $addr, $m)) {
+			$host = $m[1];
+		} elseif (preg_match('/^\[([^\]]+)\]:\d+$/', $addr, $m)) {
+			$host = $m[1];
+		}
+		if ($host === '' || filter_var($host, FILTER_VALIDATE_IP,
+				FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+			return null;
+		}
+		if (!function_exists('curl_init') || microtime(true) >= $deadline) return null;
+
+		$payload = json_encode(array(
+			array('jsonrpc' => '2.0', 'id' => 1, 'method' => 'eth_blockNumber', 'params' => array()),
+			array('jsonrpc' => '2.0', 'id' => 2, 'method' => 'eth_chainId', 'params' => array()),
+		));
+		$ch = curl_init('http://'.$host.':8545/');
+		curl_setopt_array($ch, array(
+			CURLOPT_POST => true,
+			CURLOPT_POSTFIELDS => $payload,
+			CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_CONNECTTIMEOUT_MS => 700,
+			CURLOPT_TIMEOUT_MS => 1500,
+		));
+		$resp = curl_exec($ch);
+		curl_close($ch);
+		if (!is_string($resp)) return null;
+		$data = json_decode($resp, true);
+		if (!is_array($data)) return null;
+
+		$block = null; $chain = null;
+		foreach ($data as $row) {
+			if (!is_array($row)) continue;
+			if (isset($row['id']) && $row['id'] == 1) $block = isset($row['result']) ? $row['result'] : null;
+			if (isset($row['id']) && $row['id'] == 2) $chain = isset($row['result']) ? $row['result'] : null;
+		}
+		if (!is_string($block) || !preg_match('/^0x[0-9a-f]+$/i', $block)) return null;
+		$expected = null;
+		if (is_string($localChain) && preg_match('/^0x[0-9a-f]+$/i', $localChain)) {
+			$expected = (int) hexdec($localChain);
+		} elseif (is_numeric($localChain)) {
+			$expected = (int) $localChain;
+		}
+		if ($expected !== null && is_string($chain) && preg_match('/^0x[0-9a-f]+$/i', $chain)) {
+			if (hexdec($chain) !== $expected) return null;
+		}
+		return (int) hexdec($block);
+	}
+
 	function __call($method, $params)
 	{
 		if (stripos($method, "dump") !== false || stripos($method, "backupwallet") !== false) {
@@ -239,16 +295,24 @@ class WalletRPC {
 				// the admin peers page is not blank on mining nodes.
 				$saved = $this->error;
 				$peers = array();
+				$localChain = $this->rpc->ether_request('eth_chainId', array());
+				$deadline = microtime(true) + 4.0;
 				$raw = $this->rpc->ether_request('admin_peers', array());
 				if (is_array($raw)) {
-					foreach ($raw as $p) {
+					foreach (array_slice($raw, 0, 12) as $p) {
+						// JSON-RPC decodes each peer as stdClass, some nodes as array.
+						if (is_object($p)) $p = (array) $p;
 						if (!is_array($p)) continue;
 						$caps = isset($p['caps']) && is_array($p['caps']) ? implode(' ', $p['caps']) : '';
-						$node = isset($p['listenAddr']) ? $p['listenAddr'] :
-							(isset($p['ip']) ? $p['ip'] : (isset($p['enode']) ? $p['enode'] : ''));
+						$network = isset($p['network']) ? $p['network'] : array();
+						if (is_object($network)) $network = (array) $network;
+						$node = isset($network['remoteAddress']) ? $network['remoteAddress'] :
+							(isset($p['listenAddr']) ? $p['listenAddr'] :
+							(isset($p['ip']) ? $p['ip'] : (isset($p['enode']) ? $p['enode'] : '')));
+						$height = $this->ethPeerHeight($node, $localChain, $deadline);
 						$peers[] = array(
 							'addr' => $node, 'subver' => isset($p['name']) ? $p['name'] : '',
-							'currentheight' => 0, 'pingtime' => '', 'services' => $caps,
+							'currentheight' => $height !== null ? $height : 0, 'pingtime' => '', 'services' => $caps,
 							'conntime' => time(), 'startingheight' => '',
 							'lastrecv' => time(), 'lastsend' => time(),
 							'bytesrecv' => 0, 'bytessent' => 0, 'synthetic' => false,

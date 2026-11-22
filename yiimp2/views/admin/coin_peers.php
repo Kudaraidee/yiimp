@@ -33,7 +33,8 @@ foreach ($list as $peer) {
     if ($peerVer > $latestVersion) $latestVersion = $peerVer;
 
     $height      = $peer['currentheight'] ?? ($peer['synced_blocks'] ?? 0);
-    $outOfSync   = abs($height - $localHeight) > 5;
+    // A Geth peer with no public RPC reports 0 = height unknown, not stuck at genesis.
+    $outOfSync   = $height > 0 && abs($height - $localHeight) > 5;
     $connTime    = $peer['conntime']       ?? time();
     $startHeight = $peer['startingheight'] ?? '';
     $lastRecv    = $peer['lastrecv']       ?? time();
