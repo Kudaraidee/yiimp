@@ -600,6 +600,23 @@ class BlockService
                 $newBlock->amount     = (float) ($transaction['amount'] ?? 0);
                 $newBlock->algo       = $coin->algo;
 
+                // Wallet scans do not know which worker found the block. Recover
+                // the finder from the highest-difficulty valid share in the round
+                // so the web page can show it. Stratum-injected blocks already
+                // have userid/workerid and are left alone.
+                if (empty($newBlock->userid)) {
+                    $finder = $db->createCommand(
+                        'SELECT userid, workerid FROM shares
+                         WHERE coinid=:coin AND algo=:algo AND valid=1 AND time<=:t
+                         ORDER BY difficulty DESC LIMIT 1',
+                        [':coin' => $coin->id, ':algo' => $coin->algo, ':t' => $txTime]
+                    )->queryOne();
+                    if ($finder) {
+                        $newBlock->userid   = (int) $finder['userid'];
+                        $newBlock->workerid = (int) $finder['workerid'];
+                    }
+                }
+
                 if (($blockExt['nonce'] ?? 0) != 0) {
                     // PoW block — compute user-facing difficulty from block hash.
                     $newBlock->difficulty_user = Yii::$app->ConversionUtils->hash_to_difficulty($coin, $transaction['blockhash']);

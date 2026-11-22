@@ -508,6 +508,21 @@ function BackendBlockFind2($coinid = NULL)
 			$db_block->amount = (isset($transaction['amount']))? $transaction['amount'] : 0;
 			$db_block->algo = $coin->algo;
 
+			// Wallet scans do not know which worker found the block. Recover
+			// the finder from the highest-difficulty valid share in the round
+			// so the web page can show it (blocks injected by stratum already
+			// carry userid/workerid and are left alone).
+			if (empty($db_block->userid)) {
+				$finder = dbolist("SELECT userid, workerid FROM shares WHERE coinid=:coin AND algo=:algo AND valid=1 AND time <= :time ".
+					"ORDER BY difficulty DESC LIMIT 1", array(
+					':coin'=>$coin->id, ':algo'=>$coin->algo, ':time'=>$db_block->time
+				));
+				if (!empty($finder)) {
+					$db_block->userid = (int) $finder[0]['userid'];
+					$db_block->workerid = (int) $finder[0]['workerid'];
+				}
+			}
+
 			if (arraySafeVal($blockext,'nonce',0) != 0) {
 				$db_block->difficulty_user = hash_to_difficulty($coin, $transaction['blockhash']);
 			} else if (($coin->rpcencoding == 'POS') && (arraySafeVal($blockext,'flags') == 'proof-of-stake')) {
