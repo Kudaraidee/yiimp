@@ -296,7 +296,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	}
 
 	if(!strcmp(coind->symbol, "PPC")) strcpy(params, "[]");
-	else if(g_stratum_segwit && !is_firopow) strcpy(params, "[{\"rules\":[\"segwit\"]}]");
+	else if(g_stratum_segwit && !is_firopow && !is_homescrypt) strcpy(params, "[{\"rules\":[\"segwit\"]}]");
        
 	coind->usemweb |= g_stratum_mweb;
 
