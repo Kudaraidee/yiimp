@@ -669,6 +669,66 @@ class WalletRPC
         }
 
         $this->error = $eth->getError();
+
+        // The pool's own block records are the authoritative source for mined
+        // rewards. Geth reports the physical miner address in block headers,
+        // which may differ from the configured pool wallet, so the chain scan
+        // above alone can miss every block this coin actually found.
+        $rows = array_merge($rows, $this->ethPoolMinedBlocks());
+
+        // Deduplicate (chain + DB can describe the same block), newest first.
+        $seen = [];
+        $rows = array_values(array_filter($rows, static function (array $row) use (&$seen): bool {
+            $key = (string) ($row['blockhash'] ?? '') . '|' . (string) ($row['txid'] ?? '');
+            if ($key === '|' || isset($seen[$key])) {
+                return false;
+            }
+            $seen[$key] = true;
+            return true;
+        }));
+        usort($rows, static fn (array $a, array $b): int =>
+            ((int) ($b['time'] ?? 0)) <=> ((int) ($a['time'] ?? 0))
+        );
+
+        return array_slice($rows, 0, $count);
+    }
+
+    /**
+     * Convert the pool's `blocks` rows for this coin into Bitcoin-like
+     * `generate` entries for the admin wallet transaction table.
+     */
+    private function ethPoolMinedBlocks(): array
+    {
+        $coinId = (int) ($this->coin->id ?? 0);
+        if ($coinId <= 0 || Yii::$app === null || !Yii::$app->has('db')) {
+            return [];
+        }
+
+        try {
+            $dbRows = Yii::$app->db->createCommand(
+                'SELECT height, time, amount, confirmations, blockhash, txhash ' .
+                'FROM blocks WHERE coin_id = :cid ORDER BY time DESC LIMIT 2500',
+                [':cid' => $coinId]
+            )->queryAll();
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $wallet = (string) ($this->coin->master_wallet ?? $this->account ?? '');
+        $rows   = [];
+        foreach ($dbRows as $b) {
+            $blockHash = (string) ($b['blockhash'] ?? '');
+            $rows[] = [
+                'txid'          => (string) (($b['txhash'] ?? '') ?: $blockHash),
+                'blockhash'     => $blockHash,
+                'time'          => (int) ($b['time'] ?? 0),
+                'category'      => 'generate',
+                'amount'        => (float) ($b['amount'] ?? 0),
+                'address'       => $wallet,
+                'confirmations' => (int) ($b['confirmations'] ?? 0),
+            ];
+        }
+
         return $rows;
     }
 
