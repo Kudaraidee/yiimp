@@ -535,8 +535,21 @@ class BlockService
                 continue;
             }
 
+            // listsinceblock returns newest-first. Pay the oldest block first,
+            // otherwise a newer block consumes shares belonging to an older
+            // round and the older block ends up with no earnings.
+            $transactions = $list['transactions'] ?? [];
+            usort($transactions, static function (array $a, array $b): int {
+                $ta = (int) ($a['time'] ?? 0);
+                $tb = (int) ($b['time'] ?? 0);
+                if ($ta === $tb) {
+                    return strcmp((string) ($a['blockhash'] ?? ''), (string) ($b['blockhash'] ?? ''));
+                }
+                return $ta <=> $tb;
+            });
+
             $mostRecent = 0;
-            foreach ($list['transactions'] as $transaction) {
+            foreach ($transactions as $transaction) {
                 if (!isset($transaction['blockhash'])) {
                     continue;
                 }

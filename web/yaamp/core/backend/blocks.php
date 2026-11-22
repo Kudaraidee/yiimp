@@ -461,7 +461,19 @@ function BackendBlockFind2($coinid = NULL)
 				(is_array($list) ? count($list) : 0). "txs");
 		if(!$list) continue;
 
-		foreach($list['transactions'] as $transaction)
+		// listsinceblock returns newest-first. Distribute older blocks first so
+		// their shares are not swallowed by a newer block's reward window.
+		$transactions = isset($list['transactions']) ? $list['transactions'] : array();
+		usort($transactions, function($a, $b)
+		{
+			$ta = (int)(isset($a['time'])? $a['time']: 0);
+			$tb = (int)(isset($b['time'])? $b['time']: 0);
+			if($ta == $tb) return strcmp((string)(isset($a['blockhash'])? $a['blockhash']: ''),
+				(string)(isset($b['blockhash'])? $b['blockhash']: ''));
+			return ($ta < $tb)? -1: 1;
+		});
+
+		foreach($transactions as $transaction)
 		{
 			if(!isset($transaction['blockhash'])) continue;
 			if($transaction['time'] > time() - 5*60) continue;
