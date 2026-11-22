@@ -312,6 +312,22 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 	coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
 	if (templ->nbits && !coin_target) coin_target = 0xFFFF000000000000ULL;
 
+	bool block_hash_ok = (hash_int <= coin_target);
+	if (is_homescrypt)
+	{
+		// Lumenite Core validates the full 256-bit HomeScrypt digest against
+		// the compact target. The generic 64-bit get_hash_difficulty() value
+		// ignores the two most significant bytes and can mark non-block shares
+		// as block candidates, causing pointless submitblock rejections.
+		uint256 hash256;
+		memcpy(hash256.begin(), submitvalues->hash_bin, 32);
+		arith_uint256 full_hash = UintToArith256(hash256);
+		arith_uint256 full_target;
+		bool negative = false, overflow = false;
+		full_target.SetCompact((uint32_t)strtoul(templ->nbits, NULL, 16), &negative, &overflow);
+		block_hash_ok = !negative && !overflow && full_hash <= full_target;
+	}
+
 	int block_size = YAAMP_SMALLBUFSIZE;
 	vector<string>::const_iterator i;
 
@@ -398,7 +414,7 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 		CommonUnlock(&coind_aux->aux_mutex);
 	}
 
-	if(hash_int <= coin_target)
+	if(block_hash_ok)
 	{
 		char count_hex[8] = { 0 };
 		if (templ->txcount <= 252)
@@ -758,7 +774,24 @@ if (g_debuglog_hash) {
         debuglog("coin %016lx \n", coin_target);
 }
 
-	if(hash_int_scaled > user_target && hash_int > coin_target)
+	bool share_ok = (hash_int_scaled <= user_target || hash_int <= coin_target);
+	if (is_homescrypt)
+	{
+		// Validate the whole 256-bit HomeScrypt digest. The generic yiimp
+		// comparison only looks at bytes 22..29, so it can accept shares whose
+		// two most significant bytes make the real hash far above target.
+		uint256 hash256;
+		memcpy(hash256.begin(), submitvalues.hash_bin, 32);
+		arith_uint256 full_hash = UintToArith256(hash256);
+		arith_uint256 full_share_target = arith_uint256(user_target) << 192;
+		arith_uint256 full_coin_target;
+		bool negative = false, overflow = false;
+		full_coin_target.SetCompact((uint32_t)strtoul(templ->nbits, NULL, 16), &negative, &overflow);
+		share_ok = full_hash <= full_share_target ||
+			(!negative && !overflow && full_hash <= full_coin_target);
+	}
+
+	if(!share_ok)
 	{
 		client_submit_error(client, job, 26, "Low difficulty share", extranonce2, ntime, nonce);
 		return true;
