@@ -24,27 +24,295 @@ if (empty($coin->rpcpasswd)) $coin->rpcpasswd = preg_replace("|[^\w]|m", '', bas
 $port    = Yii::$app->YiimpUtils->getAlgoPort($coin->algo);
 $dedport = $coin->dedicatedport;
 
+// Mining-style header / KPI values
+$stratumPort = !empty($dedport) ? $dedport : $port;
+$coinStatus  = $coin->enable ? 'Enabled' : 'Disabled';
+$statusClass = $coin->enable ? 'good' : 'warn';
+$heightText  = $coin->block_height ? number_format((int) $coin->block_height) : '—';
+$marketText  = !empty($coin->market) && $coin->market !== 'unknown'
+    ? $coin->market : '—';
+$algoText    = !empty($coin->algo) ? $coin->algo : '—';
+$symbolText  = !empty($coin->symbol) ? $coin->symbol : 'NEW';
+
 ?>
 
 <?php if ($isLegacy): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
-     LEGACY  (CUFHtml + jQuery UI Tabs — unchanged)
+     LEGACY — mining-style coin properties editor
      ══════════════════════════════════════════════════════════════════════════ -->
-<?= Yii::$app->ViewUtils->getAdminSideBarLinks() ?>
-<?php if ($coin->id): ?>
- &nbsp;-&nbsp;<a href="<?= Html::encode($backUrl) ?>"><?= Html::encode($coin->name) ?></a>
-<?php else: ?>
- &nbsp;-&nbsp;new coin
-<?php endif ?>
-<br/>
-
 <?php
 $coin_algo = $coin->algo
-    ? '<span style="color:green;">' . $coin->algo . '</span>'
-    : '<span style="color:red;">None</span>';
+    ? '<span class="cw-algo-ok">' . Html::encode($coin->algo) . '</span>'
+    : '<span class="cw-algo-none">None</span>';
+?>
+<style>
+#coinwallet_form_results { display:flex; flex-direction:column; gap:16px; }
+#coinwallet_form_results .cw-toolbar {
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:9px 12px; margin:0; border:1px solid #d8e2ef; border-radius:7px;
+    background:#fff; box-shadow:0 1px 2px rgba(20,40,80,.04);
+}
+#coinwallet_form_results .cw-toolbar-brand {
+    display:flex; align-items:center; gap:9px; padding-right:12px;
+    border-right:1px solid #e8eef6;
+}
+#coinwallet_form_results .cw-live-dot {
+    width:8px; height:8px; border-radius:50%; background:#2fae5a;
+    box-shadow:0 0 0 3px rgba(47,174,90,.15);
+}
+#coinwallet_form_results .cw-brand-text { display:flex; flex-direction:column; line-height:1.25; }
+#coinwallet_form_results .cw-brand-text b { color:#26385a; font-size:13px; }
+#coinwallet_form_results .cw-brand-text small { color:#8a94a6; font-size:9px; }
+#coinwallet_form_results .mc-badge, #coinwallet_form_results .cw-toolbar .mc-badge {
+    display:inline-block; padding:2px 7px; border-radius:999px; background:#eef4ff;
+    border:1px solid #d7e5ff; color:#2c5aa0; font-size:9px; font-weight:700;
+    line-height:14px; white-space:nowrap; text-decoration:none;
+}
+#coinwallet_form_results .cw-toolbar-links { display:flex; flex-wrap:wrap; gap:6px; flex:1 1 auto; }
+#coinwallet_form_results .cw-toolbar-links a,
+#coinwallet_form_results .cw-back {
+    display:inline-block; padding:3px 8px; border-radius:999px; border:1px solid #dfe7f2;
+    background:#f8fafc; color:#4a586c; font-size:10px; line-height:15px;
+    text-decoration:none; white-space:nowrap;
+}
+#coinwallet_form_results .cw-toolbar-links a:hover, #coinwallet_form_results .cw-back:hover {
+    background:#eef4ff; border-color:#c9d9f5; color:#2c5aa0; text-decoration:none;
+}
+#coinwallet_form_results .cw-back.muted { color:#98a3b5; cursor:default; }
 
-$form = ActiveForm::begin(['options' => ['class' => 'uniForm']]);
-echo CUFHtml::beginTag('fieldset', ['class' => 'inlineLabels']);
+#coinwallet_form_results .cw-summary {
+    background:#f8fbff; border:1px solid #d8e2ef; border-left:3px solid #2c5aa0;
+    border-radius:6px; padding:8px 14px; display:flex; gap:22px; flex-wrap:wrap;
+    font-size:12px; color:#4a586c;
+}
+#coinwallet_form_results .cw-summary b { color:#223a5e; }
+#coinwallet_form_results .cw-summary .sep { color:#ccd4e0; }
+
+#coinwallet_form_results .cw-kpis {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:12px;
+}
+#coinwallet_form_results .cw-kpi {
+    border:1px solid #e8eef6; border-radius:6px; background:#fcfdff;
+    padding:8px 10px; min-width:0;
+}
+#coinwallet_form_results .cw-kpi .k-label {
+    display:block; font-size:9px; font-weight:800; letter-spacing:.06em;
+    text-transform:uppercase; color:#98a3b5;
+}
+#coinwallet_form_results .cw-kpi .k-value {
+    display:block; margin-top:3px; font-family:monospace; font-size:15px;
+    font-weight:700; color:#26385a; overflow-wrap:anywhere;
+}
+#coinwallet_form_results .cw-kpi .k-sub { display:block; margin-top:2px; font-size:9px; color:#8a94a6; }
+#coinwallet_form_results .cw-kpi.accent .k-value { color:#2c5aa0; }
+#coinwallet_form_results .cw-kpi.good .k-value { color:#2fae5a; }
+#coinwallet_form_results .cw-kpi.warn .k-value { color:#c2410c; }
+
+#coinwallet_form_results .main-left-box {
+    border:1px solid #d8e2ef; border-radius:7px; background:#fff;
+    box-shadow:0 1px 2px rgba(20,40,80,.04); overflow:hidden; margin:0;
+}
+#coinwallet_form_results .main-left-title {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    min-height:34px; padding:9px 12px; background:#f8fafc;
+    border-bottom:1px solid #e8eef6; color:#26385a; font-size:13px; font-weight:800;
+}
+#coinwallet_form_results .mn-head-main { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; min-width:0; }
+#coinwallet_form_results .mn-sub { font-size:10px; color:#8a94a6; font-weight:500; }
+#coinwallet_form_results .main-left-inner.cw-card-inner { padding:14px 16px 16px; }
+
+#coinwallet_form_results .cw-uniform { margin:0 !important; }
+#coinwallet_form_results .cw-fieldset { border:0 !important; margin:0 !important; padding:0 !important; }
+#coinwallet_form_results .ctrlHolder {
+    float:none !important; clear:none !important; width:auto !important;
+    margin:0 0 10px !important; padding:0 !important; border:0 !important;
+    background:transparent !important;
+}
+#coinwallet_form_results .ctrlHolder > div[style*="clear"] { display:none; }
+#coinwallet_form_results .ctrlHolder label[for] {
+    display:block; margin:0 0 3px !important; padding:0 !important; float:none !important;
+    width:auto !important; color:#4a586c; font-size:10px; font-weight:800;
+    letter-spacing:.02em; text-transform:none;
+}
+#coinwallet_form_results .ctrlHolder label[for][required]::after { content:' *'; color:#c2410c; }
+#coinwallet_form_results .ctrlHolder label:not([for]) {
+    display:inline !important; margin:0 !important; padding:0 !important;
+    color:inherit; font-size:inherit; font-weight:inherit; letter-spacing:normal;
+}
+#coinwallet_form_results .ctrlHolder .textInput,
+#coinwallet_form_results .ctrlHolder input[type="text"],
+#coinwallet_form_results .ctrlHolder select {
+    box-sizing:border-box; width:100% !important; height:auto !important;
+    padding:5px 9px !important; border:1px solid #dfe5ec !important; border-radius:7px !important;
+    background:#fafbfc !important; color:#26385a !important;
+    font:11px/1.4 inherit !important; outline:0 !important; box-shadow:none !important;
+}
+#coinwallet_form_results .ctrlHolder .textInput:focus,
+#coinwallet_form_results .ctrlHolder input[type="text"]:focus,
+#coinwallet_form_results .ctrlHolder select:focus {
+    border-color:#a9c4ea !important; background:#fff !important;
+}
+#coinwallet_form_results .ctrlHolder input[readonly].textInput {
+    background:#f3f6fa !important; color:#8a94a6 !important; cursor:default;
+}
+#coinwallet_form_results .ctrlHolder input[type="checkbox"] {
+    width:15px !important; height:15px !important; margin:0 4px 0 0;
+    accent-color:#2c5aa0; vertical-align:middle;
+}
+#coinwallet_form_results .formHint2 {
+    margin:3px 0 0 !important; padding:0 !important; color:#8a94a6;
+    font-size:10px; line-height:1.35;
+}
+#coinwallet_form_results .errorField {
+    margin:0 0 6px; padding:5px 8px; border-radius:6px;
+    border:1px solid #fecaca; background:#fef2f2; color:#b91c1c; font-size:10px;
+}
+#coinwallet_form_results .cw-algo-ok { color:#2fae5a; font-weight:800; }
+#coinwallet_form_results .cw-algo-none { color:#c2410c; font-weight:800; }
+
+/* Yii's jui Tabs adds ui-* classes at runtime; style the raw markup as well. */
+#coinwallet_form_results .cw-fieldset > div { border:0 !important; background:transparent !important; padding:0 !important; }
+#coinwallet_form_results .cw-fieldset > div > ul {
+    display:flex !important; gap:4px; flex-wrap:wrap; float:none !important;
+    border:0 !important; border-radius:8px !important; background:#f8fafc !important;
+    padding:4px !important; margin:0 0 12px !important; list-style:none !important;
+}
+#coinwallet_form_results .cw-fieldset > div > ul > li {
+    float:none !important; margin:0 !important; border:0 !important;
+    background:transparent !important; border-radius:6px !important;
+}
+#coinwallet_form_results .cw-fieldset > div > ul > li > a {
+    display:block; padding:6px 12px; border-radius:6px !important;
+    color:#5b6675; font-size:11px; font-weight:700; text-decoration:none;
+}
+#coinwallet_form_results .cw-fieldset > div > div[id*="-tab"] {
+    border:1px solid #e8eef6 !important; background:#fff !important;
+    border-radius:7px !important; padding:14px !important;
+}
+#coinwallet_form_results .cw-fieldset > div > ul > li.ui-tabs-active {
+    background:#fff !important; border:1px solid #d8e2ef !important;
+    box-shadow:0 1px 2px rgba(20,40,80,.05);
+}
+#coinwallet_form_results .cw-fieldset > div > ul > li.ui-tabs-active > a { color:#2c5aa0; }
+
+#coinwallet_form_results .ui-tabs { border:0 !important; background:transparent !important; padding:0 !important; }
+#coinwallet_form_results .ui-tabs .ui-tabs-nav {
+    display:flex !important; gap:4px; flex-wrap:wrap; float:none !important;
+    border:0 !important; border-radius:8px !important; background:#f8fafc !important;
+    padding:4px !important; margin:0 0 12px !important;
+}
+#coinwallet_form_results .ui-tabs .ui-tabs-nav li {
+    float:none !important; margin:0 !important; border:0 !important;
+    background:transparent !important; border-radius:6px !important;
+}
+#coinwallet_form_results .ui-tabs .ui-tabs-nav li a {
+    display:block; padding:6px 12px; border-radius:6px !important;
+    color:#5b6675; font-size:11px; font-weight:700; text-decoration:none;
+}
+#coinwallet_form_results .ui-tabs .ui-tabs-nav li.ui-tabs-active {
+    background:#fff !important; border:1px solid #d8e2ef !important;
+    box-shadow:0 1px 2px rgba(20,40,80,.05);
+}
+#coinwallet_form_results .ui-tabs .ui-tabs-nav li.ui-tabs-active a { color:#2c5aa0; }
+#coinwallet_form_results .ui-tabs .ui-tabs-panel {
+    border:1px solid #e8eef6 !important; background:#fff !important;
+    border-radius:7px !important; padding:14px !important;
+}
+#coinwallet_form_results .ui-tabs hr { border:0; border-top:1px solid #e8eef6; margin:14px 0 10px; }
+#coinwallet_form_results .ui-tabs b { color:#26385a; font-size:11px; }
+#coinwallet_form_results .ui-tabs pre {
+    margin:6px 0 0; padding:12px; border:1px solid #e8eef6; border-radius:7px;
+    background:#fcfdff; color:#33405a; font:11px/1.5 monospace;
+    overflow-x:auto; white-space:pre;
+}
+
+#coinwallet_form_results .cw-actions {
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:12px 16px; border-top:1px solid #e8eef6; background:#f8fafc;
+}
+#coinwallet_form_results .cw-save {
+    display:inline-block; padding:6px 14px; border-radius:7px; cursor:pointer;
+    border:1px solid #2c5aa0; background:#2c5aa0; color:#fff;
+    font-size:11px; font-weight:700; text-decoration:none;
+    box-shadow:0 1px 2px rgba(20,40,80,.08);
+}
+#coinwallet_form_results .cw-save:hover { background:#244b86; border-color:#244b86; color:#fff; text-decoration:none; }
+#coinwallet_form_results .cw-cancel {
+    display:inline-block; padding:6px 12px; border-radius:7px;
+    border:1px solid #dfe5ec; background:#fff; color:#5b6675;
+    font-size:11px; font-weight:700; text-decoration:none;
+}
+#coinwallet_form_results .cw-cancel:hover { background:#eef4ff; border-color:#c9d9f5; color:#2c5aa0; text-decoration:none; }
+@media (max-width:900px) {
+    #coinwallet_form_results .cw-toolbar-brand { border-right:0; }
+    #coinwallet_form_results .cw-summary { gap:12px; }
+}
+</style>
+
+<div id="coinwallet_form_results">
+
+    <div class="cw-toolbar">
+        <div class="cw-toolbar-brand">
+            <span class="cw-live-dot"></span>
+            <span class="cw-brand-text"><b>Coin Wallet</b><small>properties · admin console</small></span>
+            <span class="mc-badge"><?= Html::encode($symbolText) ?></span>
+        </div>
+        <div class="cw-toolbar-links"><?= str_replace('&nbsp;', '', Yii::$app->ViewUtils->getAdminSideBarLinks()) ?></div>
+        <?php if ($coin->id): ?>
+        <a class="cw-back" href="<?= Html::encode($backUrl) ?>">&larr; <?= Html::encode($coin->name) ?></a>
+        <?php else: ?>
+        <span class="cw-back muted">new coin</span>
+        <?php endif ?>
+    </div>
+
+    <?= \app\widgets\Alert::widget() ?>
+
+    <div class="cw-summary">
+        <span>Coin <b><?= $coin->id ? Html::encode($coin->symbol . ' — ' . $coin->name) : 'New coin' ?></b></span>
+        <span class="sep">|</span>
+        <span>Algo <b><?= Html::encode($algoText) ?></b></span>
+        <span class="sep">|</span>
+        <span>Market <b><?= Html::encode($marketText) ?></b></span>
+        <span class="sep">|</span>
+        <span>Stratum <b><?= (int) $stratumPort ?></b></span>
+    </div>
+
+    <div class="cw-kpis">
+        <div class="cw-kpi <?= $statusClass ?>">
+            <span class="k-label">Status</span>
+            <span class="k-value"><?= Html::encode($coinStatus) ?></span>
+            <span class="k-sub">daemon setting</span>
+        </div>
+        <div class="cw-kpi accent">
+            <span class="k-label">Algorithm</span>
+            <span class="k-value"><?= Html::encode($algoText) ?></span>
+            <span class="k-sub">proof of work</span>
+        </div>
+        <div class="cw-kpi accent">
+            <span class="k-label">Stratum port</span>
+            <span class="k-value"><?= (int) $stratumPort ?></span>
+            <span class="k-sub"><?= !empty($dedport) ? 'dedicated' : 'shared algo port' ?></span>
+        </div>
+        <div class="cw-kpi">
+            <span class="k-label">Block height</span>
+            <span class="k-value"><?= Html::encode($heightText) ?></span>
+            <span class="k-sub">last known</span>
+        </div>
+    </div>
+
+    <div class="main-left-box cw-card">
+        <div class="main-left-title">
+            <span class="mn-head-main">
+                <span>Coin properties</span>
+                <span class="mn-sub">general · settings · daemon · exchange · links</span>
+            </span>
+            <span class="mc-badge">5 SECTIONS</span>
+        </div>
+        <div class="main-left-inner cw-card-inner">
+<?php
+$form = ActiveForm::begin(['options' => ['class' => 'uniForm cw-uniform']]);
+echo CUFHtml::beginTag('fieldset', ['class' => 'inlineLabels cw-fieldset']);
 
 $tab_general =
     CUFHtml::openActiveCtrlHolder($coin, 'name').
@@ -469,11 +737,15 @@ echo Tabs::widget([
 ]);
 ?>
 
-<br>
-<?= Html::submitButton($update ? 'Save' : 'Create', ['class' => 'submitButton ui-button ui-corner-all ui-widget']) ?>
+<div class="cw-actions">
+    <?= Html::submitButton($update ? 'Save changes' : 'Create coin', ['class' => 'cw-save']) ?>
+    <a class="cw-cancel" href="<?= Html::encode($backUrl) ?>">Cancel</a>
+</div>
 <?= CUFHtml::endTag('fieldset') ?>
 <?php ActiveForm::end() ?>
-
+        </div>
+    </div>
+</div>
 
 <?php else: ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
