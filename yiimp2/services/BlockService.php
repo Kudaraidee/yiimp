@@ -554,8 +554,10 @@ class BlockService
                     continue;
                 }
                 $txTime = $transaction['time'] ?? 0;
-                if ($txTime > time() - 5 * 60) {
-                    continue; // too recent — wait for it to stabilise
+                // Show newly found blocks on the web as soon as the wallet
+                // sees them; getblock() below still validates the block.
+                if ($txTime > time() - 15) {
+                    continue;
                 }
                 if ($txTime < time() - 60 * 60) {
                     continue; // too old — already processed

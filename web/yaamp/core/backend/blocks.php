@@ -476,7 +476,9 @@ function BackendBlockFind2($coinid = NULL)
 		foreach($transactions as $transaction)
 		{
 			if(!isset($transaction['blockhash'])) continue;
-			if($transaction['time'] > time() - 5*60) continue;
+			// Show newly found blocks on the web as soon as the wallet sees
+			// them; getblock()/gettransaction() below still validate the block.
+			if($transaction['time'] > time() - 15) continue;
 			if($transaction['time'] < time() - 60*60) continue;
 			if($transaction['category'] != 'generate' && $transaction['category'] != 'immature') continue;
 
