@@ -161,8 +161,12 @@ $coin_algo = $coin->algo
     accent-color:#2c5aa0; vertical-align:middle;
 }
 #coinwallet_form_results .formHint2 {
+    float:none !important; clear:both !important; width:auto !important;
     margin:3px 0 0 !important; padding:0 !important; color:#8a94a6;
     font-size:10px; line-height:1.35;
+}
+#coinwallet_form_results .cw-algo-note {
+    margin-top:3px; color:#8a94a6; font-size:10px; line-height:1.35;
 }
 #coinwallet_form_results .errorField {
     margin:0 0 6px; padding:5px 8px; border-radius:6px;
@@ -172,29 +176,29 @@ $coin_algo = $coin->algo
 #coinwallet_form_results .cw-algo-none { color:#c2410c; font-weight:800; }
 
 /* Yii's jui Tabs adds ui-* classes at runtime; style the raw markup as well. */
-#coinwallet_form_results .cw-fieldset > div { border:0 !important; background:transparent !important; padding:0 !important; }
-#coinwallet_form_results .cw-fieldset > div > ul {
+#coinwallet_form_results .cw-fieldset > div[id] { border:0 !important; background:transparent !important; padding:0 !important; }
+#coinwallet_form_results .cw-fieldset > div[id] > ul {
     display:flex !important; gap:4px; flex-wrap:wrap; float:none !important;
     border:0 !important; border-radius:8px !important; background:#f8fafc !important;
     padding:4px !important; margin:0 0 12px !important; list-style:none !important;
 }
-#coinwallet_form_results .cw-fieldset > div > ul > li {
+#coinwallet_form_results .cw-fieldset > div[id] > ul > li {
     float:none !important; margin:0 !important; border:0 !important;
     background:transparent !important; border-radius:6px !important;
 }
-#coinwallet_form_results .cw-fieldset > div > ul > li > a {
+#coinwallet_form_results .cw-fieldset > div[id] > ul > li > a {
     display:block; padding:6px 12px; border-radius:6px !important;
     color:#5b6675; font-size:11px; font-weight:700; text-decoration:none;
 }
-#coinwallet_form_results .cw-fieldset > div > div[id*="-tab"] {
+#coinwallet_form_results .cw-fieldset > div[id] > div[id*="-tab"] {
     border:1px solid #e8eef6 !important; background:#fff !important;
     border-radius:7px !important; padding:14px !important;
 }
-#coinwallet_form_results .cw-fieldset > div > ul > li.ui-tabs-active {
+#coinwallet_form_results .cw-fieldset > div[id] > ul > li.ui-tabs-active {
     background:#fff !important; border:1px solid #d8e2ef !important;
     box-shadow:0 1px 2px rgba(20,40,80,.05);
 }
-#coinwallet_form_results .cw-fieldset > div > ul > li.ui-tabs-active > a { color:#2c5aa0; }
+#coinwallet_form_results .cw-fieldset > div[id] > ul > li.ui-tabs-active > a { color:#2c5aa0; }
 
 #coinwallet_form_results .ui-tabs { border:0 !important; background:transparent !important; padding:0 !important; }
 #coinwallet_form_results .ui-tabs .ui-tabs-nav {
@@ -228,7 +232,7 @@ $coin_algo = $coin->algo
 }
 
 #coinwallet_form_results .cw-actions {
-    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    box-sizing:border-box; width:100%; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
     padding:12px 16px; border-top:1px solid #e8eef6; background:#f8fafc;
 }
 #coinwallet_form_results .cw-save {
@@ -336,8 +340,7 @@ $tab_general =
     CUFHtml::openActiveCtrlHolder($coin, 'algo').
     CUFHtml::activeLabelEx($coin, 'algo').
     CUFHtml::dropDownList('db_coins[algo]', $coin->algo, $algos, ['style' => 'border:1px solid #dfdfdf;height:26px;width:135px;', 'class' => 'textInput tweetnews-input']).
-    '<label style="padding-left:20px;" for="algo">Algo: ' . $coin_algo . '</label>'.
-    '<p class="formHint2">Required, all lower case</p>'.
+    '<div class="cw-algo-note">Current: ' . $coin_algo . ' · Required, all lower case</div>'.
     CUFHtml::closeCtrlHolder().
 
     CUFHtml::openActiveCtrlHolder($coin, 'auto_exchange').
