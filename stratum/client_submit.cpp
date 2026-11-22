@@ -8,7 +8,8 @@ uint64_t lyra2z_height = 0;
 //#define DONTSUBMIT
 
 bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
-	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce, uint32_t versionbits)
+	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce,
+	uint32_t versionbits, bool compute_hash)
 {
 	sprintf(submitvalues->coinbase, "%s%s%s%s", templ->coinb1, nonce1, nonce2, templ->coinb2);
 	int coinbase_len = strlen(submitvalues->coinbase);
@@ -120,10 +121,13 @@ bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *tem
 
 //	printf("%s\n", submitvalues->header_be);
 	int header_len = strlen(submitvalues->header)/2;
-	g_current_algo->hash_function((char *)submitvalues->header_bin, (char *)submitvalues->hash_bin, header_len);
+	if (compute_hash)
+	{
+		g_current_algo->hash_function((char *)submitvalues->header_bin, (char *)submitvalues->hash_bin, header_len);
 
-	hexlify(submitvalues->hash_hex, submitvalues->hash_bin, 32);
-	string_be(submitvalues->hash_hex, submitvalues->hash_be);
+		hexlify(submitvalues->hash_hex, submitvalues->hash_bin, 32);
+		string_be(submitvalues->hash_hex, submitvalues->hash_be);
+	}
 	return true;
 }
 

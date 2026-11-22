@@ -279,8 +279,9 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		// Kiiro Core requires explicit segwit rule support in the GBT request.
 		sprintf(params, "[{\"mode\":\"template\",\"rules\":[\"segwit\"]},\"%s\"]", coind->wallet);
 	}
-	else if (is_randomscash) {
-		// Scash Core rejects template requests that do not advertise segwit.
+	else if (is_randomscash || is_homescrypt) {
+		// Scash and Lumenite Core reject template requests that do not
+		// advertise segwit. Lumenite activates segwit at height 1.
 		strcpy(params, "[{\"rules\":[\"segwit\"]}]");
 	}
 	else if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow) {

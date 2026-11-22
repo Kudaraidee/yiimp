@@ -101,12 +101,18 @@ bool is_evrprogpow = false;
 bool is_ethash = false;
 bool is_etchash = false;
 bool is_randomscash = false;
+bool is_homescrypt = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 static void scrypt_hash(const char* input, char* output, uint32_t len)
 {
 	scrypt_1024_1_1_256((unsigned char *)input, (unsigned char *)output);
+}
+
+static void homescrypt_hash(const char* input, char* output, uint32_t len)
+{
+	homescrypt_v12((const unsigned char *)input, (unsigned char *)output);
 }
 
 static void scryptn_hash(const char* input, char* output, uint32_t len)
@@ -186,6 +192,7 @@ YAAMP_ALGO g_algos[] =
 	{"hex", hex_hash, 0x100, 0, sha256_hash_hex },
 	{"hive", hive_hash, 0x10000, 0, 0},
 	{"hmq1725", hmq17_hash, 0x10000, 0, 0},
+	{"homescrypt", homescrypt_hash, 1, 0, 0},
 	{"honeycomb", beenode_hash, 0x10000, 0, 0},
 	{"hoohash-pepew", hoohash_hash, 0x10000, 0, 0},
 	{"hsr", hsr_hash, 1, 0, 0},
@@ -468,6 +475,10 @@ int main(int argc, char **argv)
 	{
 		is_randomscash = true;
 	}
+	else if (!strcmp(g_current_algo->name,"homescrypt"))
+	{
+		is_homescrypt = true;
+	}
 
 //	struct rlimit rlim_files = {0x10000, 0x10000};
 //	setrlimit(RLIMIT_NOFILE, &rlim_files);
@@ -723,6 +734,8 @@ bool validate_hashfunctions() {
 		{ std::string("neoscrypt") , neoscrypt_hash ,     std::string("000000001c04534a1170d4ab8206660383fed56853e09d436cf74d1cf7659c40") , std::string("00000020e73e6b6c9e318f193adb76aeb01ffd508c48a83e30b5394c4291cf67010000005d1210c46d9aca742c1619d2928d87e5eedf731f082249ef4fa7a592e35a5169a8132c66bab3011d24a69b06") },
 		// Innova Block 4385783
 		{ std::string("tribus") ,    tribus_hash ,        std::string("0000000073effdeee31dbbcc72a6a8aab9c6fc3abc65c184b91e913121529ed6") , std::string("06000000cc4dd52af9ce356116e04f1ae4973ed0e77f9f713d958266509daeba00000000b85a3f9fa0ec87b5b85cbb43a221f66fd2de0e05cef11f60f123f6d980f0f0bfe3811966fa60011d2bef40e6") },
+		// HomeScrypt v1.2 zero header, cross-checked against Lumenite Core v1.2.0
+		{ std::string("homescrypt"), homescrypt_hash, std::string("6d2a3ad919f528ac443180b7e749dad1918bfc7b4920d1ef7255dc17964eec07"), std::string("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") },
 	};
 
 	for(auto CurrentCheckdata : VectorCheckdata)

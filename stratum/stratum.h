@@ -81,6 +81,7 @@ extern bool is_evrprogpow;
 extern bool is_ethash;
 extern bool is_etchash;
 extern bool is_randomscash;
+extern bool is_homescrypt;
 
 extern int g_tcp_port;
 
@@ -170,6 +171,7 @@ extern volatile bool g_exiting;
 #include "ethash/params.h"
 #include "ethash/context.h"
 #include "ethash/work.h"
+#include "homescrypt/homescrypt.h"
 
 extern YAAMP_DB *g_db;
 extern YAAMP_ALGO g_algos[];
@@ -180,6 +182,12 @@ extern bool g_autoexchange;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 YAAMP_ALGO *stratum_find_algo(const char *name);
+
+// Set compute_hash=false when only the serialized header is needed (for the
+// official Lumenite miner's complete-header mining.notify).
+bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
+	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce,
+	uint32_t versionbits, bool compute_hash = true);
 
 extern "C"
 {

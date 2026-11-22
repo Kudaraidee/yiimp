@@ -12,7 +12,10 @@ import ssl
 import sys
 import time
 
-DEFAULT_PAIRS = [(3433, 4433), (3639, 4639), (3640, 4640), (3641, 4641)]
+DEFAULT_PAIRS = [
+    (3433, 4433), (3639, 4639), (3640, 4640), (3641, 4641),
+    (3643, 4643), (3644, 4644),
+]
 MSG = b'{"id":1,"method":"mining.subscribe","params":["tls-smoke/1.0"]}\n'
 
 

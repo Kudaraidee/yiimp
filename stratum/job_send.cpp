@@ -84,6 +84,26 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 		job->id, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 }
 
+// The official Lumenite GPU miner does not understand standard Stratum v1
+// jobs. It expects a complete serialized 80-byte header and only substitutes
+// the nonce at bytes 76..79. Build that header from the same template/coinbase
+// the pool will later use to verify and submit the share.
+static void homescrypt_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer)
+{
+	YAAMP_JOB_TEMPLATE *templ = job->templ;
+
+	YAAMP_JOB_VALUES submitvalues;
+	memset(&submitvalues, 0, sizeof(submitvalues));
+
+	// Fixed extranonce2: uniqueness comes from the per-client extranonce1 in
+	// the coinbase. The miner echoes this value back in mining.submit.
+	build_submit_values(&submitvalues, templ, client->extranonce1, "00000000",
+		templ->ntime, "00000000", 0, false);
+
+	sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",true,\"%s\",\"%s\"]}\n",
+		job->id, submitvalues.header_be, templ->nbits, "00000000", templ->ntime);
+}
+
 static YAAMP_JOB *job_get_last(int coinid)
 {
 	g_list_job.Enter();
@@ -178,6 +198,10 @@ void job_send_last(YAAMP_CLIENT *client)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
 	}
+	else if (is_homescrypt)
+	{
+		homescrypt_job_mining_notify_buffer(job, client, buffer);
+	}
 	else {
 		job_mining_notify_buffer(job, buffer);
 	}
@@ -206,6 +230,10 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
+	}
+	else if (is_homescrypt)
+	{
+		homescrypt_job_mining_notify_buffer(job, client, buffer);
 	}
 	else {
 		job_mining_notify_buffer(job, buffer);
@@ -256,6 +284,10 @@ void job_broadcast(YAAMP_JOB *job)
 		else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 		{
 			kawpow_job_mining_notify_buffer(job, client, buffer);
+		}
+		else if (is_homescrypt)
+		{
+			homescrypt_job_mining_notify_buffer(job, client, buffer);
 		}
 		else {
 			job_mining_notify_buffer(job, buffer);

@@ -22,13 +22,14 @@ SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/
 	evrprogpow/lib/progpow.cpp evrprogpow/hash.cpp
 SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/work.cpp
 SOURCES_RANDOMSCASH=randomscash/randomscash.cpp
+SOURCES_HOMESCRYPT=homescrypt/homescrypt.cpp
 
 CFLAGS += -DHAVE_CURL
 SOURCES += rpc_curl.cpp
 #LDCURL = $(shell /usr/bin/pkg-config --static --libs libcurl)
 #LDFLAGS += $(LDCURL)
 
-OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o) $(SOURCES_RANDOMSCASH:.cpp=.o)
+OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o) $(SOURCES_RANDOMSCASH:.cpp=.o) $(SOURCES_HOMESCRYPT:.cpp=.o)
 OUTPUT=stratum
 
 CODEDIR1=algos
@@ -40,8 +41,8 @@ CODEDIR5=randomx
 
 .PHONY: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5
 
-all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(OUTPUT)
-buildonly: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(OUTPUT)
+all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(OUTPUT)
+buildonly: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(OUTPUT)
 
 gitsubmodules:
 	git submodule init && git submodule update
@@ -69,6 +70,12 @@ endif
 $(SOURCES): stratum.h util.h
 $(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/work.h
 $(SOURCES_RANDOMSCASH): stratum.h randomscash/randomscash.h randomx/src/randomx.h
+$(SOURCES_HOMESCRYPT): stratum.h homescrypt/homescrypt.h
+
+# HomeScrypt v1.2 consensus requires exact IEEE-754 fmaf rounding. Never build
+# this translation unit with fast-math or FP contraction.
+homescrypt/homescrypt.o: stratum.h homescrypt/homescrypt.h
+	$(CC) $(CFLAGS) $(SQLFLAGS) -ffp-contract=off -fno-fast-math -c $< -o $@
 
 $(OUTPUT): $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDLIBS) $(LDFLAGS) -o $@
@@ -104,6 +111,7 @@ clean:
 	rm -f firopow/*.o
 	rm -f firopow/lib/*.o
 	rm -f randomscash/*.o
+	rm -f homescrypt/*.o
 	rm -rf randomx/build
 	rm -f randomx/librandomx.a
 	rm -f ethash/*.o
