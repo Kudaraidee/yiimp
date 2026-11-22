@@ -213,6 +213,13 @@ function BackendCoinsUpdate()
 				$coin->reward -= $coin->charity_amount;
 			}
 
+			// Evrmore includes a mandatory miner dev fund output in
+			// coinbasevalue; it is not part of the miner's reward.
+			if(isset($template['coinbasetxn']['minerdevfund']['minimumvalue']))
+			{
+				$coin->reward -= doubleval($template['coinbasetxn']['minerdevfund']['minimumvalue'])/100000000;
+			}
+
 			// handle special cases (maybe outdated)
 			switch ($coin->symbol) {
 				case 'XZC':

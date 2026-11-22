@@ -465,6 +465,12 @@ class CoinService
             $coin->reward -= $coin->charity_amount;
         }
 
+        // Evrmore includes a mandatory miner dev fund output in coinbasevalue;
+        // it is paid to the node-provided address, not to the miners.
+        if (isset($template['coinbasetxn']['minerdevfund']['minimumvalue'])) {
+            $coin->reward -= (float) $template['coinbasetxn']['minerdevfund']['minimumvalue'] / 1e8;
+        }
+
         switch ($coin->symbol) {
             case 'XZC':
                 $coin->reward         = ($template['coinbasevalue'] ?? 0) / 1e8 * $coin->reward_mul;
