@@ -44,6 +44,9 @@ void nebhash_client_set_target_silent(YAAMP_CLIENT *client, const uint8_t le[32]
 void nebhash_client_publish_target(YAAMP_CLIENT *client);
 // Returns true when a vardiff change needs the current job pushed again.
 bool nebhash_vardiff(YAAMP_CLIENT *client, YAAMP_JOB *job);
+// Same 60 s window, called from the periodic client loop for sessions that
+// have not submitted anything yet, so a too-hard initial target can recover.
+bool nebhash_vardiff_tick(YAAMP_CLIENT *client);
 
 // Rate limiting and consecutive-bad-submit tracking from the reference pool.
 // The caller sends the NEB error and closes the socket when either returns a

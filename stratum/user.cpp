@@ -1,5 +1,6 @@
 
 #include "stratum.h"
+#include "nebhash/work.h"
 
 // sql injection security, unwanted chars
 void db_check_user_input(char* input)
@@ -210,7 +211,9 @@ void db_update_workers(YAAMP_DB *db)
 		// Low-difficulty coins need far longer between shares, so the rough
 		// speed estimate stays below YAAMP_CLIENT_MINSPEED and would kick a
 		// healthy miner (and his reconnect inherits the same low estimate).
-		if(!client_low_difficulty_algo() && client->speed < YAAMP_CLIENT_MINSPEED)
+		// NEB shares are even rarer (one every ~10^10 hashes here) and its
+		// speed is not measured by yiimp's generic share formula at all.
+		if(!is_nebhash && !client_low_difficulty_algo() && client->speed < YAAMP_CLIENT_MINSPEED)
 		{
 			clientlog(client, "speed %f", client->speed);
 			shutdown(client->sock->sock, SHUT_RDWR);
@@ -218,6 +221,11 @@ void db_update_workers(YAAMP_DB *db)
 			object_delete(client);
 			continue;
 		}
+
+		// Idle NEB sessions still need vardiff: a miner that never finds a
+		// share cannot trigger the submit-driven adjustment itself.
+		if(is_nebhash && nebhash_vardiff_tick(client))
+			job_send_last(client);
 
 		client->speed *= 0.8;
 		if(client->difficulty_written == client->difficulty_actual) continue;

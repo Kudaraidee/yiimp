@@ -994,6 +994,44 @@ void nebhash_note_good_submit(YAAMP_CLIENT *client)
 	client->neb_bad_in_a_row = 0;
 }
 
+static bool nebhash_vardiff_apply(YAAMP_CLIENT *client, const uint8_t share_target[32],
+	uint32_t counted, long long now)
+{
+	long long elapsed = now - client->neb_vardiff_start;
+	if (elapsed < 1) elapsed = 1;
+	if (counted <= NEB_RATE_HIGH * 2 && elapsed < NEB_VARDiff_WINDOW_MS)
+		return false;
+
+	double scaled = (double) counted * (double) NEB_VARDiff_WINDOW_MS / (double) elapsed;
+	uint32_t oldk = client->neb_k;
+	if (scaled > (double) NEB_RATE_HIGH && client->neb_k > 0)
+	{
+		uint32_t steps = (uint32_t) floor(log(scaled / 6.0) / log(2.0));
+		if (steps < 1) steps = 1;
+		if (steps > client->neb_k) steps = client->neb_k;
+		client->neb_k -= steps;
+	}
+	else if (scaled < (double) NEB_RATE_LOW && client->neb_k < NEB_K_MAX)
+		client->neb_k++;
+
+	client->neb_vardiff_start = now;
+	client->neb_vardiff_shares = 0;
+	if (client->neb_k == oldk) return false;
+
+	client->neb_k_prev = oldk;
+	client->neb_k_changed = now;
+
+	uint8_t target[32];
+	nebhash_shift_target(share_target, client->neb_k, target);
+	client->difficulty_actual = nebhash_target_to_diff(target);
+	nebhash_client_set_target_bytes(client, target);
+
+	// The caller re-pushes the job only after it releases the job object
+	// lock. Re-entering object_find() while locked would unlock it twice.
+	client->neb_vardiff_repush = true;
+	return true;
+}
+
 bool nebhash_vardiff(YAAMP_CLIENT *client, YAAMP_JOB *job)
 {
 	if (!client || !job || !job->templ || client->difficulty_fixed || !client->neb_authorized)
@@ -1005,49 +1043,37 @@ bool nebhash_vardiff(YAAMP_CLIENT *client, YAAMP_JOB *job)
 	client->neb_bad_in_a_row = 0;
 	if (!client->neb_vardiff_start) client->neb_vardiff_start = now;
 	client->neb_vardiff_shares++;
-	long long elapsed = now - client->neb_vardiff_start;
-	if (elapsed < 1) elapsed = 1;
 
-	bool changed = false;
-	if (client->neb_vardiff_shares > NEB_RATE_HIGH * 2 || elapsed >= NEB_VARDiff_WINDOW_MS)
-	{
-		double scaled = (double) client->neb_vardiff_shares * (double) NEB_VARDiff_WINDOW_MS / (double) elapsed;
-		uint32_t oldk = client->neb_k;
-		if (scaled > (double) NEB_RATE_HIGH && client->neb_k > 0)
-		{
-			uint32_t steps = (uint32_t) floor(log(scaled / 6.0) / log(2.0));
-			if (steps < 1) steps = 1;
-			if (steps > client->neb_k) steps = client->neb_k;
-			client->neb_k -= steps;
-		}
-		else if (scaled < (double) NEB_RATE_LOW && client->neb_k < NEB_K_MAX)
-			client->neb_k++;
+	uint8_t share_target[32];
+	if (!parse_hex_bytes(job->templ->neb_share_target, 32, share_target)) return false;
+	return nebhash_vardiff_apply(client, share_target, client->neb_vardiff_shares, now);
+}
 
-		if (client->neb_k != oldk)
-		{
-			client->neb_k_prev = oldk;
-			client->neb_k_changed = now;
-			changed = true;
-		}
-		client->neb_vardiff_start = now;
-		client->neb_vardiff_shares = 0;
-	}
+// A miner that never finds a share at the initial target would never trigger
+// the submit-driven vardiff above and could stay on an impossible target
+// forever. Run the same 60 s window from the periodic client loop so a quiet
+// session gets easier until it starts producing shares; once shares arrive the
+// normal submit-driven adjustments take over.
+bool nebhash_vardiff_tick(YAAMP_CLIENT *client)
+{
+	if (!client || client->difficulty_fixed || !client->neb_authorized || client->deleted)
+		return false;
 
-	if (changed)
-	{
-		uint8_t share_target[32], target[32];
-		if (!parse_hex_bytes(job->templ->neb_share_target, 32, share_target))
-			return false;
-		nebhash_shift_target(share_target, client->neb_k, target);
-		client->difficulty_actual = nebhash_target_to_diff(target);
-		nebhash_client_set_target_bytes(client, target);
+	uint8_t share_target[32];
+	nebhash_current_share_target(share_target);
+	bool has_work = false;
+	for (int i = 0; i < 32; i++) if (share_target[i]) { has_work = true; break; }
+	if (!has_work) return false;
 
-		// The caller re-pushes the job only after it releases the job object
-		// lock. Re-entering object_find() while locked would unlock it twice.
-		client->neb_vardiff_repush = true;
-		return true;
-	}
-	return false;
+	long long now = neb_monotonic_ms();
+	if (!client->neb_vardiff_start) client->neb_vardiff_start = now;
+	uint32_t oldk = client->neb_k;
+	if (!nebhash_vardiff_apply(client, share_target, client->neb_vardiff_shares, now))
+		return false;
+
+	stratumlog("nebhash: idle vardiff k %u -> %u for client %d\n",
+		oldk, client->neb_k, client->userid);
+	return true;
 }
 
 // ---------------------------------------------------------------------------
