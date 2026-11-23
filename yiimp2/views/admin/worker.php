@@ -10,8 +10,6 @@ $this->title = 'Workers';
 $isTailwind  = Yii::$app->LayoutManager->isTailwind();
 $isLegacy    = Yii::$app->LayoutManager->isLegacy();
 
-echo Yii::$app->ViewUtils->getAdminSideBarLinks();
-
 $options = '';
 if ($currentAlgo !== '' && !in_array($currentAlgo, $algos, true)) {
     $options .= '<option value="' . Html::encode($currentAlgo) . '" selected>'
@@ -27,11 +25,19 @@ $homeUrl = Yii::$app->homeUrl;
 ?>
 
 <?php if ($isLegacy): ?>
-<div align="right" style="margin-top:-14px; margin-bottom:-6px; margin-right:140px;">
-    Select Algo: <select id="algo_select"><?= $options ?></select>&nbsp;
+<div class="admn-page">
+<?= Yii::$app->ViewUtils->getAdminMiningToolbar('Workers', 'stratum workers · admin console', 'LIVE', 'live · 30s') ?>
+<div class="admn-selectbar">
+    <label for="algo_select">Algorithm</label>
+    <select id="algo_select"><?= $options ?></select>
+    <span class="admn-hint">switch algo to reload the table</span>
+</div>
+<div id="main_results"></div>
 </div>
 
-<?php elseif (!$isTailwind): ?>
+<?php else: ?>
+<?= Yii::$app->ViewUtils->getAdminSideBarLinks() ?>
+<?php if (!$isTailwind): ?>
 <div class="d-flex align-items-center gap-2 mb-2">
     <label class="text-muted small mb-0">Algo:</label>
     <select id="algo_select" class="form-select form-select-sm" style="width:140px;">
@@ -52,6 +58,7 @@ $homeUrl = Yii::$app->homeUrl;
 <?php endif ?>
 
 <div id="main_results"></div>
+<?php endif ?>
 
 <script>
 $(function () {

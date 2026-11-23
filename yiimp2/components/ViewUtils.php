@@ -271,6 +271,37 @@ JS;
     }
 
     /**
+     * Compact admin toolbar using the public mining-page visual language.
+     * Registers the shared stylesheet once and reuses the existing quick-nav links.
+     */
+    public function getAdminMiningToolbar(
+        string $title,
+        string $subtitle = 'admin console',
+        string $badge = '',
+        string $live = 'live · 60s'
+    ): string {
+        Yii::$app->view->registerCssFile('@web/css/admin-mining.css');
+
+        $links = str_replace('&nbsp;', '', $this->getAdminSideBarLinks());
+        $html  = '<div class="admn-toolbar">';
+        $html .= '<div class="admn-toolbar-brand"><i class="admn-live-dot"></i>'
+               . '<span class="admn-brand-text"><b>' . Html::encode($title) . '</b>'
+               . '<small>' . Html::encode($subtitle) . '</small></span>';
+        if ($badge !== '') {
+            $html .= '<span class="admn-badge">' . Html::encode($badge) . '</span>';
+        }
+        $html .= '</div>';
+        $html .= '<div class="admn-toolbar-links">' . $links . '</div>';
+        if ($live !== '') {
+            $html .= '<span class="admn-live"><i class="admn-live-dot"></i>'
+                   . Html::encode($live) . ' <span>auto</span></span>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
      * Full sidebar navigation rendered inside layout files.
      * AdminLTE: <ul class="nav sidebar-menu"> with Bootstrap Icons.
      * Tailwind: <nav> with Lucide icon placeholders.

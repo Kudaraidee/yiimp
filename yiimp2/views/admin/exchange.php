@@ -3,10 +3,12 @@
 /** @var yii\web\View $this */
 
 $this->title = 'Exchange';
-echo Yii::$app->ViewUtils->getAdminSideBarLinks();
 ?>
+<div class="admn-page">
+<?= Yii::$app->ViewUtils->getAdminMiningToolbar('Exchange', 'order routing · admin console', 'EXCH', 'live · 60s') ?>
 
 <div id="main_results"></div>
+</div>
 
 <script>
 $(function () { main_refresh(); });

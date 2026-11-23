@@ -68,6 +68,10 @@ if ($coinId && $coin) {
     ];
 }
 
+$owedFmt     = $cu->bitcoinvaluetoa($total);
+$immatureFmt = $cu->bitcoinvaluetoa($totalImmat);
+$clearedFmt  = $cu->bitcoinvaluetoa($cleared);
+
 // ── Category badge helpers ────────────────────────────────────────────────────
 $categoryBadge = function(string $cat) use ($isTailwind): string {
     if ($isTailwind) {
@@ -100,18 +104,37 @@ $categoryBadge = function(string $cat) use ($isTailwind): string {
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<div align="right" style="margin-top:-14px; margin-bottom:6px;">
-    <input class="search" type="search" data-column="all" style="width:140px;" placeholder="Search...">
+<div class="admn-kpis">
+    <div class="admn-kpi accent">
+        <span class="k-label">Records</span>
+        <span class="k-value"><?= count($rows) ?></span>
+        <span class="k-sub"><?= count($earnings) >= 1500 ? 'limit reached' : 'latest earnings' ?></span>
+    </div>
+    <div class="admn-kpi good">
+        <span class="k-label">Total owed</span>
+        <span class="k-value">₿ <?= Html::encode($owedFmt) ?></span>
+        <span class="k-sub">mature + immature</span>
+    </div>
+    <div class="admn-kpi warn">
+        <span class="k-label">Immature</span>
+        <span class="k-value">₿ <?= Html::encode($immatureFmt) ?></span>
+        <span class="k-sub">awaiting confirmations</span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Cleared</span>
+        <span class="k-value">₿ <?= Html::encode($clearedFmt) ?></span>
+        <span class="k-sub">moved to balances</span>
+    </div>
 </div>
-<style type="text/css">
-tr.ssrow.filtered { display: none; }
-.actions { width: 120px; text-align: right; }
-table.dataGrid a.red { color: darkred; }
-table.totals { margin-top: 8px; margin-left: 16px; display: inline-block; }
-table.totals th { text-align: left; width: 100px; }
-table.totals td { text-align: right; }
-.page .footer { width: auto; }
-</style>
+
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Earnings</span>
+        <span class="admn-sub">block rewards &middot; status &middot; payouts</span></span>
+        <input class="search" type="search" data-column="all" placeholder="Search…">
+    </div>
+    <div class="admn-card-body flush">
+    <style>tr.ssrow.filtered { display: none; }</style>
 
 <?php Yii::$app->ViewUtils->showTableSorter('maintable', "{
 	tableClass: 'dataGrid',
@@ -165,19 +188,44 @@ table.totals td { text-align: right; }
 </th></tr>
 </tfoot>
 </table>
+    </div>
+</div>
 
 <?php if ($coinId && $coin): ?>
-<div class="totals" align="right">
-    <table class="totals">
-        <?php foreach ($totals as [$label, $val]): ?>
-        <tr><th><?= Html::encode($label) ?></th><td><?= $val ?> <?= Html::encode($symbol) ?></td></tr>
-        <?php endforeach ?>
-    </table>
-    <table class="totals">
-        <?php foreach ($wallet as [$label, $val, $title]): ?>
-        <tr<?= $title ? ' title="' . Html::encode($title) . '"' : '' ?>><th><?= Html::encode($label) ?></th><td><?= $val ?> <?= Html::encode($symbol) ?></td></tr>
-        <?php endforeach ?>
-    </table>
+<div class="admn-grid">
+    <div class="admn-card">
+        <div class="admn-card-head">
+            <span class="admn-head-main"><span class="admn-title">Owed</span>
+            <span class="admn-sub">block reward breakdown</span></span>
+            <span class="admn-badge"><?= Html::encode($symbol) ?></span>
+        </div>
+        <div class="admn-card-body">
+            <div class="admn-tiles">
+                <?php foreach ($totals as [$label, $val]): ?>
+                <div class="admn-tile">
+                    <span class="t-label"><?= Html::encode($label) ?></span>
+                    <span class="t-value"><?= Html::encode($val) ?> <?= Html::encode($symbol) ?></span>
+                </div>
+                <?php endforeach ?>
+            </div>
+        </div>
+    </div>
+    <div class="admn-card">
+        <div class="admn-card-head">
+            <span class="admn-head-main"><span class="admn-title">Wallet</span>
+            <span class="admn-sub">balance reconciliation</span></span>
+        </div>
+        <div class="admn-card-body">
+            <div class="admn-tiles">
+                <?php foreach ($wallet as [$label, $val, $title]): ?>
+                <div class="admn-tile"<?= $title ? ' title="' . Html::encode($title) . '"' : '' ?>>
+                    <span class="t-label"><?= Html::encode($label) ?></span>
+                    <span class="t-value"><?= Html::encode($val) ?> <?= Html::encode($symbol) ?></span>
+                </div>
+                <?php endforeach ?>
+            </div>
+        </div>
+    </div>
 </div>
 <?php endif ?>
 

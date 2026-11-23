@@ -5,11 +5,13 @@
 /** @var app\models\Coins|null $coin   */
 
 $this->title = $coin ? 'Earnings — ' . $coin->symbol : 'Earnings';
-
-echo Yii::$app->ViewUtils->getAdminSideBarLinks();
+$badge = $coin ? strtoupper((string) $coin->symbol) : 'ALL';
 ?>
+<div class="admn-page">
+<?= Yii::$app->ViewUtils->getAdminMiningToolbar('Earnings', 'rewards · admin console', $badge, 'live · 60s') ?>
 
 <div id="main_results"></div>
+</div>
 
 <script>
 var main_delay = 60000;

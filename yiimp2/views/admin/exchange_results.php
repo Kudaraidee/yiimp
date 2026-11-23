@@ -28,6 +28,13 @@ foreach ($orders as $order) {
 }
 $totalBidPct = $totalValue > 0 ? round(($totalValue - $totalBid) / $totalValue * 100, 1) : '';
 
+$waitingCount = 0;
+$depositValue = 0.0;
+foreach ($deposits as $dep) {
+    if ($dep->status === 'waiting') $waitingCount++;
+    $depositValue += (float) (($dep->price ?: ($coins[$dep->coinid]->price ?? 0)) * $dep->quantity);
+}
+
 ?>
 
 <?php if ($isLegacy): ?>
@@ -35,8 +42,37 @@ $totalBidPct = $totalValue > 0 ? round(($totalValue - $totalBid) / $totalValue *
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
 
+<div class="admn-kpis">
+    <div class="admn-kpi <?= $stuckMarkets ? 'warn' : 'good' ?>">
+        <span class="k-label">Stuck markets</span>
+        <span class="k-value"><?= count($stuckMarkets) ?></span>
+        <span class="k-sub">sent &gt;2h, not traded</span>
+    </div>
+    <div class="admn-kpi accent">
+        <span class="k-label">Open orders</span>
+        <span class="k-value"><?= count($orderRows) ?></span>
+        <span class="k-sub">₿ <?= Html::encode($conv->bitcoinvaluetoa($totalValue)) ?> at ask</span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Deposits</span>
+        <span class="k-value"><?= count($deposits) ?></span>
+        <span class="k-sub"><?= (int) $waitingCount ?> waiting</span>
+    </div>
+    <div class="admn-kpi good">
+        <span class="k-label">Deposit value</span>
+        <span class="k-value">₿ <?= Html::encode($conv->bitcoinvaluetoa($depositValue)) ?></span>
+        <span class="k-sub">tracked transfers</span>
+    </div>
+</div>
+
 <?php if ($stuckMarkets): ?>
-<br>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Stuck Markets</span>
+        <span class="admn-sub">sent but not yet traded</span></span>
+        <span class="admn-badge warn"><?= count($stuckMarkets) ?></span>
+    </div>
+    <div class="admn-card-body flush">
 <table class="dataGrid">
 <thead><tr>
     <th width="20"></th>
@@ -57,9 +93,17 @@ $totalBidPct = $totalValue > 0 ? round(($totalValue - $totalBid) / $totalValue *
 <?php endforeach ?>
 </tbody>
 </table>
+    </div>
+</div>
 <?php endif ?>
 
-<br>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Open Orders</span>
+        <span class="admn-sub">live exchange asks / bids</span></span>
+        <span class="admn-badge"><?= count($orderRows) ?> orders</span>
+    </div>
+    <div class="admn-card-body flush">
 <table class="dataGrid">
 <thead><tr>
     <th width="20"></th>
@@ -94,8 +138,16 @@ $totalBidPct = $totalValue > 0 ? round(($totalValue - $totalBid) / $totalValue *
     <td></td>
 </tr></tfoot>
 </table>
+    </div>
+</div>
 
-<br>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Exchange Deposits</span>
+        <span class="admn-sub">tracked transfers</span></span>
+        <span class="admn-badge <?= $waitingCount ? 'warn' : '' ?>"><?= (int) $waitingCount ?> waiting</span>
+    </div>
+    <div class="admn-card-body flush">
 <table class="dataGrid">
 <thead><tr>
     <th width="20"></th>
@@ -127,6 +179,8 @@ $totalBidPct = $totalValue > 0 ? round(($totalValue - $totalBid) / $totalValue *
 <?php endforeach ?>
 </tbody>
 </table>
+    </div>
+</div>
 
 
 <?php elseif (!$isTailwind): ?>

@@ -4,14 +4,14 @@
 /** @var int                   $coinId */
 /** @var app\models\Coins|null $coin   */
 
-use yii\helpers\Html;
-
 $this->title = 'Payments' . ($coin ? ' — ' . $coin->symbol : '');
-
-echo Yii::$app->ViewUtils->getAdminSideBarLinks();
+$badge = $coin ? strtoupper((string) $coin->symbol) : 'ALL';
 ?>
+<div class="admn-page">
+<?= Yii::$app->ViewUtils->getAdminMiningToolbar('Payments', 'payout queue · admin console', $badge, 'live · 60s') ?>
 
 <div id="main_results"></div>
+</div>
 
 <script>
 var main_delay   = 60000;

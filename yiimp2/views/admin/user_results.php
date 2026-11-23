@@ -42,6 +42,7 @@ foreach ($users as $user) {
 
 $balanceFmt = $conv->bitcoinvaluetoa($totalBalance);
 $paidFmt    = $conv->bitcoinvaluetoa($totalPaid);
+$workerTotal = array_sum(array_column($rows, 'minerCount'));
 
 // ── Action link builders ──────────────────────────────────────────────────────
 if ($isTailwind) {
@@ -62,14 +63,37 @@ if ($isTailwind) {
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<div align="right" style="margin-top:-20px; margin-bottom:6px;">
-    <input class="search" type="search" data-column="all" style="width:140px;" placeholder="Search…">
+<div class="admn-kpis">
+    <div class="admn-kpi accent">
+        <span class="k-label">Users</span>
+        <span class="k-value"><?= count($users) ?></span>
+        <span class="k-sub"><?= Html::encode($symbol) ?></span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Workers</span>
+        <span class="k-value"><?= (int) $workerTotal ?></span>
+        <span class="k-sub">registered miners</span>
+    </div>
+    <div class="admn-kpi warn">
+        <span class="k-label">Balance</span>
+        <span class="k-value">₿ <?= Html::encode($balanceFmt) ?></span>
+        <span class="k-sub">owed to miners</span>
+    </div>
+    <div class="admn-kpi good">
+        <span class="k-label">Total paid</span>
+        <span class="k-value">₿ <?= Html::encode($paidFmt) ?></span>
+        <span class="k-sub">lifetime payouts</span>
+    </div>
 </div>
-<style>
-.red { color: darkred; }
-tr.ssrow.filtered { display: none; }
-.actions a { margin-right: 4px; }
-</style>
+
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Miner Accounts</span>
+        <span class="admn-sub">balances · hashrate · controls</span></span>
+        <input class="search" type="search" data-column="all" placeholder="Search…">
+    </div>
+    <div class="admn-card-body flush">
+    <style>tr.ssrow.filtered { display: none; }</style>
 
 <?php Yii::$app->ViewUtils->showTableSorter('maintable', "{
     tableClass: 'dataGrid',
@@ -172,6 +196,8 @@ tr.ssrow.filtered { display: none; }
 <?php endif ?>
 </tfoot>
 </table>
+    </div>
+</div>
 
 
 <?php elseif (!$isTailwind): ?>

@@ -12,8 +12,14 @@ $isTailwind  = Yii::$app->LayoutManager->isTailwind();
 $isLegacy    = Yii::$app->LayoutManager->isLegacy();
 $conv        = Yii::$app->ConversionUtils;
 
-echo Yii::$app->ViewUtils->getAdminSideBarLinks();
-if ($isLegacy) echo '<br/><br/>';
+if ($isLegacy) {
+    echo '<div class="admn-page">';
+    echo Yii::$app->ViewUtils->getAdminMiningToolbar(
+        'Botnets', 'suspicious miner clusters · admin console', 'RISK', 'static · on load'
+    );
+} else {
+    echo Yii::$app->ViewUtils->getAdminSideBarLinks();
+}
 
 // ── Shared row resolution ─────────────────────────────────────────────────────
 $resolved = [];
@@ -22,6 +28,14 @@ foreach ($rows as $botnet) {
     $user = $accounts[$botnet['userid']] ?? null; if (!$user) continue;
     $coin = $coins[$user->coinid]        ?? null; if (!$coin) continue;
     $resolved[] = compact('botnet', 'user', 'coin');
+}
+
+$botnetGroups  = count($resolved);
+$botnetIps     = 0;
+$botnetWorkers = 0;
+foreach ($resolved as $r) {
+    $botnetIps     = max($botnetIps, (int) $r['botnet']['ips']);
+    $botnetWorkers += (int) $r['botnet']['workers'];
 }
 
 // ── Action link builder ───────────────────────────────────────────────────────
@@ -43,12 +57,31 @@ if ($isTailwind) {
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<style>
-.red { color: darkred; }
-table.dataGrid { max-width: 99.5%; }
-table.dataGrid a.red { color: darkred; }
-.actions form { display: inline; margin-right: 3px; }
-</style>
+<div class="admn-kpis">
+    <div class="admn-kpi <?= $botnetGroups > 0 ? 'warn' : 'good' ?>">
+        <span class="k-label">Flagged groups</span>
+        <span class="k-value"><?= (int) $botnetGroups ?></span>
+        <span class="k-sub">&gt; 10 distinct IPs per group</span>
+    </div>
+    <div class="admn-kpi accent">
+        <span class="k-label">Peak IPs</span>
+        <span class="k-value"><?= (int) $botnetIps ?></span>
+        <span class="k-sub">single worker group</span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Workers</span>
+        <span class="k-value"><?= (int) $botnetWorkers ?></span>
+        <span class="k-sub">across flagged groups</span>
+    </div>
+</div>
+
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Suspected Botnets</span>
+        <span class="admn-sub">distinct IP clustering</span></span>
+        <span class="admn-badge <?= $botnetGroups > 0 ? 'warn' : 'good' ?>"><?= (int) $botnetGroups ?> groups</span>
+    </div>
+    <div class="admn-card-body flush">
 
 <?php Yii::$app->ViewUtils->showTableSorter('maintable', "{
     tableClass: 'dataGrid',
@@ -108,7 +141,10 @@ table.dataGrid a.red { color: darkred; }
 <tr><th colspan="10">No botnets detected (threshold: &gt; 10 distinct IPs per worker group)</th></tr>
 <?php endif ?>
 </tfoot>
-</table><br>
+</table>
+    </div>
+</div>
+</div><!-- /.admn-page -->
 
 
 <?php elseif (!$isTailwind): ?>

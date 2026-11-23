@@ -47,19 +47,37 @@ $limited   = (!$coinId && $userCount === 100);
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<div align="right" style="margin-top:-14px; margin-bottom:6px;">
-    <input class="search" type="search" data-column="all" style="width:140px;" placeholder="Search…">
+<div class="admn-kpis">
+    <div class="admn-kpi accent">
+        <span class="k-label">Users</span>
+        <span class="k-value"><?= (int) $userCount ?></span>
+        <span class="k-sub"><?= $limited ? 'limited to 100' : 'active payout queue' ?></span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Balances</span>
+        <span class="k-value">₿ <?= Html::encode($conv->bitcoinvaluetoa($totalBalance)) ?></span>
+        <span class="k-sub">owed to miners</span>
+    </div>
+    <div class="admn-kpi warn">
+        <span class="k-label">Immature</span>
+        <span class="k-value">₿ <?= Html::encode($conv->bitcoinvaluetoa($totalImmature)) ?></span>
+        <span class="k-sub">not yet cleared</span>
+    </div>
+    <div class="admn-kpi <?= $totalFailed > 0 ? 'warn' : 'good' ?>">
+        <span class="k-label">Failed</span>
+        <span class="k-value">₿ <?= Html::encode($conv->bitcoinvaluetoa($totalFailed)) ?></span>
+        <span class="k-sub">needs restoration</span>
+    </div>
 </div>
-<style>
-tr.ssrow.filtered { display: none; }
-.currency { width:120px; max-width:180px; text-align:right; }
-.red      { color: darkred; }
-.actions  { width:120px; text-align:right; }
-table.totals { margin-top:8px; margin-right:16px; }
-table.totals th { text-align:left; width:100px; }
-table.totals td { text-align:right; }
-table.totals tr.red td { color:darkred; }
-</style>
+
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Payout Queue</span>
+        <span class="admn-sub">balances · immature · failed payouts</span></span>
+        <input class="search" type="search" data-column="all" placeholder="Search…">
+    </div>
+    <div class="admn-card-body flush">
+    <style>tr.ssrow.filtered { display: none; }</style>
 
 <?php Yii::$app->ViewUtils->showTableSorter('maintable', "{
     tableClass: 'dataGrid',
@@ -118,25 +136,44 @@ table.totals tr.red td { color:darkred; }
 </th></tr>
 </tfoot>
 </table>
+    </div>
+</div>
 
 <?php if ($coinId && $coin):
     $symbol = Html::encode($coin->symbol); ?>
-<div class="totals" align="right">
-    <table class="totals">
-        <tr><th>Balances</th><td><?= Html::encode($conv->bitcoinvaluetoa($totalBalance)) ?> <?= $symbol ?></td></tr>
-        <tr><th>Immature</th><td><?= Html::encode($conv->bitcoinvaluetoa($totalImmature)) ?> <?= $symbol ?></td></tr>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Coin Totals</span>
+        <span class="admn-sub">payout reconciliation</span></span>
+        <span class="admn-badge <?= $totalFailed > 0 ? 'warn' : 'good' ?>"><?= Html::encode($symbol) ?></span>
+    </div>
+    <div class="admn-card-body">
+        <div class="admn-tiles">
+            <div class="admn-tile">
+                <span class="t-label">Balances</span>
+                <span class="t-value"><?= Html::encode($conv->bitcoinvaluetoa($totalBalance)) ?> <?= $symbol ?></span>
+            </div>
+            <div class="admn-tile">
+                <span class="t-label">Immature</span>
+                <span class="t-value"><?= Html::encode($conv->bitcoinvaluetoa($totalImmature)) ?> <?= $symbol ?></span>
+            </div>
+            <?php if ($totalFailed > 0): ?>
+            <div class="admn-tile">
+                <span class="t-label">Failed</span>
+                <span class="t-value"><?= Html::encode($conv->bitcoinvaluetoa($totalFailed)) ?> <?= $symbol ?></span>
+            </div>
+            <?php endif ?>
+        </div>
         <?php if ($totalFailed > 0): ?>
-        <tr class="red">
-            <th>Failed</th><td><?= Html::encode($conv->bitcoinvaluetoa($totalFailed)) ?> <?= $symbol ?></td>
-        </tr>
-        <tr><td colspan="2">
+        <div class="admn-card-foot">
             <?= Html::a('Reset all failed', ['/admin/cancelUsersPayment', 'id' => $coinId], [
+                'class'   => 'admn-pill warn',
                 'title'   => 'Add all failed payouts back to user balances',
                 'onclick' => 'return confirm("Restore all failed payouts for ' . $symbol . ' to user balances?")',
             ]) ?>
-        </td></tr>
+        </div>
         <?php endif ?>
-    </table>
+    </div>
 </div>
 <?php endif ?>
 

@@ -13,11 +13,15 @@ $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 // ── Shared computation ────────────────────────────────────────────────────────
 $computed = [];
 $totalWorkers = 0;
+$totalHashrate = 0.0;
+$totalInvalid  = 0.0;
 foreach ($rows as $item) {
     $hashrate = (float) $item['hashrate'];
     $invalid  = (float) $item['invalid'];
     $percent  = $hashrate ? round($invalid * 100 / $hashrate, 3) : 0;
-    $totalWorkers += (int) $item['workers'];
+    $totalWorkers  += (int) $item['workers'];
+    $totalHashrate += $hashrate;
+    $totalInvalid  += $invalid;
     $computed[] = [
         'version'  => $item['version'],
         'workers'  => (int) $item['workers'],
@@ -26,6 +30,8 @@ foreach ($rows as $item) {
         'percent'  => $percent,
     ];
 }
+
+$badPct = $totalHashrate > 0 ? round($totalInvalid * 100 / $totalHashrate, 3) : 0.0;
 
 if ($algo === '') {
     if ($isTailwind) {
@@ -42,7 +48,36 @@ if ($algo === '') {
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<br>
+<div class="admn-kpis">
+    <div class="admn-kpi accent">
+        <span class="k-label">Pool rate</span>
+        <span class="k-value"><?= Html::encode($conv->Itoa2($totalHashrate) . 'h/s') ?></span>
+        <span class="k-sub"><?= Html::encode($algo) ?></span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Workers</span>
+        <span class="k-value"><?= (int) $totalWorkers ?></span>
+        <span class="k-sub">reporting clients</span>
+    </div>
+    <div class="admn-kpi warn">
+        <span class="k-label">Bad rate</span>
+        <span class="k-value"><?= Html::encode($conv->Itoa2($totalInvalid) . 'h/s') ?></span>
+        <span class="k-sub">stale / invalid</span>
+    </div>
+    <div class="admn-kpi <?= $badPct > 5 ? 'warn' : 'good' ?>">
+        <span class="k-label">Bad share</span>
+        <span class="k-value"><?= $badPct ?>%</span>
+        <span class="k-sub">of reported rate</span>
+    </div>
+</div>
+
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Client Versions</span>
+        <span class="admn-sub">worker software mix</span></span>
+        <span class="admn-badge"><?= count($computed) ?> versions</span>
+    </div>
+    <div class="admn-card-body flush">
 <table class="dataGrid">
 <thead>
 <tr>
@@ -68,6 +103,8 @@ if ($algo === '') {
 <?php endif ?>
 </tbody>
 </table>
+    </div>
+</div>
 
 
 <?php elseif (!$isTailwind): ?>
