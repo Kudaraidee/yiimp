@@ -33,6 +33,11 @@ bool client_uses_precise_difficulty()
 	return is_gpu_vardiff() || is_low_diff_vardiff();
 }
 
+bool client_low_difficulty_algo()
+{
+	return is_low_diff_vardiff();
+}
+
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client)
 {
 	if (client_uses_precise_difficulty())

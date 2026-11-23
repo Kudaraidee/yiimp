@@ -170,6 +170,7 @@ bool client_find_my_ip(const char *ip);
 int client_send_difficulty(YAAMP_CLIENT *client, double difficulty);
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client);
 bool client_uses_precise_difficulty();
+bool client_low_difficulty_algo();
 
 void client_change_difficulty(YAAMP_CLIENT *client, double difficulty);
 void client_record_difficulty(YAAMP_CLIENT *client);

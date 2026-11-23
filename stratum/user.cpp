@@ -207,7 +207,10 @@ void db_update_workers(YAAMP_DB *db)
 		if(client->deleted) continue;
 		if(!client->workerid) continue;
 
-		if(client->speed < YAAMP_CLIENT_MINSPEED)
+		// Low-difficulty coins need far longer between shares, so the rough
+		// speed estimate stays below YAAMP_CLIENT_MINSPEED and would kick a
+		// healthy miner (and his reconnect inherits the same low estimate).
+		if(!client_low_difficulty_algo() && client->speed < YAAMP_CLIENT_MINSPEED)
 		{
 			clientlog(client, "speed %f", client->speed);
 			shutdown(client->sock->sock, SHUT_RDWR);
