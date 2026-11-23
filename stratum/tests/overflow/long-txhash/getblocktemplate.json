@@ -1,0 +1,39 @@
+{
+ "result": {
+  "capabilities": [
+   "proposal"
+  ],
+  "version": 536870912,
+  "rules": [
+   "csv"
+  ],
+  "previousblockhash": "000000000000000000015608c6f72ab72e77a19fe36dd5aac9115ec09d407c0f",
+  "transactions": [
+   {
+    "data": "85d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a4485d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a4485d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a44",
+    "txid": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    "fee": 1000,
+    "depends": [],
+    "weight": 384
+   }
+  ],
+  "coinbaseaux": {
+   "flags": ""
+  },
+  "coinbasevalue": 312501000,
+  "target": "00000000000000000002f1280000000000000000000000000000000000000000",
+  "mintime": 1767225000,
+  "mutable": [
+   "time",
+   "transactions",
+   "prevblock"
+  ],
+  "noncerange": "00000000ffffffff",
+  "curtime": 1767225600,
+  "bits": "17030ecd",
+  "height": 900000
+ },
+ "error": null,
+ "id": 1
+}
