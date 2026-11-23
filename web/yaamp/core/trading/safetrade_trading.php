@@ -40,14 +40,16 @@ function safetrade_auto_withdraw($saveBalance)
 	if ($beneficiary > 0) {
 		$body['beneficiary_id'] = $beneficiary;
 	} else {
+		// SafeTrade's CreateWithdrawParams requires email_code without a
+		// beneficiary_id; otp_code is only an additional factor.
 		$emailCode = trim((string) exchange_get('safetrade', 'withdraw_email_code', ''));
 		$otpCode = trim((string) exchange_get('safetrade', 'withdraw_otp_code', ''));
-		if ($emailCode === '' && $otpCode === '') {
-			debuglog('safetrade: withdraw_min_btc is set but no withdraw_beneficiary_id or withdraw code is configured');
+		if ($emailCode === '') {
+			debuglog('safetrade: withdraw_min_btc is set but no withdraw_beneficiary_id or withdraw_email_code is configured');
 			return;
 		}
 		$body['address'] = $btcaddr;
-		if ($emailCode !== '') $body['email_code'] = $emailCode;
+		$body['email_code'] = $emailCode;
 		if ($otpCode !== '') $body['otp_code'] = $otpCode;
 	}
 

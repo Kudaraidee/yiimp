@@ -31,7 +31,18 @@ class SafeTradeDriver extends ExchangeDriver
     {
         $url = self::API . ltrim($method, '/');
         if ($params !== '') $url .= '?' . $params;
-        $raw = $this->curlRequest('GET', $url, ['Accept: application/json'], '', false);
+
+        $status = 0;
+        $raw = $this->curlRequest('GET', $url, ['Accept: application/json'], '', false, [], $status);
+        if ($status >= 300) {
+            static $warned = false;
+            if (!$warned) {
+                $warned = true;
+                Yii::warning($this->name() . ': public api returned HTTP ' . $status, __CLASS__);
+            }
+            return null;
+        }
+
         $decoded = json_decode($raw, $returnType === 'object' ? false : true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             Yii::warning($this->name() . ': invalid public response ' . substr($raw, 0, 200), __CLASS__);
@@ -422,14 +433,16 @@ class SafeTradeDriver extends ExchangeDriver
         if ($beneficiary > 0) {
             $body['beneficiary_id'] = $beneficiary;
         } else {
+            // SafeTrade's CreateWithdrawParams requires email_code without a
+            // beneficiary_id; otp_code is only an additional factor.
             $emailCode = trim((string) $this->config('withdraw_email_code', ''));
             $otpCode = trim((string) $this->config('withdraw_otp_code', ''));
-            if ($emailCode === '' && $otpCode === '') {
-                Yii::warning($this->name() . ': withdraw_min_btc set but no withdraw_beneficiary_id or withdraw code configured', __CLASS__);
+            if ($emailCode === '') {
+                Yii::warning($this->name() . ': withdraw_min_btc set but no withdraw_beneficiary_id or withdraw_email_code configured', __CLASS__);
                 return;
             }
             $body['address'] = $btcAddr;
-            if ($emailCode !== '') $body['email_code'] = $emailCode;
+            $body['email_code'] = $emailCode;
             if ($otpCode !== '') $body['otp_code'] = $otpCode;
         }
 

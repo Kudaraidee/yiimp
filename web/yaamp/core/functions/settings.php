@@ -150,8 +150,8 @@ function exchange_valid_keys()
 		'deposit_network'		=> 'Default deposit blockchain_key (SafeTrade)',
 		'withdraw_beneficiary_id'=> 'Beneficiary ID used by SafeTrade automatic BTC withdrawals',
 		'withdraw_blockchain_key'=> 'BTC withdrawal blockchain_key (SafeTrade, default bitcoin-key)',
-		'withdraw_email_code'	=> 'SafeTrade withdrawal email code (only when no beneficiary ID)',
-		'withdraw_otp_code'		=> 'SafeTrade withdrawal OTP code (only when no beneficiary ID)',
+		'withdraw_email_code'	=> 'SafeTrade withdrawal email code (required when no beneficiary ID)',
+		'withdraw_otp_code'		=> 'SafeTrade withdrawal OTP code (optional when no beneficiary ID)',
 		'withdraw_password'		=> 'SafeTrade withdraw password, if enabled on the account',
 	);
 }

@@ -234,7 +234,8 @@ abstract class ExchangeDriver
         array  $headers   = [],
         string $body      = '',
         bool   $sslVerify = true,
-        array  $extraOpts = []
+        array  $extraOpts = [],
+        ?int   &$httpCode = null
     ): string {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -258,11 +259,13 @@ abstract class ExchangeDriver
         }
         foreach ($extraOpts as $opt => $val) curl_setopt($ch, $opt, $val);
         $res = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         if ($res === false) {
             Yii::warning($this->name() . ': curl ' . $method . ' ' . $url . ': ' . curl_error($ch), __CLASS__);
             $res = '';
         }
         curl_close($ch);
+        if ($httpCode !== null) $httpCode = $status;
         return strip_tags((string) $res);
     }
 }
