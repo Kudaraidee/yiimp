@@ -24,8 +24,8 @@ static bool homescrypt_uses_canonical_merkle(const YAAMP_CLIENT *client)
 	return version && strstr(version, "gpuminer");
 }
 
-static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
-	const YAAMP_CLIENT *client, const char *ntime, const char *nonce)
+static void homescrypt_standard_header_ex(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
+	const YAAMP_CLIENT *client, const char *ntime, const char *nonce, bool swap_merkle)
 {
 	unsigned char coinbase_bin[1024];
 	binlify(coinbase_bin, values->coinbase);
@@ -44,7 +44,7 @@ static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPL
 	ser_string_be(templ->prevhash_be, prevhash_le, 8);
 
 	const char *header_merkle = merkleroot.c_str();
-	if (homescrypt_uses_canonical_merkle(client))
+	if (homescrypt_uses_canonical_merkle(client) && swap_merkle)
 	{
 		// Verified against Lumenite block 45420: HomeScrypt hashes the raw
 		// merkle root, not the display-order form meshpool miners use.
@@ -60,6 +60,12 @@ static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPL
 	g_current_algo->hash_function((char *)values->header_bin, (char *)values->hash_bin, 80);
 	hexlify(values->hash_hex, values->hash_bin, 32);
 	string_be(values->hash_hex, values->hash_be);
+}
+
+static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
+	const YAAMP_CLIENT *client, const char *ntime, const char *nonce)
+{
+	homescrypt_standard_header_ex(values, templ, client, ntime, nonce, true);
 }
 
 
@@ -836,6 +842,21 @@ if (g_debuglog_hash) {
         debuglog("shar %016lx \n", user_target);
         debuglog("hash %016lx \n", hash_int);
         debuglog("coin %016lx \n", coin_target);
+}
+
+if (is_homescrypt && g_debuglog_hash && homescrypt_uses_canonical_merkle(client))
+{
+	YAAMP_JOB_VALUES altvalues;
+	memset(&altvalues, 0, sizeof(altvalues));
+	if (build_submit_values(&altvalues, templ, client->extranonce1, extranonce2, ntime, nonce,
+		versionmask, false))
+	{
+		homescrypt_standard_header_ex(&altvalues, templ, client, ntime, nonce, false);
+		uint64_t alt_hash_int = get_hash_difficulty(altvalues.hash_bin);
+		debuglog("HSCMP extra=%s ntime=%s nonce=%s curdiff=%.9f altdiff=%.9f cur=%016lx alt=%016lx target=%016lx\n",
+			extranonce2, ntime, nonce, target_to_diff(hash_int), target_to_diff(alt_hash_int),
+			hash_int_scaled, alt_hash_int / 0x10000, user_target);
+	}
 }
 
 	// HomeScrypt miners derive their share target from yiimp's 64-bit slice
