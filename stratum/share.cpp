@@ -74,7 +74,20 @@ static void share_add_worker(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, c
 	{
 		worker->difficulty += client->difficulty_actual / g_current_algo->diff_multiplier;
 		if (!isaux) {
-			client->speed += client->difficulty_actual / g_current_algo->diff_multiplier * 42;
+			if (is_nebhash) {
+				// NEB difficulty is expected hashes per share, so H/s is
+				// difficulty divided by the real interval between shares.
+				// The generic *42 rule reported 100 Gh/s for a 1050Ti.
+				long long now = (long long) time(NULL);
+				double interval = client->neb_last_share_time
+					? (double) (now - client->neb_last_share_time) : 60.0;
+				if (interval < 1) interval = 1;
+				if (interval > 600) interval = 600;
+				client->neb_last_share_time = now;
+				client->speed = client->difficulty_actual / interval;
+			} else {
+				client->speed += client->difficulty_actual / g_current_algo->diff_multiplier * 42;
+			}
 		}
 		// log best share_diff
 		if (worker->share_diff < share_diff) worker->share_diff = share_diff;

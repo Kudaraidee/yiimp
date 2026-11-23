@@ -397,6 +397,13 @@ class YiimpUtils extends Component
 	public function hashrate_constant($algo=null)
 	{
 		switch ($algo) {
+			case 'nebhash':
+				// NEB share difficulty is already the expected hash count
+				// (2^256 / 256-bit target). The generic Bitcoin scale below
+				// would report PH/s for one small GPU; callers divide by 1000,
+				// so 1000 cancels that conversion for NEB.
+				$target = 1000;
+				break;
 			case 'equihash96':
 			case 'equihash125':
 			case 'equihash144':

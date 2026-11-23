@@ -212,6 +212,14 @@ function take_yaamp_fee($v, $algo, $percent=-1)
 function yaamp_hashrate_constant($algo=null)
 {
 	switch ($algo) {
+		case 'nebhash':
+			// NEB share difficulty is already the expected hash count
+			// (2^256 / 256-bit target). The generic Bitcoin scale below would
+			// multiply it by 2^42 and report PH/s for a single small GPU.
+			// Callers divide by 1000 to convert to Itoa2's H/s scale, so 1000
+			// exactly cancels that conversion for NEB.
+			$target = 1000;
+			break;
 		case 'equihash96':
 		case 'equihash125':
 		case 'equihash144':

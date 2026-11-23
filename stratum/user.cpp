@@ -227,7 +227,15 @@ void db_update_workers(YAAMP_DB *db)
 		if(is_nebhash && nebhash_vardiff_tick(client))
 			job_send_last(client);
 
-		client->speed *= 0.8;
+		if (is_nebhash) {
+			// NEB speed is assigned from the real share interval in
+			// share_add_worker(); only expire it when the miner goes quiet.
+			if (client->neb_last_share_time &&
+				(long long) time(NULL) - client->neb_last_share_time > 300)
+				client->speed = 0;
+		} else {
+			client->speed *= 0.8;
+		}
 		if(client->difficulty_written == client->difficulty_actual) continue;
 
 		db_query(db, "UPDATE workers SET difficulty=%f, subscribe=%d, tls=%d WHERE id=%d",

@@ -151,6 +151,9 @@ public:
 	int neb_vardiff_shares;
 	long long neb_second_start;
 	int neb_second_shares;
+	// Last accepted share, used to estimate NEB hashrate from the real
+	// share interval instead of yiimp's generic "42 shares per difficulty" rule.
+	long long neb_last_share_time;
 	int neb_bad_in_a_row;
 	int neb_models_count;
 	char neb_models[8][65];
