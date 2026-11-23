@@ -1,2 +1,0 @@
-#### fetch latest release versions from github
-#5 8 * * * root cd /var/www ; php runconsole.php cronjob/GithubScan
