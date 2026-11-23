@@ -439,7 +439,9 @@ static bool nebhash_load_datasets(const char *path)
 static shared_ptr<NEB_MODEL> nebhash_decode_model(uint8_t slot,
 	const uint8_t *payload, size_t len)
 {
-	if (len < 33) return shared_ptr<NEB_MODEL>();
+	// The caller already stripped the one-byte slot from the frame. The
+	// remaining payload is exactly a 32-byte weights hash plus packed weights.
+	if (len < 32) return shared_ptr<NEB_MODEL>();
 
 	CommonLock(&g_neb_lock);
 	if (slot >= (uint8_t) g_neb_dataset_count)
@@ -454,10 +456,10 @@ static shared_ptr<NEB_MODEL> nebhash_decode_model(uint8_t slot,
 	if (!a) return shared_ptr<NEB_MODEL>();
 
 	size_t packed_len = (size_t) a->nweights / 2;
-	if (len - 33 != packed_len)
+	if (len - 32 != packed_len)
 	{
 		stratumlog("nebhash: model frame slot %u has %zu weight bytes, expected %zu\n",
-			slot, len - 33, packed_len);
+			slot, len - 32, packed_len);
 		return shared_ptr<NEB_MODEL>();
 	}
 
