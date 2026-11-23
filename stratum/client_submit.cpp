@@ -14,8 +14,18 @@ static void reverse_hex32(char *out, const char *in)
 	out[8] = '\0';
 }
 
+static bool homescrypt_uses_canonical_merkle(const YAAMP_CLIENT *client)
+{
+	// gpuminer-rplant follows the standard Stratum v1 layout: the merkle root
+	// is byte-reversed from the display-order form into the raw 80-byte
+	// header. Meshpool's HomeScrypt miner uses the display-order bytes
+	// directly, so keep that legacy behavior for every other client.
+	const char *version = client ? client->version : NULL;
+	return version && strstr(version, "gpuminer");
+}
+
 static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
-	const char *ntime, const char *nonce)
+	const YAAMP_CLIENT *client, const char *ntime, const char *nonce)
 {
 	unsigned char coinbase_bin[1024];
 	binlify(coinbase_bin, values->coinbase);
@@ -25,16 +35,25 @@ static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPL
 	string merkleroot = merkle_with_first(templ->txsteps, coinhash);
 
 	char version[16], ntime_le[16], nbits_le[16], prevhash_le[128] = {0};
+	char merkleroot_be[128] = {0};
 	reverse_hex32(version, templ->version);
 	reverse_hex32(ntime_le, ntime);
 	reverse_hex32(nbits_le, templ->nbits);
-	// Standard Stratum miners byte-swap each 32-bit word of the advertised
-	// prevhash; yiimp stores it word-reversed, so swap it back to the raw
-	// 32 bytes they will place in the serialized header.
+	// yiimp advertises prevhash with each 32-bit word byte-reversed; the raw
+	// serialized header needs the original byte order.
 	ser_string_be(templ->prevhash_be, prevhash_le, 8);
 
+	const char *header_merkle = merkleroot.c_str();
+	if (homescrypt_uses_canonical_merkle(client))
+	{
+		// Verified against Lumenite block 45420: HomeScrypt hashes the raw
+		// merkle root, not the display-order form meshpool miners use.
+		ser_string_be(merkleroot.c_str(), merkleroot_be, 8);
+		header_merkle = merkleroot_be;
+	}
+
 	sprintf(values->header, "%s%s%s%s%s%s", version, prevhash_le,
-		merkleroot.c_str(), ntime_le, nbits_le, nonce);
+		header_merkle, ntime_le, nbits_le, nonce);
 	strcpy(values->header_be, values->header);
 	binlify(values->header_bin, values->header_be);
 
@@ -788,7 +807,7 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 			return true;
 		}
 		if (is_homescrypt && !homescrypt_uses_header_notify(client))
-			homescrypt_standard_header(&submitvalues, templ, ntime, nonce);
+			homescrypt_standard_header(&submitvalues, templ, client, ntime, nonce);
 	}
 
 	if (templ->height && !strcmp(g_current_algo->name,"lyra2z")) {
@@ -819,13 +838,15 @@ if (g_debuglog_hash) {
         debuglog("coin %016lx \n", coin_target);
 }
 
-	// HomeScrypt miners (including gpuminer-rplant-cuda) derive their share
-	// target from yiimp's 64-bit slice at bytes 22..29. Requiring the full
-	// 256-bit digest here would use a different, independent slice (bytes
-	// 29..31) and reject ~98% of otherwise valid shares. Block candidates are
-	// still checked against the full compact target in client_do_submit(), so
-	// only share accounting uses this miner-compatible comparison.
+	// HomeScrypt miners derive their share target from yiimp's 64-bit slice
+	// at bytes 22..29. Requiring the full 256-bit digest here would use a
+	// different, independent slice (bytes 29..31) and reject valid shares.
+	// The legacy coin-target fallback is disabled for HomeScrypt: with the
+	// corrected gpuminer header it is no longer needed for legitimate coin
+	// difficulty shares, and it previously accepted unrelated miner hashes.
 	bool share_ok = (hash_int_scaled <= user_target || hash_int <= coin_target);
+	if (is_homescrypt)
+		share_ok = (hash_int_scaled <= user_target);
 
 	if(!share_ok)
 	{
