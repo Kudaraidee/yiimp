@@ -763,6 +763,8 @@ void nebhash_client_init(YAAMP_CLIENT *client)
 	client->neb_second_start = neb_monotonic_ms();
 	client->neb_second_shares = 0;
 	client->neb_last_share_time = 0;
+	client->neb_speed_start = 0;
+	client->neb_speed_diff = 0;
 	client->neb_bad_in_a_row = 0;
 	client->neb_models_count = 0;
 	client->neb_first_job = true;

@@ -151,9 +151,13 @@ public:
 	int neb_vardiff_shares;
 	long long neb_second_start;
 	int neb_second_shares;
-	// Last accepted share, used to estimate NEB hashrate from the real
-	// share interval instead of yiimp's generic "42 shares per difficulty" rule.
+	// Last accepted share, used only to expire a stale speed estimate.
 	long long neb_last_share_time;
+	// Rolling 600s window of target difficulties and elapsed time. NEB shares
+	// are poisson-distributed, so a single share interval is far too noisy to
+	// use as the displayed hashrate (a lucky 4s interval showed 43 Mh/s).
+	long long neb_speed_start;
+	double neb_speed_diff;
 	int neb_bad_in_a_row;
 	int neb_models_count;
 	char neb_models[8][65];

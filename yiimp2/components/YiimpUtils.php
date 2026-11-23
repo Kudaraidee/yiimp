@@ -444,8 +444,11 @@ class YiimpUtils extends Component
 		return pow(2, $coin_powlimit_bits);
 	}
 
-	public function hashrate_step()
+	public function hashrate_step($algo=null)
 	{
+		// NEB shares are much rarer and Poisson-distributed; smooth the
+		// displayed hashrate over 600s instead of the generic 300s window.
+		if ($algo === 'nebhash') return 600;
 		return 300;
 	}
 
@@ -556,7 +559,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$subquery = (new \yii\db\Query())->select(['id'])->from('coins')->where(['rpcencoding' => 'POW']);
@@ -582,7 +585,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$cacheKey = "YIIMP_pool_rate_v2-$algo";
@@ -606,7 +609,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$cacheKey = "YIIMP_pool_shared_rate_v2-$algo";
@@ -630,7 +633,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$cacheKey = "YIIMP_pool_solo_rate_v2-$algo";
@@ -651,7 +654,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$rate = Yii::$app->cache->get("YIIMP_pool_rate_bad-$algo");
@@ -670,7 +673,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$rate = Yii::$app->cache->get("YIIMP_pool_rate_rentable-$algo");
@@ -692,7 +695,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		// v2 key + 60s TTL: the old key never expired and left the wallet
@@ -717,7 +720,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$cacheKey = "YIIMP_user_shared_rate_v2-$userid-$algo";
@@ -737,7 +740,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$cacheKey = "YIIMP_user_solo_rate_v2-$userid-$algo";
@@ -760,7 +763,7 @@ class YiimpUtils extends Component
 		if(!$coin || !$coin->enable) return 0;
 
 		$target   = $this->hashrate_constant($coin->algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($coin->algo);
 		$delay    = time() - $interval;
 
 		$cacheKey = "YIIMP_user_coin_shared_rate-$userid-$coinid";
@@ -784,7 +787,7 @@ class YiimpUtils extends Component
 		if(!$coin || !$coin->enable) return 0;
 
 		$target   = $this->hashrate_constant($coin->algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($coin->algo);
 		$delay    = time() - $interval;
 
 		$cacheKey = "YIIMP_user_coin_solo_rate-$userid-$coinid";
@@ -808,7 +811,7 @@ class YiimpUtils extends Component
 		if(!$algo) return 0;
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$diff = Yii::$app->cache->get("YIIMP_user_diff_avg-$userid-$algo");
@@ -841,7 +844,7 @@ class YiimpUtils extends Component
 		if (!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target   = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay    = time() - $interval;
 
 		$cacheKey = "YIIMP_worker_rate-{$workerid}-{$algo}";
@@ -862,7 +865,7 @@ class YiimpUtils extends Component
 		if (!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target   = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay    = time() - $interval;
 
 		// Average difficulty of valid shares — used to weight the invalid-share count
@@ -887,7 +890,7 @@ class YiimpUtils extends Component
 	{
 		if (!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay    = time() - $interval;
 
 		return (int) Yii::$app->db->createCommand(
@@ -902,7 +905,7 @@ class YiimpUtils extends Component
 		if(!$coin || !$coin->enable) return 0;
 
 		$target = $this->hashrate_constant($coin->algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($coin->algo);
 		$delay = time()-$interval;
 
 	$cacheKey = "YIIMP_coin_rate_v2-$coinid";
@@ -927,7 +930,7 @@ class YiimpUtils extends Component
 		if(!$coin || !$coin->enable) return 0;
 
 		$target = $this->hashrate_constant($coin->algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($coin->algo);
 		$delay = time()-$interval;
 
 	$cacheKey = "YIIMP_coin_shared_rate_v2-$coinid";
@@ -952,7 +955,7 @@ class YiimpUtils extends Component
 		if(!$coin || !$coin->enable) return 0;
 
 		$target = $this->hashrate_constant($coin->algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($coin->algo);
 		$delay = time()-$interval;
 
 		$cacheKey = "YIIMP_coin_solo_rate_v2-$coinid";
@@ -976,7 +979,7 @@ class YiimpUtils extends Component
 		if(!$algo) $algo = Yii::$app->session->get('yaamp-algo');
 
 		$target = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($algo);
 		$delay = time()-$interval;
 
 		$rate = Yii::$app->session->get("YIIMP_rented_rate-$algo");
@@ -1000,7 +1003,7 @@ class YiimpUtils extends Component
 		if (!$job) return 0;
 
 		$target   = $this->hashrate_constant($job->algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($job->algo);
 		$delay    = time() - $interval;
 
 		$rate = Yii::$app->cache->get("YIIMP_job_rate-$jobid");
@@ -1020,7 +1023,7 @@ class YiimpUtils extends Component
 		if (!$job) return 0;
 
 		$target   = $this->hashrate_constant($job->algo);
-		$interval = $this->hashrate_step();
+		$interval = $this->hashrate_step($job->algo);
 		$delay    = time() - $interval;
 
 		$diff = Yii::$app->cache->get("YIIMP_job_diff_avg-$jobid");
