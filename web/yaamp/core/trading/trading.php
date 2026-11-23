@@ -1,7 +1,6 @@
 <?php
 require_once('poloniex_trading.php');
 require_once('binance_trading.php');
-require_once('exbitron_trading.php');
 require_once('nestex_trading.php');
 require_once('kraken_trading.php');
 require_once('yobit_trading.php');
@@ -33,9 +32,6 @@ function cancelExchangeOrder($order=false)
 			case 'kucoin':
 				doKuCoinCancelOrder($order->uuid);
 				break;
-			case 'exbitron':
-				doExbitronCancelOrder($order->uuid);
-				break;
 			case 'nestex':
 				doNestexCancelOrder($order->uuid);
 				break;
@@ -64,11 +60,6 @@ function runExchange($exchangeName=false)
 				getCexIoBalances();
 				break;
 
-			case 'exbitron':
-				doExbitronTrading(true);
-				updateExbitronMarkets();
-				break;
-			
 			case 'nestex':
 				doNestexTrading(true);
 				updateNestexMarkets();

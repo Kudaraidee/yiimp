@@ -225,7 +225,7 @@ function doPoloniexTrading()
 		$res = $poloniex->withdraw('BTC', $amount, $btcaddr);
 		debuglog($res);
 
-		if($res && isset($res->response) && strpos($res->response, 'Withdrew') !== false)
+		if(is_array($res) && isset($res['response']) && strpos($res['response'], 'Withdrew') !== false)
 		{
 			$withdraw = new db_withdraws;
 			$withdraw->market = 'poloniex';

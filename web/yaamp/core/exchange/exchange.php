@@ -15,13 +15,11 @@ function strip_data($data)
 
 require_once("bitstamp.php");
 require_once("cexio.php");
-require_once("exbitron.php");
 require_once("nestex.php");
 require_once("gateio.php");
 require_once("kraken.php");
 require_once("poloniex.php");
 require_once("yobit.php");
-require_once("shapeshift.php");
 require_once("binance.php");
 require_once("hitbtc.php");
 require_once("kucoin.php");
@@ -58,11 +56,9 @@ function getMarketUrl($coin, $marketName)
 	else if($market == 'binance')
 		$url = "https://www.binance.com/trade.html?symbol={$symbol}_{$base}";
 	else if($market == 'poloniex')
-		$url = "https://poloniex.com/exchange#{$lowbase}_{$lowsymbol}";
+		$url = "https://poloniex.com/trade/{$base}_{$symbol}";
 	else if($market == 'cexio')
 		$url = "https://cex.io/trade/{$symbol}-{$base}";
-	else if($market == 'exbitron')
-		$url = "https://app.exbitron.com/exchange/?market={$symbol}-{$base}";
 	else if($market == 'nestex')
 		$url = "https://trade.nestex.one/spot/{$symbol}";
 	else if($market == 'gateio')
@@ -70,7 +66,7 @@ function getMarketUrl($coin, $marketName)
 	else if($market == 'hitbtc')
 		$url = "https://hitbtc.com/exchange/{$symbol}-to-{$base}";
 	else if($market == 'kucoin')
-		$url = "https://www.kucoin.com/#/trade.pro/{$symbol}-{$base}";
+		$url = "https://www.kucoin.com/trade/{$symbol}-{$base}";
 	else if ($market == 'nonkyc')
 		$url = "https://nonkyc.io/market/{$symbol}_{$base}";
 	else if($market == 'yobit')

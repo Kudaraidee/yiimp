@@ -278,9 +278,9 @@ All three schemes share the same controllers, models, and view partials. The act
 
 The exchange system in `yiimp2/exchanges/` uses a driver-per-exchange architecture. Each driver extends `ExchangeDriver` and declares its capabilities (`supportsMarkets`, `supportsDiscover`, `supportsTrading`, `supportsBalance`).
 
-Active drivers: Binance, Bitstamp, CexIO, Exbitron, GateIO, HitBTC, KlingexIO, KuCoin, Kraken, Nestex, NonKYC, Poloniex, SafeTrade, Shapeshift, Yobit.
+Active drivers: Bibox, Binance, Bitstamp, CexIO, GateIO, HitBTC, KuCoin, Kraken, Nestex, NonKYC, Poloniex, SafeTrade, Yobit.
 
-Market names follow the `'exchange BASECOIN'` convention for non-BTC pairs (e.g. `'nonkyc USDT'`, `'klingex USDT'`).
+Market names follow the `'exchange BASECOIN'` convention for non-BTC pairs (e.g. `'nonkyc USDT'`, `'nestex USDT'`).
 
 ---
 

@@ -144,10 +144,10 @@ class ExchangeCommand extends CConsoleCommand
 		}
 
 		if (!empty(EXCH_HITBTC_KEY)) {
-			$data = hitbtc_api_user('trading/balance');
-			if (!is_object($data) || !isset($data->balance)) echo("hitbtc error ".json_encode($data)."\n");
-			else foreach ($data->balance as $balance) {
-				if (objSafeVal($balance,'currency_code') == 'BTC')
+			$data = hitbtc_api_user('spot/balance');
+			if (!is_array($data)) echo("hitbtc error ".json_encode($data)."\n");
+			else foreach ($data as $balance) {
+				if (objSafeVal($balance,'currency') == 'BTC')
 					echo("hitbtc btc: ".json_encode($balance)."\n");
 			}
 		}
@@ -156,7 +156,7 @@ class ExchangeCommand extends CConsoleCommand
 			echo("kraken btc: ".json_encode($balance)."\n");
 		}
 		if (!empty(EXCH_KUCOIN_KEY)) {
-			$balance = kucoin_api_user('account/BTC/balance');
+			$balance = kucoin_api_user('/api/v1/accounts');
 			if (!is_object($balance) || !isset($balance->data)) echo "kucoin error ".json_encode($balance)."\n";
 			else echo("kucoin: ".json_encode($balance->data)."\n");
 		}

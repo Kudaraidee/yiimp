@@ -4,19 +4,17 @@ namespace app\exchanges;
 
 use app\exchanges\drivers\{
     BiboxDriver, BinanceDriver, BitstampDriver, CexIoDriver,
-    ExbitronDriver, GateIoDriver, HitBtcDriver, KlingexDriver,
-    KrakenDriver, KuCoinDriver, NestexDriver, NonKycDriver,
-    PoloniexDriver, SafeTradeDriver, ShapeShiftDriver, YobitDriver
+    GateIoDriver, HitBtcDriver, KrakenDriver, KuCoinDriver,
+    NestexDriver, NonKycDriver, PoloniexDriver, SafeTradeDriver,
+    YobitDriver
 };
 
 /**
  * Creates and filters exchange driver instances.
  *
  * Registry order matters: it controls the execution order when iterating
- * withBalance() (bitstamp → cexio → kraken → poloniex) and
- * withTrading() (binance → kucoin → yobit → nestex → nonkyc → exbitron → safetrade),
- * withBalance() includes safetrade, and withMarkets/withDiscover() includes
- * klingex (markets + discover, USDT pairs) and safetrade (BTC + USDT pairs).
+ * withBalance() (bitstamp → cexio → kraken → poloniex → safetrade) and
+ * withTrading() (binance → kucoin → yobit → nestex → nonkyc → safetrade).
  */
 class ExchangeFactory
 {
@@ -30,13 +28,10 @@ class ExchangeFactory
         'yobit'      => YobitDriver::class,
         'nestex'     => NestexDriver::class,
         'nonkyc'     => NonKycDriver::class,
-        'exbitron'   => ExbitronDriver::class,
-        'klingex'    => KlingexDriver::class,
         'gateio'     => GateIoDriver::class,
         'hitbtc'     => HitBtcDriver::class,
         'safetrade'  => SafeTradeDriver::class,
         'bibox'      => BiboxDriver::class,
-        'shapeshift' => ShapeShiftDriver::class,
     ];
 
     /**

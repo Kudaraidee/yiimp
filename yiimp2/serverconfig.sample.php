@@ -139,10 +139,6 @@ defined('EXCH_CEXIO_ID')     or define('EXCH_CEXIO_ID',     '');
 defined('EXCH_CEXIO_KEY')    or define('EXCH_CEXIO_KEY',    '');
 defined('EXCH_CEXIO_SECRET') or define('EXCH_CEXIO_SECRET', '');
 
-// Exbitron
-defined('EXCH_EXBITRON_KEY')    or define('EXCH_EXBITRON_KEY',    '');
-defined('EXCH_EXBITRON_SECRET') or define('EXCH_EXBITRON_SECRET', '');
-
 // HitBTC
 defined('EXCH_HITBTC_KEY')    or define('EXCH_HITBTC_KEY',    '');
 defined('EXCH_HITBTC_SECRET') or define('EXCH_HITBTC_SECRET', '');
@@ -151,9 +147,11 @@ defined('EXCH_HITBTC_SECRET') or define('EXCH_HITBTC_SECRET', '');
 defined('EXCH_KRAKEN_KEY')    or define('EXCH_KRAKEN_KEY',    '');
 defined('EXCH_KRAKEN_SECRET') or define('EXCH_KRAKEN_SECRET', '');
 
-// KuCoin
-defined('EXCH_KUCOIN_KEY')    or define('EXCH_KUCOIN_KEY',    '');
-defined('EXCH_KUCOIN_SECRET') or define('EXCH_KUCOIN_SECRET', '');
+// KuCoin (API v2 requires the passphrase created with the API key)
+defined('EXCH_KUCOIN_KEY')         or define('EXCH_KUCOIN_KEY',         '');
+defined('EXCH_KUCOIN_SECRET')      or define('EXCH_KUCOIN_SECRET',      '');
+defined('EXCH_KUCOIN_PASSPHRASE')  or define('EXCH_KUCOIN_PASSPHRASE',  '');
+defined('EXCH_KUCOIN_KEY_VERSION') or define('EXCH_KUCOIN_KEY_VERSION', '2');
 
 // NonKYC
 defined('EXCH_NONKYC_KEY')    or define('EXCH_NONKYC_KEY',    '');

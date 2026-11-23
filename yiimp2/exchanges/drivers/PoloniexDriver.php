@@ -9,10 +9,14 @@ use app\models\Coins;
 use app\models\Markets;
 use app\models\Orders;
 
+/**
+ * Poloniex Spot API v2 driver. Public/auth work is delegated to the shared
+ * legacy `poloniex` class, which now signs api.poloniex.com requests.
+ */
 class PoloniexDriver extends ExchangeDriver
 {
     public function name(): string { return 'poloniex'; }
-    public function marketUrl(string $symbol, string $base = 'BTC'): string { return 'https://poloniex.com/exchange#' . strtolower($base) . '_' . strtolower($symbol); }
+    public function marketUrl(string $symbol, string $base = 'BTC'): string { return 'https://poloniex.com/trade/' . strtoupper($base) . '_' . strtoupper($symbol); }
     public function supportsMarkets(): bool  { return true; }
     public function supportsDiscover(): bool { return true; }
     public function supportsBalance(): bool  { return true; }
@@ -237,7 +241,8 @@ class PoloniexDriver extends ExchangeDriver
             Yii::info($this->name() . ": withdraw {$amount} BTC to {$btcAddr}", __CLASS__);
             sleep(1);
             $res = $poloniex->withdraw('BTC', $amount, $btcAddr);
-            if ($res && str_contains((string) ($res->response ?? ''), 'Withdrew')) {
+            $response = is_array($res) ? ($res['response'] ?? '') : (string) ($res->response ?? '');
+            if ($response !== '' && str_contains($response, 'Withdrew')) {
                 $this->recordWithdrawal($btcAddr, $amount);
                 $saveBalance->balance = 0; $saveBalance->save();
             }

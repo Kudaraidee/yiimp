@@ -1,265 +1,370 @@
 <?php
 /**
- * Poloniex trading and public API
+ * Poloniex Spot API v2.
+ *
+ * The legacy `poloniex.com/public?command=...` and `poloniex.com/tradingApi`
+ * endpoints are gone. Public data now lives at `api.poloniex.com` and private
+ * calls are signed with HMAC-SHA256 over METHOD\nPATH\nPARAMS.
  */
 class poloniex
 {
-		protected $api_key = '';
-		protected $api_secret = '';
-		protected $trading_url = "https://poloniex.com/tradingApi";
-		protected $public_url = "https://poloniex.com/public";
+	protected $api_key = '';
+	protected $api_secret = '';
+	protected $public_url = 'https://api.poloniex.com';
 
-		public function __construct() {
-			require_once('/etc/yiimp/keys.php');
-			if (defined('EXCH_POLONIEX_SECRET')) {
-				$this->api_key = EXCH_POLONIEX_KEY;
-				$this->api_secret = EXCH_POLONIEX_SECRET;
-			}
+	public function __construct()
+	{
+		if (is_file('/etc/yiimp/keys.php')) require_once('/etc/yiimp/keys.php');
+		$this->api_key = defined('EXCH_POLONIEX_KEY') ? EXCH_POLONIEX_KEY : '';
+		$this->api_secret = defined('EXCH_POLONIEX_SECRET') ? EXCH_POLONIEX_SECRET : '';
+	}
+
+	private function userAgent()
+	{
+		return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '.
+			'(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+	}
+
+	// Python SDK uses quote(value, safe="~()*!'"); rawurlencode is close but
+	// encodes the extra safe characters, so restore them.
+	private function encodeComponent($value)
+	{
+		return str_replace(
+			array('%28','%29','%2A','%21','%27'),
+			array('(',')','*','!',"'"),
+			rawurlencode((string) $value)
+		);
+	}
+
+	private function buildQuery(array $params)
+	{
+		ksort($params);
+		$parts = array();
+		foreach ($params as $key => $value) {
+			$parts[] = $this->encodeComponent($key).'='.$this->encodeComponent($value);
+		}
+		return implode('&', $parts);
+	}
+
+	private function retrieveJSON($url)
+	{
+		$ch = curl_init($url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+		curl_setopt($ch, CURLOPT_USERAGENT, $this->userAgent());
+		curl_setopt($ch, CURLOPT_ENCODING, '');
+		$res = curl_exec($ch);
+		if ($res === false) {
+			debuglog('poloniex: '.curl_error($ch));
+			curl_close($ch);
+			return null;
+		}
+		$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+		if ($status < 200 || $status >= 300) return null;
+
+		$json = json_decode($res, true);
+		return is_array($json) ? $json : null;
+	}
+
+	/**
+	 * Authenticated v2 request.
+	 * $params are query parameters for GET, JSON body values otherwise.
+	 */
+	private function authRequest($method, $path, array $params = array(), $body = NULL)
+	{
+		if (empty($this->api_key) || empty($this->api_secret)) return false;
+
+		$method = strtoupper($method);
+		$timestamp = (string) (int) (microtime(true) * 1000);
+		$bodyString = '';
+
+		if ($body !== NULL && $body !== array()) {
+			$bodyString = json_encode($body, JSON_UNESCAPED_SLASHES);
+			$paramsAuth = 'requestBody='.$bodyString.'&signTimestamp='.$timestamp;
+		} else {
+			$signParams = array_merge(array('signTimestamp' => $timestamp), $params);
+			$paramsAuth = $this->buildQuery($signParams);
 		}
 
-		private function query(array $req = array()) {
-			// API settings
-			$key = $this->api_key;
-			$secret = $this->api_secret;
+		$payload = $method."\n".$path."\n".$paramsAuth;
+		$signature = base64_encode(hash_hmac('sha256', $payload, $this->api_secret, true));
 
-			// generate a nonce to avoid problems with 32bit systems
-			$mt = explode(' ', microtime());
-			$req['nonce'] = $mt[1].substr($mt[0], 2, 6);
+		$url = $this->public_url.$path;
+		if ($method === 'GET' && $params) {
+			$url .= '?'.$this->buildQuery($params);
+		}
 
-			// generate the POST data string
-			$post_data = http_build_query($req, '', '&');
-			$sign = hash_hmac('sha512', $post_data, $secret);
+		$headers = array(
+			'key: '.$this->api_key,
+			'signature: '.$signature,
+			'signTimestamp: '.$timestamp,
+		);
+		if ($bodyString !== '') $headers[] = 'Content-Type: application/json';
 
-			// generate the extra headers
-			$headers = array(
-				'Key: '.$key,
-				'Sign: '.$sign,
-			);
+		$ch = curl_init($url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+		curl_setopt($ch, CURLOPT_USERAGENT, $this->userAgent());
+		curl_setopt($ch, CURLOPT_ENCODING, '');
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+		if ($method !== 'GET') {
+			curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+			if ($bodyString !== '') curl_setopt($ch, CURLOPT_POSTFIELDS, $bodyString);
+		}
 
-			// curl handle (initialize if required)
-			static $ch = null;
-			if (is_null($ch)) {
-				$ch = curl_init();
-				curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-				curl_setopt($ch, CURLOPT_USERAGENT,
-					'Mozilla/4.0 (compatible; Poloniex PHP bot; '.php_uname('a').'; PHP/'.phpversion().')'
+		$res = curl_exec($ch);
+		if ($res === false) {
+			debuglog('poloniex: '.curl_error($ch));
+			curl_close($ch);
+			return false;
+		}
+		$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
+		if ($status < 200 || $status >= 300) {
+			debuglog("poloniex: $method $path failed ($status) ".strip_data($res));
+			return false;
+		}
+
+		$dec = json_decode($res, true);
+		return is_array($dec) ? $dec : false;
+	}
+
+	/** Flatten /accounts/balances into currency => [available, hold]. */
+	private function accountBalances()
+	{
+		$accounts = $this->authRequest('GET', '/accounts/balances', array('accountType' => 'SPOT'));
+		$out = array();
+		if (!is_array($accounts)) return $out;
+
+		foreach ($accounts as $account) {
+			foreach ($account['balances'] ?? array() as $balance) {
+				$symbol = $balance['currency'] ?? '';
+				if ($symbol === '') continue;
+				$out[$symbol] = array(
+					'available' => (float) ($balance['available'] ?? 0),
+					'hold'      => (float) ($balance['hold'] ?? 0),
 				);
 			}
-			curl_setopt($ch, CURLOPT_URL, $this->trading_url);
-			curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
-			curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-			curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-			curl_setopt($ch, CURLOPT_TIMEOUT, 40);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
-
-			// run the query
-			$res = curl_exec($ch);
-
-			if ($res === false) {
-				debuglog('poloniex: curl error '.curl_error($ch));
-				return false;
-			}
-			//echo $res;
-			$dec = json_decode($res, true);
-			if (!$dec){
-				//throw new Exception('Invalid data: '.$res);
-				return false;
-			}else{
-				return $dec;
-			}
 		}
+		return $out;
+	}
 
-		protected function retrieveJSON($URL) {
-			$opts = array('http' =>
-				array(
-					'method'  => 'GET',
-					'timeout' => 20
-				)
-			);
-			$context = stream_context_create($opts);
-			$feed = @file_get_contents($URL, false, $context);
-			if(!$feed) return null;
+	// ── Authenticated compatibility methods ───────────────────────────────────
 
-			$json = json_decode($feed, true);
-			return $json;
+	public function get_balances()
+	{
+		$out = array();
+		foreach ($this->accountBalances() as $symbol => $balance) {
+			$out[$symbol] = $balance['available'];
 		}
+		return $out;
+	}
 
-		public function get_balances() {
-			return $this->query(
-				array(
-					'command' => 'returnBalances'
-				)
+	public function get_complete_balances()
+	{
+		$out = array();
+		foreach ($this->accountBalances() as $symbol => $balance) {
+			$out[$symbol] = array(
+				'available' => $balance['available'],
+				'onOrders'  => $balance['hold'],
 			);
 		}
+		return $out;
+	}
 
-		public function get_complete_balances() {
-			return $this->query(
-				array(
-					'command' => 'returnCompleteBalances'
-				)
-			);
-		}
+	public function get_available_balances()
+	{
+		return $this->get_balances();
+	}
 
-		public function get_available_balances() {
-			return $this->query(
-				array(
-					'command' => 'returnAvailableAccountBalances',
-				)
-			);
-		}
+	public function get_deposit_addresses()
+	{
+		$res = $this->authRequest('GET', '/wallets/addresses');
+		$out = array();
+		if (!is_array($res)) return $out;
 
-		public function get_deposit_addresses() {
-			return $this->query(
-				array(
-					'command' => 'returnDepositAddresses'
-				)
-			);
-		}
-
-		public function generate_address($currency) {
-			return $this->query(
-				array(
-					'command' => 'generateNewAddress',
-					'currency' => strtoupper($currency),
-				)
-			);
-		}
-
-		public function get_open_orders($pair) {
-			return $this->query(
-				array(
-					'command' => 'returnOpenOrders',
-					'currencyPair' => strtoupper($pair)
-				)
-			);
-		}
-
-		public function get_my_trade_history($pair) {
-			return $this->query(
-				array(
-					'command' => 'returnTradeHistory',
-					'currencyPair' => strtoupper($pair)
-				)
-			);
-		}
-
-		public function buy($pair, $rate, $amount) {
-			return $this->query(
-				array(
-					'command' => 'buy',
-					'currencyPair' => strtoupper($pair),
-					'rate' => $rate,
-					'amount' => $amount
-				)
-			);
-		}
-
-		public function sell($pair, $rate, $amount) {
-			return $this->query(
-				array(
-					'command' => 'sell',
-					'currencyPair' => strtoupper($pair),
-					'rate' => $rate,
-					'amount' => $amount
-				)
-			);
-		}
-
-		public function cancel_order($pair, $order_number) {
-			return $this->query(
-				array(
-					'command' => 'cancelOrder',
-					'currencyPair' => strtoupper($pair),
-					'orderNumber' => $order_number
-				)
-			);
-		}
-
-		public function withdraw($currency, $amount, $address) {
-			return $this->query(
-				array(
-					'command' => 'withdraw',
-					'currency' => strtoupper($currency),
-					'amount' => $amount,
-					'address' => $address
-				)
-			);
-		}
-
-		public function get_trade_history($pair) {
-			$trades = $this->retrieveJSON($this->public_url.'?command=returnTradeHistory&currencyPair='.strtoupper($pair));
-			return $trades;
-		}
-
-		public function get_order_book($pair) {
-			$orders = $this->retrieveJSON($this->public_url.'?command=returnOrderBook&currencyPair='.strtoupper($pair));
-			return $orders;
-		}
-
-		public function get_volume() {
-			$volume = $this->retrieveJSON($this->public_url.'?command=return24hVolume');
-			return $volume;
-		}
-
-		public function get_ticker($pair = "ALL") {
-			$pair = strtoupper($pair);
-			$prices = $this->retrieveJSON($this->public_url.'?command=returnTicker');
-			if($pair == "ALL"){
-				return $prices;
-			}else{
-				$pair = strtoupper($pair);
-				if(isset($prices[$pair])){
-					return $prices[$pair];
-				}else{
-					return array();
-				}
+		foreach ($res as $key => $item) {
+			if (is_array($item) && isset($item['currency'])) {
+				$out[$item['currency']] = $item['address'] ?? '';
+			} else if (is_string($item)) {
+				$out[$key] = $item;
 			}
 		}
+		return $out;
+	}
 
-		public function get_trading_pairs() {
-			$tickers = $this->retrieveJSON($this->public_url.'?command=returnTicker');
-			return array_keys($tickers);
+	public function generate_address($currency)
+	{
+		$res = $this->authRequest('POST', '/wallets/address', array(), array('currency' => strtoupper($currency)));
+		if (is_array($res) && isset($res['address'])) return array('response' => $res['address']);
+		return false;
+	}
+
+	public function get_open_orders($pair)
+	{
+		$res = $this->authRequest('GET', '/orders', array('symbol' => strtoupper($pair)));
+		$out = array();
+		if (!is_array($res)) return $out;
+
+		foreach ($res as $order) {
+			$id = $order['id'] ?? ($order['orderId'] ?? NULL);
+			if (!$id) continue;
+			$out[] = array(
+				'orderNumber' => $id,
+				'rate'        => (float) ($order['price'] ?? 0),
+				'amount'      => (float) ($order['quantity'] ?? 0),
+				'total'       => (float) ($order['amount'] ?? 0),
+				'type'        => strtolower($order['side'] ?? ''),
+			);
+		}
+		return $out;
+	}
+
+	public function get_my_trade_history($pair)
+	{
+		return $this->get_open_orders($pair);
+	}
+
+	private function placeOrder($side, $pair, $rate, $amount)
+	{
+		$res = $this->authRequest('POST', '/orders', array(), array(
+			'symbol'      => strtoupper($pair),
+			'side'        => strtoupper($side),
+			'type'        => 'limit',
+			'timeInForce' => 'GTC',
+			'price'       => (string) $rate,
+			'quantity'    => (string) $amount,
+		));
+		if (is_array($res) && isset($res['id'])) return array('orderNumber' => $res['id']);
+		return false;
+	}
+
+	public function buy($pair, $rate, $amount)  { return $this->placeOrder('buy',  $pair, $rate, $amount); }
+	public function sell($pair, $rate, $amount) { return $this->placeOrder('sell', $pair, $rate, $amount); }
+
+	public function cancel_order($pair, $order_number)
+	{
+		$res = $this->authRequest('DELETE', '/orders/'.rawurlencode((string) $order_number));
+		if (is_array($res) && (isset($res['orderId']) || isset($res['state']))) {
+			return array('success' => true);
+		}
+		return false;
+	}
+
+	public function withdraw($currency, $amount, $address)
+	{
+		$res = $this->authRequest('POST', '/wallets/withdraw', array(), array(
+			'currency' => strtoupper($currency),
+			'amount'   => (string) $amount,
+			'address'  => $address,
+		));
+		if (is_array($res) && isset($res['withdrawalNumber'])) {
+			return array('response' => 'Withdrew '.$res['withdrawalNumber']);
+		}
+		return false;
+	}
+
+	// ── Public compatibility methods ──────────────────────────────────────────
+
+	public function get_trade_history($pair)
+	{
+		return $this->retrieveJSON($this->public_url.'/markets/'.rawurlencode(strtoupper($pair)).'/trades');
+	}
+
+	public function get_order_book($pair)
+	{
+		return $this->retrieveJSON($this->public_url.'/markets/'.rawurlencode(strtoupper($pair)).'/orderBook');
+	}
+
+	public function get_volume()
+	{
+		$data = $this->retrieveJSON($this->public_url.'/markets/ticker24h');
+		$out = array();
+		foreach ((array) $data as $ticker) {
+			$symbol = $ticker['symbol'] ?? '';
+			if ($symbol === '') continue;
+			$out[$symbol] = array(
+				'baseVolume'  => $ticker['quantity'] ?? 0,
+				'quoteVolume' => $ticker['amount'] ?? 0,
+			);
+		}
+		return $out;
+	}
+
+	public function get_ticker($pair = 'ALL')
+	{
+		$pair = strtoupper($pair);
+		if ($pair !== 'ALL') {
+			$book = $this->retrieveJSON($this->public_url.'/markets/'.rawurlencode($pair).'/orderBook');
+			$priceData = $this->retrieveJSON($this->public_url.'/markets/'.rawurlencode($pair).'/price');
+			$last = $priceData['price'] ?? 0;
+			return array(
+				'highestBid' => $book['bids'][0] ?? $last,
+				'lowestAsk'  => $book['asks'][0] ?? $last,
+				'last'       => $last,
+			);
 		}
 
-		public function get_currencies() {
-			$tickers = $this->retrieveJSON($this->public_url.'?command=returnCurrencies');
-			return $tickers;
+		$prices = $this->retrieveJSON($this->public_url.'/markets/price');
+		$out = array();
+		foreach ((array) $prices as $item) {
+			$symbol = $item['symbol'] ?? '';
+			if ($symbol === '') continue;
+			$price = $item['price'] ?? 0;
+			$out[$symbol] = array(
+				'highestBid' => $price,
+				'lowestAsk'  => $price,
+				'last'       => $price,
+			);
 		}
+		return $out;
+	}
 
-		public function get_total_btc_balance() {
-			$balances = $this->get_balances();
-			$prices = $this->get_ticker();
+	public function get_trading_pairs()
+	{
+		return array_keys($this->get_ticker());
+	}
 
-			$tot_btc = 0;
+	public function get_currencies()
+	{
+		$data = $this->retrieveJSON($this->public_url.'/v2/currencies');
+		$out = array();
+		foreach ((array) $data as $item) {
+			$symbol = $item['coin'] ?? '';
+			if ($symbol === '') continue;
+			$out[$symbol] = array(
+				'name'     => $item['name'] ?? $symbol,
+				'disabled' => empty($item['tradeEnable']),
+				'delisted' => !empty($item['delisted']),
+			);
+		}
+		return $out;
+	}
 
-			foreach($balances as $coin => $amount){
-				$pair = "BTC_".strtoupper($coin);
+	public function get_total_btc_balance()
+	{
+		$balances = $this->get_balances();
+		$prices = $this->get_ticker();
+		$total = 0;
 
-				// convert coin balances to btc value
-				if($amount > 0){
-					if($coin != "BTC"){
-						$tot_btc += $amount * $prices[$pair];
-					}else{
-						$tot_btc += $amount;
-					}
-				}
-
-				// process open orders as well
-				if($coin != "BTC"){
-					$open_orders = $this->get_open_orders($pair);
-					foreach($open_orders as $order){
-						if($order['type'] == 'buy'){
-							$tot_btc += $order['total'];
-						}elseif($order['type'] == 'sell'){
-							$tot_btc += $order['amount'] * $prices[$pair];
-						}
-					}
-				}
+		foreach ($balances as $coin => $amount) {
+			$pair = 'BTC_'.strtoupper($coin);
+			$price = $prices[$pair]['last'] ?? 0;
+			if ($amount > 0) {
+				$total += ($coin === 'BTC') ? (float) $amount : (float) $amount * (float) $price;
 			}
-
-			return $tot_btc;
+			if ($coin === 'BTC' || !$price) continue;
+			foreach ($this->get_open_orders($pair) as $order) {
+				if ($order['type'] === 'buy') $total += (float) $order['total'];
+				else if ($order['type'] === 'sell') $total += (float) $order['amount'] * (float) $price;
+			}
 		}
 
+		return $total;
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////

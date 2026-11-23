@@ -1,19 +1,21 @@
 <?php
 
-// see https://kucoinapidocs.docs.apiary.io/
+// KuCoin REST API v2 (Classic/Spot). The retired v1 API is unavailable.
+// https://www.kucoin.com/docs-new/rest/spot-trading/market-data/get-all-tickers
 
 function kucoin_result_valid($obj, $method='')
 {
 	if (!is_object($obj) || !isset($obj->data)) return false;
+	if (isset($obj->code) && (string) $obj->code !== '200000') return false;
 	return true;
 }
 
-// https://api.kucoin.com/v1/open/symbols/?market=BTC
+// https://api.kucoin.com/api/v1/symbols?market=BTC
 
 function kucoin_api_query($method, $params='', $returnType='object')
 {
 	$exchange = 'kucoin';
-	$url = "https://api.kucoin.com/v1/$method/";
+	$url = "https://api.kucoin.com/api/v1/".ltrim($method, '/');
 	if (!empty($params))
 		$url .= "?$params";
 
@@ -21,9 +23,8 @@ function kucoin_api_query($method, $params='', $returnType='object')
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 	curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 	curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-	curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/4.0 (compatible; KuCoin API PHP client; '.php_uname('s').'; PHP/'.phpversion().')');
+	curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; KuCoin API PHP client; '.php_uname('s').'; PHP/'.phpversion().')');
 	curl_setopt($ch, CURLOPT_ENCODING , '');
-	//curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
 	$res = curl_exec($ch);
 	if($res === false) {
@@ -46,58 +47,67 @@ function kucoin_api_query($method, $params='', $returnType='object')
 	return $ret;
 }
 
-// https://api.kucoin.com/v1/account/<coin>/wallet/address
+// https://www.kucoin.com/docs-new/authentication
+// $endpoint is a full v2 path such as /api/v1/accounts
 
-function kucoin_api_user($method, $params=NULL, $isPostMethod=false)
+function kucoin_api_user($endpoint, $params=NULL, $httpMethod='GET')
 {
 	$exchange = 'kucoin';
 	require_once('/etc/yiimp/keys.php');
+	if (!defined('EXCH_KUCOIN_KEY')) define('EXCH_KUCOIN_KEY', '');
 	if (!defined('EXCH_KUCOIN_SECRET')) define('EXCH_KUCOIN_SECRET', '');
+	if (!defined('EXCH_KUCOIN_PASSPHRASE')) define('EXCH_KUCOIN_PASSPHRASE', '');
+	if (!defined('EXCH_KUCOIN_KEY_VERSION')) define('EXCH_KUCOIN_KEY_VERSION', '2');
 
-	if (empty(EXCH_KUCOIN_KEY) || empty(EXCH_KUCOIN_SECRET)) return false;
+	if (empty(EXCH_KUCOIN_KEY) || empty(EXCH_KUCOIN_SECRET) || empty(EXCH_KUCOIN_PASSPHRASE)) return false;
 
 	$api_host = 'https://api.kucoin.com';
-	$mt = explode(' ', microtime());
-	$nonce = $mt[1].substr($mt[0], 2, 3);
-	$url = $endpoint = "/v1/$method";
-	$tosign = "$endpoint/$nonce/";
+	$params = empty($params) ? array() : $params;
+	$httpMethod = strtoupper($httpMethod);
+	$body = '';
 
-	if (empty($params)) $params = array();
-	$query = http_build_query($params);
-	if (strlen($query) && !$isPostMethod) {
-		$url .= '&'.$query; $query = '';
+	if (!empty($params)) {
+		if ($httpMethod == 'POST') {
+			$body = json_encode($params, JSON_UNESCAPED_SLASHES);
+		} else {
+			$endpoint .= (strpos($endpoint, '?') === false ? '?' : '&').http_build_query($params);
+		}
 	}
-	if ($isPostMethod) $post_data = $params;
-	$hmac = strtolower(hash_hmac('sha256', base64_encode($tosign.$query), EXCH_KUCOIN_SECRET));
+
+	$timestamp = (string) (int) (microtime(true) * 1000);
+	$toSign = $timestamp.$httpMethod.$endpoint.$body;
+	$sign = base64_encode(hash_hmac('sha256', $toSign, EXCH_KUCOIN_SECRET, true));
+	$pass = base64_encode(hash_hmac('sha256', EXCH_KUCOIN_PASSPHRASE, EXCH_KUCOIN_SECRET, true));
 
 	$headers = array(
-		'Content-Type: application/json;charset=UTF-8',
+		'Content-Type: application/json',
 		'KC-API-KEY: '.EXCH_KUCOIN_KEY,
-		'KC-API-NONCE: '.$nonce,
-		'KC-API-SIGNATURE: '.$hmac,
+		'KC-API-SIGN: '.$sign,
+		'KC-API-TIMESTAMP: '.$timestamp,
+		'KC-API-PASSPHRASE: '.$pass,
+		'KC-API-KEY-VERSION: '.EXCH_KUCOIN_KEY_VERSION,
 	);
 
 	$ch = curl_init();
-
-	curl_setopt($ch, CURLOPT_URL, $api_host.$url);
+	curl_setopt($ch, CURLOPT_URL, $api_host.$endpoint);
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-	if ($isPostMethod) {
+	if ($httpMethod == 'POST') {
 		curl_setopt($ch, CURLOPT_POST, true);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+	} else if ($httpMethod == 'DELETE') {
+		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
+		if ($body !== '') curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
 	}
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 	curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 	curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-	curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/4.0 (compatible; KuCoin API PHP client; '.php_uname('s').'; PHP/'.phpversion().')');
+	curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; KuCoin API PHP client; '.php_uname('s').'; PHP/'.phpversion().')');
 	curl_setopt($ch, CURLOPT_ENCODING , '');
-	//curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-	//curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-	//curl_setopt($ch, CURLOPT_VERBOSE, 1);
 
 	$res = curl_exec($ch);
 	if($res === false) {
 		$e = curl_error($ch);
-		debuglog("$exchange: $method $e");
+		debuglog("$exchange: $endpoint $e");
 		curl_close($ch);
 		return false;
 	}
@@ -105,11 +115,10 @@ function kucoin_api_user($method, $params=NULL, $isPostMethod=false)
 	$result = json_decode($res);
 	if(!is_object($result) && !is_array($result)) {
 		$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-		debuglog("$exchange: $method failed ($status) ".strip_data($res));
+		debuglog("$exchange: $endpoint failed ($status) ".strip_data($res));
 	}
 
 	curl_close($ch);
-
 	return $result;
 }
 
@@ -138,7 +147,8 @@ function kucoin_update_market($market)
 	}
 
 	$t1 = microtime(true);
-	$query = kucoin_api_query("$pair/open/tick");
+	// v1 "$pair/open/tick" is gone; v2 market/stats exposes buy and sell.
+	$query = kucoin_api_query('market/stats', 'symbol='.urlencode($pair));
 	if(!kucoin_result_valid($query)) return false;
 	$ticker = $query->data;
 

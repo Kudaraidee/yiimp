@@ -89,7 +89,7 @@ class ExchangeController extends Controller
         if (!empty(EXCH_KUCOIN_SECRET ?? '')) {
             $this->testExchange('kucoin', function () {
                 if (!function_exists('kucoin_api_user')) return '(kucoin_api_user not loaded)';
-                $b = kucoin_api_user('account/BTC/balance');
+                $b = kucoin_api_user('/api/v1/accounts');
                 return json_encode($b->data ?? $b);
             });
             $tested++;
