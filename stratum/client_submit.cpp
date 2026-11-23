@@ -62,9 +62,9 @@ static void homescrypt_standard_header_ex(YAAMP_JOB_VALUES *values, YAAMP_JOB_TE
 	string_be(values->hash_hex, values->hash_be);
 
 	if (g_debuglog_hash && homescrypt_uses_canonical_merkle(client))
-		debuglog("HDRJOB prev=%s merkle=%s ver=%s nbits=%s ntime=%s nonce=%s hdr=%s\n",
+		debuglog("HDRJOB prev=%s merkle=%s ver=%s nbits=%s ntime=%s nonce=%s hdr=%s coinbase=%s steps=%s\n",
 			templ->prevhash_be, merkleroot.c_str(), templ->version, templ->nbits,
-			ntime, nonce, values->header);
+			ntime, nonce, values->header, values->coinbase, templ->txmerkles);
 }
 
 static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
