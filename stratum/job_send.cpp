@@ -88,7 +88,7 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 // the nonce at bytes 76..79. Other HomeScrypt miners (rplant's gpuminer, ...)
 // use standard Stratum v1 jobs, so keep the header-only variant just for
 // MukiMiner and let everybody else build the header from coinb1/coinb2.
-static bool homescrypt_uses_header_notify(YAAMP_CLIENT *client)
+bool homescrypt_uses_header_notify(const YAAMP_CLIENT *client)
 {
 	const char *version = client->version;
 	return version && (strstr(version, "Muki") || strstr(version, "muki"));

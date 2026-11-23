@@ -4,6 +4,46 @@
 
 uint64_t lyra2z_height = 0;
 
+// Standard Stratum v1 miners build the 80-byte header from the job fields
+// without yiimp's extra 2-byte-word shuffling. Rebuild that header here so
+// their shares (and any blocks they find) validate against the same bytes the
+// miner hashed.
+static void reverse_hex32(char *out, const char *in)
+{
+	for (int i = 0; i < 4; i++) memcpy(out + i*2, in + (3-i)*2, 2);
+	out[8] = '\0';
+}
+
+static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
+	const char *ntime, const char *nonce)
+{
+	unsigned char coinbase_bin[1024];
+	binlify(coinbase_bin, values->coinbase);
+
+	char coinhash[128];
+	sha256_double_hash_hex((char *)coinbase_bin, coinhash, strlen(values->coinbase)/2);
+	string merkleroot = merkle_with_first(templ->txsteps, coinhash);
+
+	char version[16], ntime_le[16], nbits_le[16], prevhash_le[128] = {0};
+	reverse_hex32(version, templ->version);
+	reverse_hex32(ntime_le, ntime);
+	reverse_hex32(nbits_le, templ->nbits);
+	// Standard Stratum miners byte-swap each 32-bit word of the advertised
+	// prevhash; yiimp stores it word-reversed, so swap it back to the raw
+	// 32 bytes they will place in the serialized header.
+	ser_string_be(templ->prevhash_be, prevhash_le, 8);
+
+	sprintf(values->header, "%s%s%s%s%s%s", version, prevhash_le,
+		merkleroot.c_str(), ntime_le, nbits_le, nonce);
+	strcpy(values->header_be, values->header);
+	binlify(values->header_bin, values->header_be);
+
+	g_current_algo->hash_function((char *)values->header_bin, (char *)values->hash_bin, 80);
+	hexlify(values->hash_hex, values->hash_bin, 32);
+	string_be(values->hash_hex, values->hash_be);
+}
+
+
 //#define MERKLE_DEBUGLOG
 //#define DONTSUBMIT
 
@@ -747,6 +787,8 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 			client_submit_error(client, job, 20, "RandomX verification error", extranonce2, ntime, nonce);
 			return true;
 		}
+		if (is_homescrypt && !homescrypt_uses_header_notify(client))
+			homescrypt_standard_header(&submitvalues, templ, ntime, nonce);
 	}
 
 	if (templ->height && !strcmp(g_current_algo->name,"lyra2z")) {

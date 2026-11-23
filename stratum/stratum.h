@@ -189,6 +189,10 @@ bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *tem
 	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce,
 	uint32_t versionbits, bool compute_hash = true);
 
+// MukiMiner wants a prebuilt complete header; other HomeScrypt miners use
+// standard Stratum v1 jobs and build the header themselves.
+bool homescrypt_uses_header_notify(const YAAMP_CLIENT *client);
+
 extern "C"
 {
 void sha256_hash(const char *input, char *output, unsigned int len);
