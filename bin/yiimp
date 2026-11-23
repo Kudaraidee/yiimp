@@ -1,8 +1,64 @@
 #!/bin/bash
+# ─────────────────────────────────────────────────────────────────────────────
+# yiimp — admin CLI, runs the Yii2 console (yiimp2/yii).
+#
+# Accepts the legacy command syntax and translates it to Yii2 routes:
+#   yiimp coin <SYM> <sub> [args]     → yii coin/<sub> <SYM> [args]
+#   yiimp market <SYM> <sub> [args]   → yii market/<sub> <SYM> [args]
+#   yiimp graphes <sub> [args]        → yii graph/<sub> [args]
+#   yiimp distclean <dbpassword>      → yii distclean/index <dbpassword>
+#   yiimp <cmd> <sub> [args]          → yii <cmd>/<sub> [args]
+#   yiimp <cmd>                       → yii <cmd>   (default action / help)
+# Yii2 routes pass through unchanged:  yiimp queue/status, yiimp help coin
+#
+# YIIMP2_DIR: location of the Yii2 app (default: /var/yiimp2 in the image,
+# else ../yiimp2 next to this script). Run as root, commands execute as
+# www-data so cache and runtime files stay writable for the queue workers.
+# ─────────────────────────────────────────────────────────────────────────────
 
-ROOTDIR=/data/yiimp
-DIR=`pwd`
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+if [ -z "${YIIMP2_DIR}" ]; then
+    if [ -f /var/yiimp2/yii ]; then
+        YIIMP2_DIR=/var/yiimp2
+    else
+        YIIMP2_DIR="${SCRIPT_DIR}/../yiimp2"
+    fi
+fi
+PHP="${PHP_CLI:-php}"
 
-cd "$ROOTDIR/web" && php yaamp/yiic.php "$@"
+if [ ! -f "${YIIMP2_DIR}/yii" ]; then
+    echo "yiimp: Yii2 console not found in ${YIIMP2_DIR} (set YIIMP2_DIR)" >&2
+    exit 1
+fi
 
-cd $DIR
+args=("$@")
+if [ ${#args[@]} -gt 0 ] && [[ "${args[0]}" != */* ]] && [[ "${args[0]}" != -* ]]; then
+    cmd="${args[0]}"
+    case "${cmd}" in
+        coin|market)
+            # legacy: <cmd> <SYM> <sub> [args]
+            if [ ${#args[@]} -ge 3 ]; then
+                args=("${cmd}/${args[2]}" "${args[1]}" "${args[@]:3}")
+            else
+                args=(help "${cmd}")
+            fi
+            ;;
+        graphes|graph)
+            [ ${#args[@]} -ge 2 ] && args=("graph/${args[1]}" "${args[@]:2}") || args=(help graph)
+            ;;
+        distclean)
+            [ ${#args[@]} -ge 2 ] && args=(distclean/index "${args[@]:1}")
+            ;;
+        help)
+            ;;
+        *)
+            [ ${#args[@]} -ge 2 ] && args=("${cmd}/${args[1]}" "${args[@]:2}")
+            ;;
+    esac
+fi
+
+cd "${YIIMP2_DIR}" || exit 1
+if [ "$(id -u)" = 0 ] && id www-data >/dev/null 2>&1; then
+    exec sudo -E -u www-data "${PHP}" yii "${args[@]}"
+fi
+exec "${PHP}" yii "${args[@]}"

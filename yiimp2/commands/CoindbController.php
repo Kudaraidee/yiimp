@@ -114,7 +114,7 @@ class CoindbController extends Controller
 
     private function grabKuCoinIcons(): int
     {
-        $root    = defined('YIIMP_HTDOCS') ? YIIMP_HTDOCS : '';
+        $root    = Yii::getAlias('@app/web');
         $base    = 'https://assets.kucoin.com/www/1.2.0/assets/coins/';
         $updated = 0;
 

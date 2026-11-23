@@ -38,7 +38,7 @@ class CheckupController extends Controller
     /** Check writable directories and required files. */
     public function actionDirs(): int
     {
-        $root = defined('YIIMP_HTDOCS') ? YIIMP_HTDOCS : dirname(Yii::$app->basePath);
+        $root = Yii::getAlias('@app/web');
         foreach ([
             $root . '/assets',
             defined('YIIMP_LOGS') ? YIIMP_LOGS : ($root . '/log'),
@@ -68,7 +68,7 @@ class CheckupController extends Controller
     /** Auto-link coin images and remove HTML-injected fakes. */
     public function actionImages(): int
     {
-        $root    = defined('YIIMP_HTDOCS') ? YIIMP_HTDOCS : dirname(Yii::$app->basePath);
+        $root    = Yii::getAlias('@app/web');
         $coins   = Coins::find()->all();
         $updated = 0;
         $dropped = 0;

@@ -287,7 +287,7 @@ class CoinService
                 $localPath   = Coins::imagePathFor($coin->symbol, $coin->symbol2);
                 if ($localPath === '') $localPath = "/images/coin-{$coin->id}.png";
                 $coin->image = $localPath;
-                $htdocs      = defined('YIIMP_HTDOCS') ? YIIMP_HTDOCS : '';
+                $htdocs      = Yii::getAlias('@app/web');
                 if ($data && $htdocs) {
                     @unlink($htdocs . $localPath);
                     file_put_contents($htdocs . $localPath, $data);

@@ -1,3 +1,9 @@
 .git
 .vscode
 .settings
+
+# Legacy Yii1 app — no longer part of the image.
+web
+
+# Local composer vendor (may hold dev packages); the image builds its own in composer-deps.
+yiimp2/vendor

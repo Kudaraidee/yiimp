@@ -10,9 +10,11 @@ use app\jobs\BaseJob;
  * Runs only in production and only when YIIMP_PAYMENTS_FREQ seconds have elapsed
  * since the last payout. Acquires 'balances_locked' for the duration.
  *
- * @todo implement — calls PaymentService::doPayments()
+ * The last payout time lives in the database (mining.last_payout, as in the
+ * legacy cronjob), not in the cache: a lost cache (container recreate, cache
+ * flush) must not trigger an early payout run.
+ *
  * Ports: BackendDoBackup() + BackendPayments() + BackendCleanDatabase() from payment.php
- * Triggered from main.sh after the 8-state cycle when payment time is due.
  */
 class PaymentsJob extends BaseJob
 {
@@ -25,10 +27,19 @@ class PaymentsJob extends BaseJob
             return;
         }
 
-        $freq       = defined('YIIMP_PAYMENTS_FREQ') ? (int) YIIMP_PAYMENTS_FREQ : 14400;
-        $lastPayout = (int) (Yii::$app->cache->get('last_payout_time') ?: 0);
+        $freq = defined('YIIMP_PAYMENTS_FREQ') ? (int) YIIMP_PAYMENTS_FREQ : 14400;
+        $now  = time();
 
-        if ($lastPayout + $freq > time()) {
+        // Claim the payout slot atomically; like the legacy cronjob the slot is
+        // taken before paying, so a failing run waits for the next period
+        // instead of retrying every minute.
+        $claimed = Yii::$app->db->createCommand(
+            'UPDATE mining SET last_payout = :now
+              WHERE IFNULL(last_payout, 0) + :freq <= :now LIMIT 1',
+            [':now' => $now, ':freq' => $freq]
+        )->execute();
+
+        if (!$claimed) {
             return;
         }
 
@@ -38,7 +49,6 @@ class PaymentsJob extends BaseJob
             $svc->doBackup();
             $svc->doPayments();
             $svc->cleanDatabase();
-            Yii::$app->cache->set('last_payout_time', time(), $freq * 2);
         } finally {
             Yii::$app->cache->delete('balances_locked');
         }
