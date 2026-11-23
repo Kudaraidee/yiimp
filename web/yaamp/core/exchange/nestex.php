@@ -2,7 +2,8 @@
 //info from public api
 function nestex_api_query($method = 'cg/tickers', $params = '', $returnType = 'array')
 {
-	$uri = "https://trade.nestex.one/api/{$method}";
+	// Public tickers live on api.nestex.one; trade.nestex.one/api/* only redirects there.
+	$uri = "https://api.nestex.one/{$method}";
 	if (!empty($params)) {
 		$uri .= "?{$params}";
 	}
