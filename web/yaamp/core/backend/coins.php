@@ -63,8 +63,13 @@ function BackendCoinsUpdate()
 
 		if ($debug) echo "{$coin->symbol}\n";
 
+		$isNebRpc = (isset($coin->algo) && $coin->algo === 'nebhash') ||
+			(isset($coin->symbol) && $coin->symbol === 'NEB');
+
 		if(isset($info['difficulty']))
 			$difficulty = $info['difficulty'];
+		else if ($isNebRpc && isset($info['bits']))
+			$difficulty = target_to_diff(decode_compact(sprintf('%08x', (int) $info['bits'])));
 		else
 			$difficulty = $remote->getdifficulty();
 
@@ -151,8 +156,9 @@ function BackendCoinsUpdate()
 		// as submitblock/getauxblock/getblocktemplate. Skip those probes; the
 		// GETH/NIRO readiness branch below still handles auto_ready.
 		$isEthRpc = in_array(strtoupper((string) $coin->rpcencoding), ['GETH', 'NIRO'], true);
+		$skipBitcoinProbes = $isEthRpc || $isNebRpc;
 
-		if(!$isEthRpc && is_null($coin->hassubmitblock))
+		if(!$skipBitcoinProbes && is_null($coin->hassubmitblock))
 		{
 			$remote->submitblock('');
 			if(strcasecmp($remote->error, 'method not found') == 0)
@@ -161,7 +167,7 @@ function BackendCoinsUpdate()
 				$coin->hassubmitblock = true;
 		}
 
-		if(!$isEthRpc && is_null($coin->auxpow))
+		if(!$skipBitcoinProbes && is_null($coin->auxpow))
 		{
 			$ret = $remote->getauxblock();
 
@@ -171,9 +177,9 @@ function BackendCoinsUpdate()
 				$coin->auxpow = true;
 		}
 
-        if ($isEthRpc) {
-            // geth/NIRO have no getblocktemplate; leave $template empty so the
-            // GETH/NIRO branch below only checks node connectivity.
+        if ($isEthRpc || $isNebRpc) {
+            // geth/NIRO/NEB have no Bitcoin getblocktemplate; leave $template
+            // empty so their readiness branch below only checks connectivity.
             $template = false;
         }
         // Kiiro Core requires explicit segwit rule support and the pool wallet
@@ -308,8 +314,10 @@ function BackendCoinsUpdate()
 			}
 		}
 
-		else if ($coin->rpcencoding == 'GETH' || $coin->rpcencoding == 'NIRO')
+		else if ($coin->rpcencoding == 'GETH' || $coin->rpcencoding == 'NIRO' || $isNebRpc)
 		{
+			// NEB's native getinfo reports connections and slots; PoW work is
+			// consumed by stratum from the node work service, not GBT.
 			$coin->auto_ready = ($coin->connections > 0);
 		}
 

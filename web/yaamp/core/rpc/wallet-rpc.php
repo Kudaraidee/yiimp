@@ -45,7 +45,16 @@ class WalletRPC {
 			default:
 				$this->type = 'Bitcoin';
 				$this->rpc = new Bitcoin($coin->rpcuser, $coin->rpcpasswd, $coin->rpchost, $coin->rpcport, $url);
-				$this->hasGetInfo = $coin->hasgetinfo;
+				// NEB nodes implement a native getinfo RPC but not the
+				// Bitcoin getmininginfo/getwalletinfo/getnetworkinfo calls.
+				// Keep the DB flag at 0 for stratum, which uses its own
+				// NEB-specific template path.
+				if (isset($coin->algo) && $coin->algo === 'nebhash')
+					$this->hasGetInfo = true;
+				else if (isset($coin->symbol) && $coin->symbol === 'NEB')
+					$this->hasGetInfo = true;
+				else
+					$this->hasGetInfo = $coin->hasgetinfo;
 			}
 
 		} else {
