@@ -12,6 +12,14 @@
 function safetrade_unwrap_relay($raw)
 {
 	$raw = ltrim((string) $raw, "\xEF\xBB\xBF");
+
+	// The relay returns either a JSON envelope (with a custom User-Agent) or
+	// plain Markdown text. Accept both so price sync never depends on its UA.
+	$envelope = json_decode($raw, true);
+	if (is_array($envelope) && isset($envelope['data']['content']) && is_string($envelope['data']['content'])) {
+		return trim($envelope['data']['content']);
+	}
+
 	$marker = 'Markdown Content:';
 	$pos = strpos($raw, $marker);
 	if ($pos !== false) $raw = substr($raw, $pos + strlen($marker));
