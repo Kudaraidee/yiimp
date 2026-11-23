@@ -228,10 +228,11 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 		client_call(client, "mining.set_target", "[\"%s\"]", user_target_hex_reversed);
 	}
 	else {
-		if(difficulty >= 1)
-			client_call(client, "mining.set_difficulty", "[%.0f]", difficulty);
+		double wire_difficulty = homescrypt_wire_difficulty(client, difficulty);
+		if(wire_difficulty >= 1)
+			client_call(client, "mining.set_difficulty", "[%.0f]", wire_difficulty);
 		else
-			client_call(client, "mining.set_difficulty", "[%0.8f]", difficulty);
+			client_call(client, "mining.set_difficulty", "[%0.8f]", wire_difficulty);
 	}
 	return 0;
 }

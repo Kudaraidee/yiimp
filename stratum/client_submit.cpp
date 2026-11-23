@@ -14,18 +14,22 @@ static void reverse_hex32(char *out, const char *in)
 	out[8] = '\0';
 }
 
-static bool homescrypt_uses_canonical_merkle(const YAAMP_CLIENT *client)
+bool homescrypt_uses_gpuminer_job(const YAAMP_CLIENT *client)
 {
-	// gpuminer-rplant follows the standard Stratum v1 layout: the merkle root
-	// is byte-reversed from the display-order form into the raw 80-byte
-	// header. Meshpool's HomeScrypt miner uses the display-order bytes
-	// directly, so keep that legacy behavior for every other client.
 	const char *version = client ? client->version : NULL;
 	return version && strstr(version, "gpuminer");
 }
 
+double homescrypt_wire_difficulty(const YAAMP_CLIENT *client, double difficulty)
+{
+	// gpuminer reports/accepts difficulty against Lumenite's block powlimit
+	// (0x3ffff << 224), while yiimp shares use 0xffff << 208. Send four times
+	// the pool difficulty so its share target matches the validator exactly.
+	return (is_homescrypt && homescrypt_uses_gpuminer_job(client)) ? difficulty * 4.0 : difficulty;
+}
+
 static void homescrypt_standard_header_ex(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
-	const YAAMP_CLIENT *client, const char *ntime, const char *nonce, bool swap_merkle)
+	const YAAMP_CLIENT *client, const char *ntime, const char *nonce)
 {
 	unsigned char coinbase_bin[1024];
 	binlify(coinbase_bin, values->coinbase);
@@ -35,7 +39,6 @@ static void homescrypt_standard_header_ex(YAAMP_JOB_VALUES *values, YAAMP_JOB_TE
 	string merkleroot = merkle_with_first(templ->txsteps, coinhash);
 
 	char version[16], ntime_le[16], nbits_le[16], prevhash_le[128] = {0};
-	char merkleroot_be[128] = {0};
 	reverse_hex32(version, templ->version);
 	reverse_hex32(ntime_le, ntime);
 	reverse_hex32(nbits_le, templ->nbits);
@@ -43,34 +46,33 @@ static void homescrypt_standard_header_ex(YAAMP_JOB_VALUES *values, YAAMP_JOB_TE
 	// serialized header needs the original byte order.
 	ser_string_be(templ->prevhash_be, prevhash_le, 8);
 
-	const char *header_merkle = merkleroot.c_str();
-	if (homescrypt_uses_canonical_merkle(client) && swap_merkle)
+	// merkle_with_first() already returns the internal-order root used in the
+	// serialized header (verified against Lumenite block 45420).
+
+	// gpuminer is xmrig-derived: the submitted nonce is the big-endian hex
+	// form of a 32-bit counter, so the header needs its bytes reversed.
+	char nonce_le[16] = {0};
+	const char *header_nonce = nonce;
+	if (homescrypt_uses_gpuminer_job(client))
 	{
-		// Verified against Lumenite block 45420: HomeScrypt hashes the raw
-		// merkle root, not the display-order form meshpool miners use.
-		ser_string_be(merkleroot.c_str(), merkleroot_be, 8);
-		header_merkle = merkleroot_be;
+		reverse_hex32(nonce_le, nonce);
+		header_nonce = nonce_le;
 	}
 
 	sprintf(values->header, "%s%s%s%s%s%s", version, prevhash_le,
-		header_merkle, ntime_le, nbits_le, nonce);
+		merkleroot.c_str(), ntime_le, nbits_le, header_nonce);
 	strcpy(values->header_be, values->header);
 	binlify(values->header_bin, values->header_be);
 
 	g_current_algo->hash_function((char *)values->header_bin, (char *)values->hash_bin, 80);
 	hexlify(values->hash_hex, values->hash_bin, 32);
 	string_be(values->hash_hex, values->hash_be);
-
-	if (g_debuglog_hash && homescrypt_uses_canonical_merkle(client))
-		debuglog("HDRJOB prev=%s merkle=%s ver=%s nbits=%s ntime=%s nonce=%s hdr=%s coinbase=%s steps=%s\n",
-			templ->prevhash_be, merkleroot.c_str(), templ->version, templ->nbits,
-			ntime, nonce, values->header, values->coinbase, templ->txmerkles);
 }
 
 static void homescrypt_standard_header(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
 	const YAAMP_CLIENT *client, const char *ntime, const char *nonce)
 {
-	homescrypt_standard_header_ex(values, templ, client, ntime, nonce, true);
+	homescrypt_standard_header_ex(values, templ, client, ntime, nonce);
 }
 
 
@@ -847,21 +849,6 @@ if (g_debuglog_hash) {
         debuglog("shar %016lx \n", user_target);
         debuglog("hash %016lx \n", hash_int);
         debuglog("coin %016lx \n", coin_target);
-}
-
-if (is_homescrypt && g_debuglog_hash && homescrypt_uses_canonical_merkle(client))
-{
-	YAAMP_JOB_VALUES altvalues;
-	memset(&altvalues, 0, sizeof(altvalues));
-	if (build_submit_values(&altvalues, templ, client->extranonce1, extranonce2, ntime, nonce,
-		versionmask, false))
-	{
-		homescrypt_standard_header_ex(&altvalues, templ, client, ntime, nonce, false);
-		uint64_t alt_hash_int = get_hash_difficulty(altvalues.hash_bin);
-		debuglog("HSCMP extra=%s ntime=%s nonce=%s curdiff=%.9f altdiff=%.9f cur=%016lx alt=%016lx target=%016lx\n",
-			extranonce2, ntime, nonce, target_to_diff(hash_int), target_to_diff(alt_hash_int),
-			hash_int_scaled, alt_hash_int / 0x10000, user_target);
-	}
 }
 
 	// HomeScrypt miners derive their share target from yiimp's 64-bit slice
