@@ -1081,6 +1081,12 @@ static bool neb_parse_job(const uint8_t *p, size_t len, shared_ptr<NEB_JOB> &out
 {
 	NEB_READER r(p, len);
 	if (!(out.reset(new NEB_JOB), r.u64(&out->node_id))) return false;
+	// The Job frame does not carry its dataset slot; it comes from the Model
+	// frame immediately before it. Initialize these fields so a missing or
+	// out-of-order Model is reported deterministically instead of using heap
+	// garbage.
+	out->slot = 0;
+	memset(out->weights_hash, 0, sizeof(out->weights_hash));
 	uint8_t clean;
 	if (!r.u8(&clean) || clean > 1) return false;
 	out->clean = clean != 0;
@@ -1262,10 +1268,11 @@ static bool nebhash_handle_node_frame(uint8_t type, const uint8_t *p, size_t len
 			stratumlog("nebhash: node job extranonce below 8 bytes\n");
 			return false;
 		}
-		if (!latest_model || job->slot >= (uint8_t) g_neb_dataset_count ||
-			latest_model->slot != job->slot)
+		// The slot belongs to the most recent Model frame, not the Job frame.
+		uint8_t slot = latest_model ? (uint8_t) latest_model->slot : 0;
+		if (!latest_model || slot >= (uint8_t) g_neb_dataset_count)
 		{
-			stratumlog("nebhash: no matching model for slot %u\n", job->slot);
+			stratumlog("nebhash: no usable model for job\n");
 			return false;
 		}
 
@@ -1274,7 +1281,7 @@ static bool nebhash_handle_node_frame(uint8_t type, const uint8_t *p, size_t len
 		have_parent = true;
 
 		job->model = latest_model;
-		job->slot = (uint8_t) latest_model->slot;
+		job->slot = slot;
 		memcpy(job->weights_hash, latest_model->hash, 32);
 		job->weights_hex = latest_model->packed_hex;
 		nebhash_install_job(job);
