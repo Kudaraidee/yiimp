@@ -546,9 +546,11 @@ class SiteController extends BaseController
 		$data = $this->buildDiffData();
 		Yii::$app->response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
 
+		$partial = Yii::$app->LayoutManager->isLegacy() ? 'diff_live_legacy' : 'diff_live';
+
 		return $this->asJson([
 			'generated' => gmdate('Y-m-d H:i:s', $data['now']),
-			'html'      => $this->renderPartial('diff_live', $data),
+			'html'      => $this->renderPartial($partial, $data),
 		]);
 	}
 

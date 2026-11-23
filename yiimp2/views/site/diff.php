@@ -12,7 +12,106 @@ foreach ($rows as $r) {
 }
 $scryptPort = (int) ($ports['scrypt'] ?? 3433);
 $ethashPort = (int) ($ports['ethash'] ?? 3639);
-?>
+
+if (Yii::$app->LayoutManager->isLegacy()): ?>
+<style>
+/* Difficulty page — same chrome as /site/mining */
+.df-toolbar {
+    display: flex; flex-direction: column; gap: 10px;
+    background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
+    padding: 11px 14px 12px; margin: 12px 0 10px;
+    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+    color: #334155; font-size: 11px;
+}
+.df-toolbar-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.df-toolbar-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .12em;
+    color: #8a94a6; text-transform: uppercase; white-space: nowrap;
+}
+.df-toolbar-title { font-size: 13px; font-weight: 800; color: #26385a; letter-spacing: .01em; }
+.df-toolbar-hint {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    border-top: 1px solid #eef2f7; padding-top: 9px; color: #8a94a6; font-size: 10px;
+}
+.df-toolbar-pill {
+    display: inline-block; border: 1px solid #dfe5ec; background: #fafbfc; color: #64748b;
+    border-radius: 999px; padding: 2px 9px; line-height: 15px;
+    font-size: 9px; font-weight: 800; white-space: nowrap;
+}
+.df-live {
+    margin-left: auto; display: flex; align-items: center; gap: 6px;
+    white-space: nowrap; font-size: 11px; color: #5b6675;
+}
+.df-live i {
+    width: 7px; height: 7px; border-radius: 50%; background: #2fae5a;
+    box-shadow: 0 0 0 3px rgba(47,174,90,.15);
+}
+.df-live #df-last-update { color: #98a3b5; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 720px) { .df-live { margin-left: 0; } }
+</style>
+
+<div class="df-toolbar">
+    <div class="df-toolbar-head">
+        <span class="df-toolbar-label">Difficulty</span>
+        <span class="df-toolbar-title">Stratum difficulty — live</span>
+        <span class="df-live"><i></i> live · 60s <span id="df-last-update">just now</span></span>
+    </div>
+    <div class="df-toolbar-hint">
+        <span>Vardiff targets 5–15 submits/min · override with a password parameter</span>
+        <span class="df-toolbar-pill">d= fixed</span>
+        <span class="df-toolbar-pill">sd= seed</span>
+    </div>
+</div>
+
+<div id="diff-live">
+    <?= $this->render('diff_live_legacy', [
+        'rows'       => $rows,
+        'workers'    => $workers,
+        'now'        => $now,
+        'stratumUrl' => $stratumUrl,
+    ]) ?>
+</div>
+
+<script>
+(function () {
+    var url   = <?= json_encode(Url::to(['/site/diff_data'])) ?>;
+    var box   = document.getElementById('diff-live');
+    var state = document.getElementById('df-last-update');
+    if (!box || !url) return;
+
+    var last = Date.now();
+
+    function tick() {
+        if (!last || !state) return;
+        var age = Math.floor((Date.now() - last) / 1000);
+        state.textContent = age + 's ago · next ' + Math.max(0, 60 - age) + 's';
+    }
+
+    function refresh() {
+        fetch(url, {cache: 'no-store', credentials: 'same-origin'})
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function (data) {
+                if (data && data.html) box.innerHTML = data.html;
+                if (state) state.textContent = (data.generated || '').slice(11) + ' UTC · just now';
+                last = Date.now();
+            })
+            .catch(function (e) {
+                if (state) state.textContent = '(refresh failed: ' + e.message + ')';
+            })
+            .then(function () {
+                setTimeout(refresh, 60000);
+            });
+    }
+
+    setInterval(tick, 1000);
+    setTimeout(refresh, 60000);
+})();
+</script>
+<?php return; endif; ?>
 <br>
 
 <div class="main-left-box">
