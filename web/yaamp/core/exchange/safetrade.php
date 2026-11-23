@@ -3,6 +3,29 @@
 // https://safe.trade/api/v2
 // https://safetrade.com/api
 
+/**
+ * Cloudflare rejects the pool's egress IP for safe.trade. Public GET data is
+ * still retrievable through a read-only text relay; unwrap the relay header so
+ * the original JSON is decoded exactly as if the direct call had succeeded.
+ * Authenticated/trading calls never use this path.
+ */
+function safetrade_unwrap_relay($raw)
+{
+	$raw = ltrim((string) $raw, "\xEF\xBB\xBF");
+	$marker = 'Markdown Content:';
+	$pos = strpos($raw, $marker);
+	if ($pos !== false) $raw = substr($raw, $pos + strlen($marker));
+	$raw = ltrim($raw);
+	$start = strcspn($raw, '[{');
+	if ($start > 0 && $start < strlen($raw)) $raw = substr($raw, $start);
+	return trim($raw);
+}
+
+function safetrade_public_relay_allowed($method)
+{
+	return strpos(strtolower(ltrim((string) $method, '/')), 'trade/public/') === 0;
+}
+
 function safetrade_api_query($method, $params='', $returnType='object')
 {
 	$uri = 'https://safe.trade/api/v2/'.ltrim((string) $method, '/');
@@ -29,9 +52,41 @@ function safetrade_api_query($method, $params='', $returnType='object')
 		static $warned = false;
 		if (!$warned) {
 			$warned = true;
-			debuglog("safetrade: public api returned HTTP $status");
+			debuglog("safetrade: public api returned HTTP $status, trying read-only relay");
 		}
-		return null;
+
+		if (!safetrade_public_relay_allowed($method)) return null;
+
+		$relay = 'https://r.jina.ai/'.$uri;
+		$ch2 = curl_init($relay);
+		curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch2, CURLOPT_CONNECTTIMEOUT, 10);
+		curl_setopt($ch2, CURLOPT_TIMEOUT, 30);
+		curl_setopt($ch2, CURLOPT_HTTPHEADER, array(
+			'Accept: application/json',
+		));
+		curl_setopt($ch2, CURLOPT_USERAGENT,
+			'Mozilla/5.0 (compatible; Yiimp SafeTrade client; '.php_uname('s').'; PHP/'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.')');
+		curl_setopt($ch2, CURLOPT_SSL_VERIFYPEER, false);
+		$relayRaw = curl_exec($ch2);
+		$relayStatus = (int) curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+		curl_close($ch2);
+
+		if ($relayRaw === false || $relayStatus >= 300) {
+			static $relayWarned = false;
+			if (!$relayWarned) {
+				$relayWarned = true;
+				debuglog("safetrade: read-only relay returned HTTP $relayStatus");
+			}
+			return null;
+		}
+
+		$raw = safetrade_unwrap_relay($relayRaw);
+		static $relayUsed = false;
+		if (!$relayUsed) {
+			$relayUsed = true;
+			debuglog('safetrade: using read-only relay for public prices');
+		}
 	}
 
 	$ret = json_decode($raw, $returnType !== 'array');
