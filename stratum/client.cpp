@@ -362,6 +362,11 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 
 	if(g_list_client.Find(client)) {
 		clientlog(client, "Already logged");
+		if (is_nebhash)
+		{
+			nebhash_send_error(client, 20, "Already logged");
+			return true;
+		}
 		client_send_error(client, 21, "Already logged");
 		return false;
 	}
@@ -370,6 +375,12 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 		strncpy(client->password, neb_password, 1023);
 
 	if (g_list_client.count >= g_stratum_max_cons) {
+		// NEB code 21 is "job not found"; generic authorization failures use 20.
+		if (is_nebhash)
+		{
+			nebhash_send_error(client, 20, "Server full");
+			return true;
+		}
 		client_send_error(client, 21, "Server full");
 		return false;
 	}
