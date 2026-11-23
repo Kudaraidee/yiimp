@@ -1,0 +1,19 @@
+[Unit]
+Description=Forward geth newHeads blocks to yiimp blocknotify
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/codex/yiimp/bin/geth-blocknotify.py
+Restart=always
+RestartSec=3
+
+# Override these in a systemd drop-in if the node is not local:
+# Environment=GETH_WS_URL=ws://127.0.0.1:8546
+# Environment=BLOCKNOTIFY_BIN=/home/codex/yiimp-runtime/stratum/blocknotify
+# Environment=STRATUM_HOSTPORT=127.0.0.1:3639
+# Environment=COIN_ID=7
+# Environment=BLOCKNOTIFY_LOG=/home/codex/yiimp-runtime/log/geth-blocknotify.log
+
+[Install]
+WantedBy=default.target

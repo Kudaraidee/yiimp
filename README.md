@@ -343,6 +343,10 @@ Coin daemons should be configured to send block notifications to the stratum:
 blocknotify=blocknotify pool.example.com:port coinid %s
 ```
 
+`geth` has no `blocknotify=` option. Use the `newHeads` watcher in
+`bin/geth-blocknotify.py` instead — see [docs/blocknotify.md](docs/blocknotify.md)
+for Docker/geth setup, coin ids, environment variables and verification steps.
+
 ---
 
 ## Database migrations
