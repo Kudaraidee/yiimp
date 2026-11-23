@@ -21,7 +21,10 @@
 #include <sha3/sph_haval.h>
 #include <sha3/sph_tiger.h>
 #include <sha3/sph_panama.h>
-#include <sha3/blake2s.h>
+// reference BLAKE2 (algos/blake2-ref), the implementation libalgos.a links.
+// sha3/blake2s.h declares a same-named blake2s() with another signature;
+// calling that one hit the blake2-ref symbol and left the hash all-zero.
+#include "blake2-ref/blake2.h"
 
 #include "SWIFFTX/SWIFFTX.h"
 #include "lane.h"
@@ -168,7 +171,7 @@ void x25x_hash(const char* input, char* output, uint32_t len)
 		}
 	}
 
-	blake2s_simple((uint8_t*)&hash[24], (const void*)(&hash[0]), 64 * 24);
+	blake2s((void*)&hash[24], 32, (const void*)(&hash[0]), 64 * 24, NULL, 0);
 
 	memcpy(output, &hash[24], 32);
 }

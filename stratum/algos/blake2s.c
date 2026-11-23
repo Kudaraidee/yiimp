@@ -6,7 +6,9 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <sha3/blake2s.h>
+// reference BLAKE2 (algos/blake2-ref): the implementation libalgos.a links;
+// sha3/blake2s.h declares a different, same-named API
+#include "blake2-ref/blake2.h"
 
 void blake2s_hash(const char* input, char* output, uint32_t len)
 {
