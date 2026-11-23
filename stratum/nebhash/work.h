@@ -51,11 +51,13 @@ bool nebhash_vardiff(YAAMP_CLIENT *client, YAAMP_JOB *job);
 // have not submitted anything yet, so a too-hard initial target can recover.
 bool nebhash_vardiff_tick(YAAMP_CLIENT *client);
 
-// Smooth displayed hashrate: a 600s exponential window over actual share work.
+// Smooth displayed hashrate: a 600s exponential window over the expected work
+// of accepted shares (the session's target difficulty). The ticket score is a
+// heavy-tailed sample and overstated a steady ~5 Mh/s miner by >3x.
 // Called for every accepted share and once a second from the client loop, so
 // the estimate decays even when the miner has not found another share yet.
 double nebhash_client_speed(YAAMP_CLIENT *client);
-void nebhash_client_note_share_speed(YAAMP_CLIENT *client, double share_diff);
+void nebhash_client_note_share_speed(YAAMP_CLIENT *client, double target_diff);
 
 // Rate limiting and consecutive-bad-submit tracking from the reference pool.
 // The caller sends the NEB error and closes the socket when either returns a

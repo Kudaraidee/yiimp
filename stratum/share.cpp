@@ -76,10 +76,10 @@ static void share_add_worker(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, c
 		worker->difficulty += client->difficulty_actual / g_current_algo->diff_multiplier;
 		if (!isaux) {
 			if (is_nebhash) {
-				// Use the actual share work in a 600s exponential window. A
-				// target-difficulty/interval estimate made the log jump from
-				// 0 to 84 Mh/s on a steady ~5 Mh/s GPU during a lucky burst.
-				nebhash_client_note_share_speed(client, share_diff);
+				// Use the share's expected work (target difficulty) in a 600s
+				// exponential window. A single interval made the log jump to
+				// 84 Mh/s, while the heavy-tailed ticket score read 18 Mh/s.
+				nebhash_client_note_share_speed(client, client->difficulty_actual);
 			} else {
 				client->speed += client->difficulty_actual / g_current_algo->diff_multiplier * 42;
 			}

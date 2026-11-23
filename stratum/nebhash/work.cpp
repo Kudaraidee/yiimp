@@ -786,9 +786,11 @@ void nebhash_client_init(YAAMP_CLIENT *client)
 }
 
 // NEB share arrival is a Poisson process: one lucky share after 4 s is not a
-// 40 Mh/s miner. Decay the accumulated work with a 600 s time constant and
-// divide by that same constant, so both the web 600 s window and the stratum
-// job log converge on the miner's sustained rate without share-luck spikes.
+// 40 Mh/s miner. Decay the accumulated expected work (target difficulty) with
+// a 600 s time constant and divide by that same constant, so both the web 600 s
+// window and the stratum job log converge on the miner's sustained rate
+// without share-luck spikes. Ticket score is deliberately not used: its
+// heavy tail made a steady ~5 Mh/s miner read as 18 Mh/s.
 #define NEB_SPEED_WINDOW 600.0
 
 static void nebhash_speed_decay(YAAMP_CLIENT *client, long long now)
@@ -814,13 +816,13 @@ double nebhash_client_speed(YAAMP_CLIENT *client)
 	return client->speed;
 }
 
-void nebhash_client_note_share_speed(YAAMP_CLIENT *client, double share_diff)
+void nebhash_client_note_share_speed(YAAMP_CLIENT *client, double target_diff)
 {
 	if (!client) return;
 
 	long long now = (long long) time(NULL);
 	nebhash_speed_decay(client, now);
-	client->neb_speed_diff += share_diff;
+	client->neb_speed_diff += target_diff;
 	client->neb_last_share_time = now;
 	client->speed = client->neb_speed_diff / NEB_SPEED_WINDOW;
 }
