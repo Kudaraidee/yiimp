@@ -22,7 +22,7 @@ foreach ($rawRecents as $addr) {
 // ── Sanitise address ──────────────────────────────────────────────────────────
 $address = trim((string) Yii::$app->request->get('address', ''));
 if ($address !== '' && preg_match('/[^A-Za-z0-9]/', $address)) die;
-$address = substr($address, 0, 52);
+$address = substr($address, 0, 128); // NEB bech32m payout addresses are 62 chars
 
 // ── Drop cookie entry ─────────────────────────────────────────────────────────
 $dropAddress = Yii::$app->request->get('drop', '');

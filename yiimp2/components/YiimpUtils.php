@@ -1042,7 +1042,8 @@ class YiimpUtils extends Component
 	{
 		if(empty($address)) return null;
 
-		$address = trim(substr($address, 0, 52));
+		// NEB bech32m payout addresses are 62 chars; accounts.username is varchar(128).
+		$address = trim(substr($address, 0, 128));
 		$user = Accounts::find()->where(['username' => $address])->one();
 
 		return $user;

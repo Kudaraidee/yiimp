@@ -41,7 +41,8 @@ function getuserparam($address)
 {
 	if(empty($address)) return null;
 
-	$address = trim(substr($address, 0, 52));
+	// NEB bech32m payout addresses are 62 chars; accounts.username is varchar(128).
+	$address = trim(substr($address, 0, 128));
 	$user = getdbosql('db_accounts', "username=:ad", array(':ad'=>$address));
 
 	return $user;
