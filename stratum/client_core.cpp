@@ -63,6 +63,9 @@ void client_sort()
 
 int client_send_error(YAAMP_CLIENT *client, int error, const char *string)
 {
+	// neb-pool/1 uses result:null and a two-element error array.
+	if (is_nebhash) return nebhash_send_error(client, error, string);
+
 	char buffer3[1024];
 
 	if(client->id_str)

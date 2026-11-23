@@ -257,16 +257,19 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 {
 	// Ethereum nodes do not implement getblocktemplate; work comes from
 	// eth_getWork and the miner is paid through the node's beneficiary.
-	if (is_ethash || is_etchash)
+	if (is_ethash || is_etchash || is_nebhash)
 	{
-		YAAMP_JOB_TEMPLATE *eth_templ = new YAAMP_JOB_TEMPLATE;
-		memset(eth_templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
-		if (!ethash_build_template(coind, eth_templ))
+		YAAMP_JOB_TEMPLATE *work_templ = new YAAMP_JOB_TEMPLATE;
+		memset(work_templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+		bool built = is_nebhash ?
+			nebhash_build_template(coind, work_templ) :
+			ethash_build_template(coind, work_templ);
+		if (!built)
 		{
-			delete eth_templ;
+			delete work_templ;
 			return NULL;
 		}
-		return eth_templ;
+		return work_templ;
 	}
 
 	if(coind->usememorypool)
@@ -712,12 +715,19 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 
 	bool same_eth_work = job_last && job_last->templ &&
 		!strcmp(templ->eth_header, job_last->templ->eth_header);
+	// NEB refreshes a job every 30 s on the same parent by advancing
+	// time_start; that must become a new notify, not be treated as a
+	// duplicate template.
+	bool same_neb_work = job_last && job_last->templ &&
+		templ->neb_node_id == job_last->templ->neb_node_id &&
+		templ->neb_time_start == job_last->templ->neb_time_start;
 
 	if(	!force && job_last && job_last->templ && job_last->templ->created + 45 > time(NULL) &&
 		(is_ethash || is_etchash ? same_eth_work :
+		(is_nebhash ? same_neb_work :
 		(templ->height == job_last->templ->height &&
 		templ->txcount == job_last->templ->txcount &&
-		strcmp(templ->coinb2, job_last->templ->coinb2) == 0)))
+		strcmp(templ->coinb2, job_last->templ->coinb2) == 0))))
 	{
 //		debuglog("coind_create_job %s %d same template %x \n", coind->name, coind->height, coind->job->id);
 		for(int i=0; i<templ->auxs_size; i++) {
@@ -759,6 +769,12 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 		uint8_t target_be[32];
 		if (ethash_parse_hex_target(templ->eth_target, target_be))
 			ethash_target_to_diff(target_be, &coind->difficulty);
+	}
+	else if (is_nebhash)
+	{
+		// NEB's target is an exact 256-bit little-endian value from the work
+		// service; the Bitcoin compact-target calculation below is invalid.
+		coind->difficulty = nebhash_target_hex_to_diff(templ->neb_target);
 	}
 	else
 	{

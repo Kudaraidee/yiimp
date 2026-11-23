@@ -43,6 +43,12 @@ double g_stratum_max_diff;
 int g_stratum_eth_vardiff_window = 180;
 double g_stratum_eth_vardiff_target = 1.0;
 
+char g_nebhash_work_host[256] = "127.0.0.1";
+int g_nebhash_work_port = 3441;
+char g_nebhash_dataset[1024] = "/home/codex/lrs-nodes/neb-node/neb-datasets.bin";
+char g_nebhash_chain_id[65] = "da2f5af7bb4c5e2bcc8d558b2f4f01d4c88557a943e6cff9cd035638fe9439ae";
+uint32_t g_nebhash_start_k = 10;
+
 double g_stratum_nicehash_difficulty;
 double g_stratum_nicehash_min_diff;
 double g_stratum_nicehash_max_diff;
@@ -102,6 +108,7 @@ bool is_ethash = false;
 bool is_etchash = false;
 bool is_randomscash = false;
 bool is_homescrypt = false;
+bool is_nebhash = false;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -220,6 +227,9 @@ YAAMP_ALGO g_algos[] =
 	{"minotaur", minotaur_hash, 1, 0, 0},
 	{"minotaurx", minotaurx_hash, 1, 0, 0},
 	{"myr-gr", groestlmyriad_hash, 1, 0, 0}, /* groestl + sha 64 */
+	// PoW is verified against the node work-service model/ticket, not this
+	// placeholder hash (the same pattern used by Ethash/Etchash).
+	{"nebhash", sha256_double_hash, 1, 0, 0},
 	{"neoscrypt", neoscrypt_hash, 0x10000, 0, 0},
 	{"neoscrypt-xaya", neoscrypt_hash, 0x10000, 0, 0},
 	{"nist5", nist5_hash, 1, 0, 0},
@@ -402,6 +412,21 @@ int main(int argc, char **argv)
 	if (!strcmp(g_stratum_algo, "ethash") || !strcmp(g_stratum_algo, "etchash"))
 		ethash_params_load(ini);
 
+	if (!strcmp(g_stratum_algo, "nebhash"))
+	{
+		const char *value;
+		value = iniparser_getstring(ini, "NEBHASH:work_host", NULL);
+		if (value) snprintf(g_nebhash_work_host, sizeof(g_nebhash_work_host), "%s", value);
+		g_nebhash_work_port = iniparser_getint(ini, "NEBHASH:work_port", g_nebhash_work_port);
+		value = iniparser_getstring(ini, "NEBHASH:dataset", NULL);
+		if (value) snprintf(g_nebhash_dataset, sizeof(g_nebhash_dataset), "%s", value);
+		value = iniparser_getstring(ini, "NEBHASH:chain_id", NULL);
+		if (value && strlen(value) == 64)
+			snprintf(g_nebhash_chain_id, sizeof(g_nebhash_chain_id), "%s", value);
+		g_nebhash_start_k = (uint32_t) iniparser_getint(ini, "NEBHASH:start_k", (int) g_nebhash_start_k);
+		if (g_nebhash_start_k > 48) g_nebhash_start_k = 48;
+	}
+
 	g_stratum_nicehash_difficulty = iniparser_getdouble(ini, "STRATUM:nicehash", 16);
 	g_stratum_nicehash_min_diff = iniparser_getdouble(ini, "STRATUM:nicehash_diff_min", g_stratum_nicehash_difficulty/2);
 	g_stratum_nicehash_max_diff = iniparser_getdouble(ini, "STRATUM:nicehash_diff_max", g_stratum_nicehash_difficulty*8192);
@@ -479,6 +504,10 @@ int main(int argc, char **argv)
 	{
 		is_homescrypt = true;
 	}
+	else if (!strcmp(g_current_algo->name,"nebhash"))
+	{
+		is_nebhash = true;
+	}
 
 //	struct rlimit rlim_files = {0x10000, 0x10000};
 //	setrlimit(RLIMIT_NOFILE, &rlim_files);
@@ -537,6 +566,9 @@ int main(int argc, char **argv)
 
 	sleep(2);
 	job_init();
+
+	if (is_nebhash && !nebhash_init())
+		yaamp_error("cannot initialize nebhash work service");
 
 //	job_signal();
 

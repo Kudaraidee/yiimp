@@ -111,6 +111,25 @@ struct YAAMP_JOB_TEMPLATE
 	char eth_seed[80];
 	char eth_target[80];
 	int eth_epoch;
+
+	// NEB work-service job. Hashes are lower-case hex in NEB byte order.
+	uint64_t neb_node_id;
+	bool neb_clean;
+	uint32_t neb_version;
+	uint32_t neb_time_start;
+	uint32_t neb_time_window;
+	uint32_t neb_bits;
+	uint32_t neb_tx_count;
+	uint32_t neb_expiry;
+	uint8_t neb_slot;
+	uint8_t neb_extranonce_size;
+	char neb_target[65];
+	char neb_share_target[65];
+	char neb_shares_root[65];
+	char neb_weights_hash[65];
+	// KEP1 packs 26,000 four-bit weights into 13,000 bytes (26,000 hex chars).
+	char neb_weights_hex[26001];
+	vector<string> neb_branch;
 };
 
 #define YAAMP_JOB_MAXSUBIDS		200

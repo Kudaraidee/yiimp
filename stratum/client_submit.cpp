@@ -639,6 +639,9 @@ void client_submit_error(YAAMP_CLIENT *client, YAAMP_JOB *job, int id, const cha
 
 bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 {
+	if (is_nebhash)
+		return nebhash_submit(client, json_params);
+
 	if (is_ethash || is_etchash)
 		return ethash_submit(client, json_params);
 

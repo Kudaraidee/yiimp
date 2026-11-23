@@ -1,8 +1,13 @@
 
 #include "stratum.h"
+#include <strings.h>
 
 bool client_suggest_difficulty(YAAMP_CLIENT *client, json_value *json_params)
 {
+	// neb-pool/1 sends this as a no-op; vardiff is driven by the node's
+	// share_target, not by a miner-supplied difficulty.
+	if (is_nebhash) return client_send_result(client, "true");
+
 	if(json_params->u.array.length>0)
 	{
 		double diff = client_normalize_difficulty(json_params->u.array.values[0]->u.dbl, client);
@@ -42,9 +47,24 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 	else
 		get_next_extraonce1(client->extranonce1_default);
 
-	if(!strcmp(g_stratum_algo,"neoscrypt-xaya")) client->extranonce2size_default = 2;
-	else client->extranonce2size_default = YAAMP_EXTRANONCE2_SIZE;
-	client->difficulty_actual = g_stratum_difficulty;
+	if (is_nebhash)
+	{
+		// neb-pool/1 has a 4-byte extranonce1 and derives extranonce2 length
+		// from the current node job, not from yiimp's generic 4-byte default.
+		if (!nebhash_current_job_ready())
+		{
+			nebhash_send_error(client, 20, "pool has no work from its node yet");
+			return true;
+		}
+		client->extranonce2size_default = nebhash_extranonce2_size();
+		nebhash_client_init(client);
+	}
+	else
+	{
+		if(!strcmp(g_stratum_algo,"neoscrypt-xaya")) client->extranonce2size_default = 2;
+		else client->extranonce2size_default = YAAMP_EXTRANONCE2_SIZE;
+		client->difficulty_actual = g_stratum_difficulty;
+	}
 
 	strcpy(client->extranonce1, client->extranonce1_default);
 	client->extranonce2size = client->extranonce2size_default;
@@ -93,7 +113,20 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		if(strstr(client->version, "cpuminer-opt")) client->stats = true;
 	}
 
-	if(json_params->u.array.length>1 && !client->is_nicehash_ethstratum)
+	if (is_nebhash)
+	{
+		// Every neb-pool/1 client sends the protocol token as param[1]. It is
+		// not a reconnect notify id, so never feed it to the generic notify-id
+		// reuse logic below (which would leak another miner's session state).
+		json_value *protocol = json_params->u.array.length > 1 ?
+			json_params->u.array.values[1] : NULL;
+		if (!json_is_string(protocol) || strcmp(json_string_value(protocol), "neb-pool/1"))
+		{
+			nebhash_send_error(client, 20, "unsupported stratum protocol");
+			return true;
+		}
+	}
+	else if(json_params->u.array.length>1 && !client->is_nicehash_ethstratum)
 	{
 		char notify_id[1024] = { 0 };
 		if (json_params->u.array.values[1]->u.string.ptr)
@@ -155,7 +188,14 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		debuglog("new client with nonce %s\n", client->extranonce1);
 	}
 
-	if (is_ethash || is_etchash)
+	if (is_nebhash)
+	{
+		client->neb_subscribed = true;
+		char result[YAAMP_SMALLBUFSIZE];
+		nebhash_subscribe_result(client, result, sizeof(result));
+		client_send_result(client, "%s", result);
+	}
+	else if (is_ethash || is_etchash)
 	{
 		if (client->is_nicehash_ethstratum)
 		{
@@ -291,6 +331,34 @@ bool client_validate_user_address(YAAMP_CLIENT *client)
 
 bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 {
+	const char *neb_login = NULL;
+	const char *neb_password = NULL;
+	if (json_params->u.array.length > 0 && json_is_string(json_params->u.array.values[0]))
+		neb_login = json_string_value(json_params->u.array.values[0]);
+	if (json_params->u.array.length > 1 && json_is_string(json_params->u.array.values[1]))
+		neb_password = json_string_value(json_params->u.array.values[1]);
+
+	// The reference pool rejects authorize before subscribe without creating
+	// an account or closing the socket.
+	if (is_nebhash && !client->neb_subscribed)
+	{
+		nebhash_send_error(client, 25, "Session not subscribed");
+		return true;
+	}
+
+	// neb-pool/1 lets one session authorize several neb1 accounts (dev-fee
+	// miners do), so later authorizes are additions rather than a new login.
+	if (is_nebhash && client->neb_subscribed && g_list_client.Find(client))
+	{
+		if (!neb_login || !nebhash_add_login(client, neb_login, neb_password))
+		{
+			nebhash_send_error(client, 24, "Invalid neb1 login");
+			return true;
+		}
+		client_send_result(client, "true");
+		if (!client->jobid_sent) job_send_last(client);
+		return true;
+	}
 
 	if(g_list_client.Find(client)) {
 		clientlog(client, "Already logged");
@@ -298,30 +366,58 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 		return false;
 	}
 
-	if(json_params->u.array.length>1 && json_params->u.array.values[1]->u.string.ptr)
-		strncpy(client->password, json_params->u.array.values[1]->u.string.ptr, 1023);
+	if(neb_password)
+		strncpy(client->password, neb_password, 1023);
 
 	if (g_list_client.count >= g_stratum_max_cons) {
 		client_send_error(client, 21, "Server full");
 		return false;
 	}
 
-	if(json_params->u.array.length>0 && json_params->u.array.values[0]->u.string.ptr)
+	if(neb_login)
 	{
-		strncpy(client->username, json_params->u.array.values[0]->u.string.ptr, 1023);
+		strncpy(client->username, neb_login, 1023);
 
 		db_check_user_input(client->username);
 		int len = strlen(client->username);
 		if (!len)
 			return false;
 
-		char *sep = strpbrk(client->username, ".,;:");
-		if (sep) {
-			*sep = '\0';
-			strncpy(client->worker, sep+1, 1023-len);
-			if (strlen(client->username) > MAX_ADDRESS_LEN) return false;
-		} else if (len > MAX_ADDRESS_LEN) {
-			return false;
+		if (is_nebhash)
+		{
+			// The node has no validateaddress RPC, so verify the bech32m
+			// wallet address locally before it reaches the account table.
+			if (!nebhash_add_login(client, neb_login, neb_password))
+			{
+				nebhash_send_error(client, 24, "Invalid neb1 login");
+				return true;
+			}
+
+			// Use the same first-'.' split and worker rules as the reference
+			// pool. nebhash_add_login() has already validated both parts.
+			char neb_address[1088], neb_worker[1088];
+			nebhash_split_login(neb_login, neb_address, neb_worker);
+			db_check_user_input(neb_address);
+			strncpy(client->username, neb_address, sizeof(client->username) - 1);
+			client->username[sizeof(client->username) - 1] = '\0';
+			strncpy(client->worker, neb_worker, sizeof(client->worker) - 1);
+			client->worker[sizeof(client->worker) - 1] = '\0';
+			if (strlen(client->username) > MAX_ADDRESS_LEN)
+			{
+				nebhash_send_error(client, 24, "Invalid neb1 login");
+				return true;
+			}
+		}
+		else
+		{
+			char *sep = strpbrk(client->username, ".,;:");
+			if (sep) {
+				*sep = '\0';
+				strncpy(client->worker, sep+1, 1023-len);
+				if (strlen(client->username) > MAX_ADDRESS_LEN) return false;
+			} else if (len > MAX_ADDRESS_LEN) {
+				return false;
+			}
 		}
 	}
 /*
@@ -334,7 +430,10 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 	bool reset = client_initialize_multialgo(client);
 	if(reset) return false;
 
-	client_initialize_difficulty(client);
+	// NEB's target comes from the node's share_target and its own reference
+	// vardiff. Yiimp's password-driven difficulty/vardiff must not overwrite
+	// the exact 256-bit target already seeded at subscribe.
+	if (!is_nebhash) client_initialize_difficulty(client);
 
 	if (g_debuglog_client) {
 		debuglog("new client %s, %s, %s\n", client->username, client->password, client->version);
@@ -358,6 +457,11 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 		CommonUnlock(&g_db_mutex);
 	}
 
+	// db_add_user() clears solo while parsing password tokens; neb-pool/1
+	// carries the solo option as a plain "solo" password word.
+	if (is_nebhash && client->password && strcasestr(client->password, "solo"))
+		client->solo = true;
+
 	// when auto exchange is disabled, only authorize good wallet address...
 	if (!g_autoexchange && !client_validate_user_address(client)) 
 	{
@@ -373,7 +477,8 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 	}
 	
 	client_send_result(client, "true");
-	client_send_difficulty(client, client->difficulty_actual);
+	// The NEB job push publishes mining.set_target in the reference order.
+	if (!is_nebhash) client_send_difficulty(client, client->difficulty_actual);
 
 	if(client->jobid_locked)
 		job_send_jobid(client, client->jobid_locked);
@@ -381,6 +486,13 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 		job_send_last(client);
 
 	g_list_client.AddTail(client);
+	// Cache the first NEB login's account/worker IDs without creating a
+	// duplicate worker row; later dev-fee logins are resolved on first submit.
+	if (is_nebhash && neb_login && !nebhash_select_login(client, neb_login))
+	{
+		g_list_client.Delete(client);
+		return false;
+	}
 	return true;
 }
 
@@ -839,6 +951,10 @@ void *client_thread(void *p)
 
 	if(client->sock->sock >= 0)
 		shutdown(client->sock->sock, SHUT_RDWR);
+
+	// NEB sessions can create worker rows for extra dev-fee logins on first
+	// submit; clear all of them, not just the primary login's worker.
+	if (is_nebhash) nebhash_clear_workers(client);
 
 	if(g_list_client.Find(client))
 	{

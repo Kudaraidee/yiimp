@@ -193,7 +193,8 @@ void job_send_last(YAAMP_CLIENT *client)
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
 	client->jobid_sent = job->id;
 
-	char buffer[YAAMP_SMALLBUFSIZE];
+	// NEB notifications carry a 26 KiB model hash plus a merkle branch.
+	char buffer[512*1024];
 	if (client->is_ethproxy && (is_ethash || is_etchash))
 	{
 		ethash_ethproxy_work_buffer(job, client, buffer);
@@ -205,6 +206,10 @@ void job_send_last(YAAMP_CLIENT *client)
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
+	}
+	else if (is_nebhash)
+	{
+		nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
 	}
 	else if (is_homescrypt && homescrypt_uses_header_notify(client))
 	{
@@ -226,7 +231,8 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 		return;
 	}
 
-	char buffer[YAAMP_SMALLBUFSIZE];
+	// NEB notifications carry a 26 KiB model hash plus a merkle branch.
+	char buffer[512*1024];
 	if (client->is_ethproxy && (is_ethash || is_etchash))
 	{
 		ethash_ethproxy_work_buffer(job, client, buffer);
@@ -238,6 +244,10 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
+	}
+	else if (is_nebhash)
+	{
+		nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
 	}
 	else if (is_homescrypt && homescrypt_uses_header_notify(client))
 	{
@@ -279,7 +289,8 @@ void job_broadcast(YAAMP_JOB *job)
 		if(client->jobid_next != job->id) continue;
 		if(client->jobid_sent == job->id) continue;
 
-		char buffer[YAAMP_SMALLBUFSIZE];
+		// NEB notifications carry a 26 KiB model hash plus a merkle branch.
+		char buffer[512*1024];
 		memset(buffer, 0, sizeof(buffer));
 		if (client->is_ethproxy && (is_ethash || is_etchash))
 		{
@@ -292,6 +303,10 @@ void job_broadcast(YAAMP_JOB *job)
 		else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 		{
 			kawpow_job_mining_notify_buffer(job, client, buffer);
+		}
+		else if (is_nebhash)
+		{
+			nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
 		}
 		else if (is_homescrypt && homescrypt_uses_header_notify(client))
 		{

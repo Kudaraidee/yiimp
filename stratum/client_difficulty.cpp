@@ -101,6 +101,10 @@ void client_change_difficulty(YAAMP_CLIENT *client, double difficulty)
 
 void client_adjust_difficulty(YAAMP_CLIENT *client)
 {
+	// NEB uses the reference pool's k-window vardiff and publishes exact
+	// 256-bit targets from nebhash_submit(); never run yiimp's second vardiff.
+	if (is_nebhash) return;
+
 	if(client->difficulty_remote) {
 		client_change_difficulty(client, client->difficulty_remote);
 		return;
@@ -172,6 +176,10 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 
 int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 {
+	// NEB targets are 256-bit little-endian and travel with each job. The
+	// generic set_difficulty/set_target paths use incompatible byte order.
+	if (is_nebhash) return 0;
+
 //	debuglog("%s diff %f\n", client->sock->ip, difficulty);
 	if (client_uses_precise_difficulty())
 	{

@@ -84,8 +84,13 @@ bool coind_can_mine(YAAMP_COIND *coind, bool isaux)
 	if(!coind->enable) return false;
 	if(!coind->auto_ready) return false;
 	if(!rpc_connected(&coind->rpc)) return false;
-	if(!coind->height) return false;
-	if(!coind->difficulty) return false;
+	// NEB height/difficulty come from getinfo and the work-service job after
+	// startup; the work-service template itself is the readiness signal.
+	if (!is_nebhash)
+	{
+		if(!coind->height) return false;
+		if(!coind->difficulty) return false;
+	}
 	if(coind->isaux != isaux) return false;
 //	if(isaux && !coind->aux.chainid) return false;
 
@@ -97,6 +102,15 @@ bool coind_can_mine(YAAMP_COIND *coind, bool isaux)
 bool coind_validate_user_address(YAAMP_COIND *coind, char* const address)
 {
 	if(!address[0]) return false;
+
+	// NEB nodes have no usable validateaddress RPC; verify bech32m locally.
+	if (is_nebhash)
+	{
+		bool valid = nebhash_valid_address(address);
+		if (!valid)
+			stratumlog("%s: %s user address %s is not valid.\n", g_stratum_algo, coind->symbol, address);
+		return valid;
+	}
 
 	char params[YAAMP_SMALLBUFSIZE];
 	sprintf(params, "[\"%s\"]", address);
@@ -204,7 +218,7 @@ void coind_init(YAAMP_COIND *coind)
 	// Ethereum nodes do not implement the Bitcoin wallet RPCs used below.
 	// Work and height come from eth_getWork/eth_blockNumber instead, and the
 	// pool beneficiary is configured directly on the node.
-	if (is_ethash || is_etchash)
+	if (is_ethash || is_etchash || is_nebhash)
 		return;
 
 	strcpy(account, coind->account);
@@ -216,7 +230,7 @@ void coind_init(YAAMP_COIND *coind)
 	bool valid = coind_validate_address(coind);
 	if(valid) return;
 
-	sprintf(params, "[\"legacy\"]", account);
+	snprintf(params, sizeof(params), "[\"legacy\"]");
 
 	json_value *json = rpc_call(&coind->rpc, "getrawchangeaddress", params);
 	if (json and json->u.object.values[0].value->type == json_string) {

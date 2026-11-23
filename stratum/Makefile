@@ -23,13 +23,16 @@ SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/
 SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/work.cpp
 SOURCES_RANDOMSCASH=randomscash/randomscash.cpp
 SOURCES_HOMESCRYPT=homescrypt/homescrypt.cpp
+SOURCES_NEBHASH_C=nebhash/blake3_min.c nebhash/chacha8.c nebhash/nebhash2.c nebhash/shares.c
+SOURCES_NEBHASH_CPP=nebhash/work.cpp
+SOURCES_NEBHASH=$(SOURCES_NEBHASH_C) $(SOURCES_NEBHASH_CPP)
 
 CFLAGS += -DHAVE_CURL
 SOURCES += rpc_curl.cpp
 #LDCURL = $(shell /usr/bin/pkg-config --static --libs libcurl)
 #LDFLAGS += $(LDCURL)
 
-OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o) $(SOURCES_RANDOMSCASH:.cpp=.o) $(SOURCES_HOMESCRYPT:.cpp=.o)
+OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o) $(SOURCES_RANDOMSCASH:.cpp=.o) $(SOURCES_HOMESCRYPT:.cpp=.o) $(SOURCES_NEBHASH_C:.c=.o) $(SOURCES_NEBHASH_CPP:.cpp=.o)
 OUTPUT=stratum
 
 CODEDIR1=algos
@@ -41,8 +44,8 @@ CODEDIR5=randomx
 
 .PHONY: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5
 
-all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(OUTPUT)
-buildonly: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(OUTPUT)
+all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(SOURCES_NEBHASH) $(OUTPUT)
+buildonly: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(SOURCES_NEBHASH) $(OUTPUT)
 
 gitsubmodules:
 	git submodule init && git submodule update
@@ -71,6 +74,7 @@ $(SOURCES): stratum.h util.h
 $(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/work.h
 $(SOURCES_RANDOMSCASH): stratum.h randomscash/randomscash.h randomx/src/randomx.h
 $(SOURCES_HOMESCRYPT): stratum.h homescrypt/homescrypt.h
+$(SOURCES_NEBHASH): stratum.h nebhash/work.h nebhash/shares.h nebhash/nebhash2.h nebhash/blake3_min.h nebhash/chacha8.h
 
 # HomeScrypt v1.2 consensus requires exact IEEE-754 fmaf rounding. Never build
 # this translation unit with fast-math or FP contraction.
@@ -112,6 +116,7 @@ clean:
 	rm -f firopow/lib/*.o
 	rm -f randomscash/*.o
 	rm -f homescrypt/*.o
+	rm -f nebhash/*.o
 	rm -rf randomx/build
 	rm -f randomx/librandomx.a
 	rm -f ethash/*.o
