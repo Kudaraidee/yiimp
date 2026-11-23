@@ -875,8 +875,8 @@ if (g_debuglog_hash) {
 		double hash_double = UintToArith256(hash256).getdouble();
 		arith_uint256 share_base;
 		share_base.SetHex("0000ffff0000000000000000000000000000000000000000000000000000");
+		gpuminer_share_diff = share_base.getdouble() / hash_double;
 		double full_target = share_base.getdouble() / client->difficulty_actual;
-		gpuminer_share_diff = full_target / hash_double;
 		share_ok = (hash_double <= full_target);
 	}
 
