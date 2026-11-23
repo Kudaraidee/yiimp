@@ -462,7 +462,10 @@ function BackendCoinsUpdate()
 		}
 
 		if($coin->network_hash) {
-			$coin->network_ttf = intval($coin->difficulty * 0x100000000 / $coin->network_hash);
+			// NEB's difficulty is 2^256/target, i.e. hashes per block, so
+			// its TTF is difficulty/network_hash without the Bitcoin 2^32.
+			$ttf_factor = yaamp_is_nebhash_coin($coin) ? 1.0 : 0x100000000;
+			$coin->network_ttf = intval($coin->difficulty * $ttf_factor / $coin->network_hash);
 			if($coin->network_ttf > 2147483647) $coin->network_ttf = 2147483647;
 		}
 

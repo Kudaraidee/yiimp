@@ -68,7 +68,9 @@ class Coins extends ActiveRecord
 
         $rate = null;
 
-        if ($this->rpcencoding === 'GETH') {
+        if ($this->isNebhash()) {
+            $rate = $this->nebNetworkHashrate($remote, 120);
+        } elseif ($this->rpcencoding === 'GETH') {
             $rate = $this->gethNetworkHashrate($remote);
         } else {
             $raw = $remote->getnetworkhashps([120, -1]);
@@ -99,6 +101,63 @@ class Coins extends ActiveRecord
         }
 
         return null;
+    }
+
+    public function isNebhash(): bool
+    {
+        return $this->algo === 'nebhash' || $this->symbol === 'NEB';
+    }
+
+    /**
+     * NEB nodes expose no getnetworkhashps RPC. Its compact bits are
+     * (shift << 24) | mantissa, target = mantissa << shift, so expected
+     * hashes per block = 2^(256-shift)/mantissa. Average that over the
+     * last 120 blocks, like getnetworkhashps does for Bitcoin-like chains.
+     */
+    private function nebNetworkHashrate(WalletRPC $remote, int $blocks = 120): ?float
+    {
+        $tip = (int) $remote->getblockcount();
+        if ($tip <= 0 || $remote->error !== null) {
+            return null;
+        }
+
+        $blocks = max(1, min($blocks, $tip));
+        $start  = $tip - $blocks;
+
+        $sum     = 0.0;
+        $firstTs = null;
+        $lastTs  = null;
+
+        for ($h = $start; $h <= $tip; $h++) {
+            $hash = $remote->getblockhash($h);
+            if (!$hash || $remote->error !== null) {
+                return null;
+            }
+
+            $block = $remote->getblock($hash, true);
+            if ((!is_array($block) && !is_object($block)) || $remote->error !== null) {
+                return null;
+            }
+
+            $bits = (int) (is_object($block) ? ($block->bits ?? 0) : ($block['bits'] ?? 0));
+            $time = (int) (is_object($block) ? ($block->time ?? 0) : ($block['time'] ?? 0));
+            $shift    = ($bits >> 24) & 0xff;
+            $mantissa = $bits & 0x00ffffff;
+            if ($mantissa <= 0 || $shift > 255 || $time <= 0) {
+                return null;
+            }
+
+            $sum += pow(2.0, 256 - $shift) / $mantissa;
+            if ($firstTs === null) $firstTs = $time;
+            $lastTs = $time;
+        }
+
+        $span = $lastTs - $firstTs;
+        if ($span <= 0) {
+            return null;
+        }
+
+        return $sum / $span;
     }
 
     private function gethNetworkHashrate(WalletRPC $remote): ?float

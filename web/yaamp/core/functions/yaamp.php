@@ -328,6 +328,68 @@ function yaamp_coin_image_url($coin)
 	return (string) $image;
 }
 
+function yaamp_is_nebhash_coin($coin)
+{
+	if (is_object($coin)) {
+		$algo   = isset($coin->algo) ? $coin->algo : null;
+		$symbol = isset($coin->symbol) ? $coin->symbol : null;
+	} elseif (is_array($coin)) {
+		$algo   = isset($coin['algo']) ? $coin['algo'] : null;
+		$symbol = isset($coin['symbol']) ? $coin['symbol'] : null;
+	} else {
+		return false;
+	}
+
+	return $algo === 'nebhash' || $symbol === 'NEB';
+}
+
+/**
+ * NEB nodes have no getnetworkhashps/getmininginfo RPC. Derive the rate from
+ * the last 120 blocks: NEB's compact bits are (shift << 24) | mantissa and the
+ * target is mantissa << shift, so the expected hashes per block are
+ * 2^(256-shift)/mantissa. Averaging over a block window is what
+ * getnetworkhashps does for Bitcoin-like chains.
+ */
+function yaamp_neb_network_hashrate(WalletRPC $remote, $blocks = 120)
+{
+	$tip = (int) $remote->getblockcount();
+	if ($tip <= 0 || !empty($remote->error)) return null;
+
+	$blocks = max(1, min((int) $blocks, $tip));
+	$start  = $tip - $blocks;
+
+	$sum      = 0.0;
+	$firstTs  = null;
+	$lastTs   = null;
+	$field    = function ($block, $key) {
+		if (is_object($block)) return isset($block->$key) ? $block->$key : null;
+		return is_array($block) && isset($block[$key]) ? $block[$key] : null;
+	};
+
+	for ($h = $start; $h <= $tip; $h++) {
+		$hash = $remote->getblockhash($h);
+		if (!$hash || !empty($remote->error)) return null;
+
+		$block = $remote->getblock($hash, true);
+		if ((!is_array($block) && !is_object($block)) || !empty($remote->error)) return null;
+
+		$bits = (int) $field($block, 'bits');
+		$time = (int) $field($block, 'time');
+		$shift = ($bits >> 24) & 0xff;
+		$mantissa = $bits & 0x00ffffff;
+		if ($mantissa <= 0 || $shift > 255 || $time <= 0) return null;
+
+		$sum += pow(2.0, 256 - $shift) / $mantissa;
+		if ($firstTs === null) $firstTs = $time;
+		$lastTs = $time;
+	}
+
+	$span = $lastTs - $firstTs;
+	if ($span <= 0) return null;
+
+	return $sum / $span;
+}
+
 function yaamp_geth_network_hashrate(WalletRPC $remote)
 {
 	$latest = $remote->eth_getBlockByNumber('latest', false);
@@ -384,7 +446,9 @@ function yaamp_rpc_network_hashrate($coin, $ttl = 60)
 	if (!empty($remote->error)) return null;
 
 	$rate = null;
-	if ($coin->rpcencoding === 'GETH') {
+	if (yaamp_is_nebhash_coin($coin)) {
+		$rate = yaamp_neb_network_hashrate($remote, 120);
+	} else if ($coin->rpcencoding === 'GETH') {
 		$rate = yaamp_geth_network_hashrate($remote);
 	} else {
 		$raw = $remote->getnetworkhashps(array(120, -1));
@@ -421,6 +485,14 @@ function yaamp_coin_nethash($coin , $coin_powlimit_bits = null , $coin_difficult
 
 	$rpc = yaamp_rpc_network_hashrate($coin);
 	if ($rpc !== null) return $rpc;
+
+	// NEB difficulty is already expected hashes per block; do not apply the
+	// Bitcoin 2^32 powlimit multiplier when the node RPC is unavailable.
+	if (yaamp_is_nebhash_coin($coin)) {
+		$blocktime = $coin->block_time ? $coin->block_time : max(min($coin->actual_ttf, 60), 30);
+		if ($coin->difficulty > 0 && $blocktime > 0) return $coin->difficulty / $blocktime;
+		return 0;
+	}
 
     if (is_null($coin_powlimit_bits)) {
         if (!is_null($coin->powlimit_bits)) {

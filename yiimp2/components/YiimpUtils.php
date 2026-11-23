@@ -508,6 +508,16 @@ class YiimpUtils extends Component
 		}
 		*/
 
+		// NEB difficulty is already expected hashes per block, so it must not
+		// be multiplied by the Bitcoin powlimit (2^32) if RPC is unavailable.
+		if (($coin->algo ?? null) === 'nebhash' || ($coin->symbol ?? null) === 'NEB') {
+			$blocktime = $coin->block_time ? $coin->block_time : max(min($coin->actual_ttf, 60), 30);
+			if (!empty($coin->difficulty) && $blocktime > 0) {
+				return (float) ($coin->difficulty / $blocktime);
+			}
+			return 0;
+		}
+
 		if (is_null($coin_powlimit_bits)) {
 			if (!is_null($coin->powlimit_bits)) {
 				$coin_powlimit_bits = $coin->powlimit_bits;

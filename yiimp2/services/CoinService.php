@@ -271,7 +271,10 @@ class CoinService
             }
 
             if ($coin->network_hash) {
-                $coin->network_ttf = (int) min($coin->difficulty * 0x100000000 / $coin->network_hash, 2147483647);
+                // NEB difficulty is hashes per block (2^256/target), not the
+                // Bitcoin powlimit-scaled difficulty, so its TTF has no 2^32.
+                $ttfFactor = ($coin->algo === 'nebhash' || $coin->symbol === 'NEB') ? 1.0 : 0x100000000;
+                $coin->network_ttf = (int) min($coin->difficulty * $ttfFactor / $coin->network_hash, 2147483647);
             }
 
             if (isset($poolRate[$coin->algo]) && $poolRate[$coin->algo]) {
