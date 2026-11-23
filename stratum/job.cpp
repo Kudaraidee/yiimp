@@ -26,6 +26,9 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 	bool specific_mining = (client->coins_mining_list.size() > 0 );
 	bool coin_to_mine = (std::find(client->coins_mining_list.begin(), client->coins_mining_list.end(), job->coind->symbol) != client->coins_mining_list.end()) ||
 						(std::find(client->coins_mining_list.begin(), client->coins_mining_list.end(), job->coind->symbol2) != client->coins_mining_list.end());
+	// Dedicated single-coin ports (autoexchange=0) can bind a wallet login to
+	// that coin's job without requiring an explicit mc=SYMBOL password token.
+	if (!g_autoexchange && client->coinid == job->coind->id) coin_to_mine = true;
 	bool coin_to_ignore = (std::find(client->coins_ignore_list.begin(), client->coins_ignore_list.end(), job->coind->symbol) != client->coins_ignore_list.end()) ||
 						  (std::find(client->coins_ignore_list.begin(), client->coins_ignore_list.end(), job->coind->symbol2) != client->coins_ignore_list.end());
 
