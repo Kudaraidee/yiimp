@@ -1565,12 +1565,16 @@ static void nebhash_send_model(YAAMP_CLIENT *client, YAAMP_JOB_TEMPLATE *templ)
 string nebhash_job_mining_notify(YAAMP_JOB *job, YAAMP_CLIENT *client)
 {
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
+	bool need_target = client && client->neb_first_job;
 	if (client)
 	{
 		// Reference order for every pushed job: target, model, then notify.
+		// The session is seeded with the start target at subscribe so submits
+		// can be checked before the first job, but the reference pool still
+		// publishes it as an explicit set_target on the first pushed job.
 		uint8_t target[32];
 		if (nebhash_template_target(templ, client->neb_k, target) &&
-			memcmp(client->share_target.begin(), target, 32) != 0)
+			(need_target || memcmp(client->share_target.begin(), target, 32) != 0))
 			nebhash_client_set_target_bytes(client, target);
 		nebhash_send_model(client, templ);
 	}
