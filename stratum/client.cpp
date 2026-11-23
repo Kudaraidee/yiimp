@@ -210,10 +210,7 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 	}
 	else {
 		double wire_difficulty = homescrypt_wire_difficulty(client, client->difficulty_actual);
-		const char *format = homescrypt_uses_gpuminer_job(client) ?
-			"[[[\"mining.set_difficulty\",\"%.8g\"],[\"mining.notify\",\"%s\"]],\"%s\",%d]" :
-			"[[[\"mining.set_difficulty\",\"%.3g\"],[\"mining.notify\",\"%s\"]],\"%s\",%d]";
-		client_send_result(client, format,
+		client_send_result(client, "[[[\"mining.set_difficulty\",\"%.3g\"],[\"mining.notify\",\"%s\"]],\"%s\",%d]",
 			wire_difficulty, client->notify_id, client->extranonce1, client->extranonce2size);
 	}
 

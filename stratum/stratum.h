@@ -195,9 +195,8 @@ bool homescrypt_uses_header_notify(const YAAMP_CLIENT *client);
 
 // gpuminer-rplant is an xmrig-derived client: it writes the 32-bit nonce
 // little-endian into the header but reports/parses it as a big-endian hex
-// value, and it interprets mining.set_difficulty against Lumenite's full
-// 256-bit block powlimit (0x3ffff << 224) rather than yiimp's 64-bit slice
-// of the 0xffff << 208 share target.
+// value, and its difficulty scale is the Lumenite block powlimit (0x3ffff),
+// four times yiimp's 0xffff share scale.
 bool homescrypt_uses_gpuminer_job(const YAAMP_CLIENT *client);
 double homescrypt_wire_difficulty(const YAAMP_CLIENT *client, double difficulty);
 

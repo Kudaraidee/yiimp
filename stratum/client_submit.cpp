@@ -22,12 +22,10 @@ bool homescrypt_uses_gpuminer_job(const YAAMP_CLIENT *client)
 
 double homescrypt_wire_difficulty(const YAAMP_CLIENT *client, double difficulty)
 {
-	// gpuminer reports/accepts difficulty against Lumenite's full 256-bit
-	// block powlimit (0x3ffff << 224). yiimp's share target uses 0xffff << 208.
-	// Convert pool difficulty to the miner's scale before sending it on the
-	// wire; validation converts the resulting full hash back to pool scale.
-	static const double scale = ((double)0x3ffff / (double)0xffff) * 65536.0;
-	return (is_homescrypt && homescrypt_uses_gpuminer_job(client)) ? difficulty * scale : difficulty;
+	// gpuminer reports/accepts difficulty against Lumenite's block powlimit
+	// (0x3ffff << 224), while yiimp shares use 0xffff << 208. Send four times
+	// the pool difficulty so its share target matches the validator exactly.
+	return (is_homescrypt && homescrypt_uses_gpuminer_job(client)) ? difficulty * 4.0 : difficulty;
 }
 
 static void homescrypt_standard_header_ex(YAAMP_JOB_VALUES *values, YAAMP_JOB_TEMPLATE *templ,
@@ -863,23 +861,6 @@ if (g_debuglog_hash) {
 	if (is_homescrypt)
 		share_ok = (hash_int_scaled <= user_target);
 
-	// gpuminer is xmrig-derived: mining.set_difficulty is interpreted against
-	// Lumenite's full 256-bit block powlimit, so validate its shares against
-	// the same full digest and convert the result back to yiimp's share scale.
-	double gpuminer_share_diff = 0;
-	bool is_gpuminer = (is_homescrypt && homescrypt_uses_gpuminer_job(client));
-	if (is_gpuminer)
-	{
-		uint256 hash256;
-		memcpy(hash256.begin(), submitvalues.hash_bin, 32);
-		double hash_double = UintToArith256(hash256).getdouble();
-		arith_uint256 share_base;
-		share_base.SetHex("0000ffff0000000000000000000000000000000000000000000000000000");
-		double full_target = share_base.getdouble() / client->difficulty_actual;
-		gpuminer_share_diff = full_target / hash_double;
-		share_ok = (hash_double <= full_target);
-	}
-
 	if(!share_ok)
 	{
 		client_submit_error(client, job, 26, "Low difficulty share", extranonce2, ntime, nonce);
@@ -912,7 +893,6 @@ if (g_debuglog_hash) {
 	}
 
 	double share_diff = target_to_diff(hash_int);
-	if (is_gpuminer) share_diff = gpuminer_share_diff;
 	double share_diff_coin = target_to_diff_coin(hash_int, job->coind->powlimit_bits - ((is_equihash)? 0 : 16));
 
 //	if (g_current_algo->diff_multiplier != 0) {
