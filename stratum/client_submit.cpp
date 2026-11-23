@@ -816,22 +816,13 @@ if (g_debuglog_hash) {
         debuglog("coin %016lx \n", coin_target);
 }
 
+	// HomeScrypt miners (including gpuminer-rplant-cuda) derive their share
+	// target from yiimp's 64-bit slice at bytes 22..29. Requiring the full
+	// 256-bit digest here would use a different, independent slice (bytes
+	// 29..31) and reject ~98% of otherwise valid shares. Block candidates are
+	// still checked against the full compact target in client_do_submit(), so
+	// only share accounting uses this miner-compatible comparison.
 	bool share_ok = (hash_int_scaled <= user_target || hash_int <= coin_target);
-	if (is_homescrypt)
-	{
-		// Validate the whole 256-bit HomeScrypt digest. The generic yiimp
-		// comparison only looks at bytes 22..29, so it can accept shares whose
-		// two most significant bytes make the real hash far above target.
-		uint256 hash256;
-		memcpy(hash256.begin(), submitvalues.hash_bin, 32);
-		arith_uint256 full_hash = UintToArith256(hash256);
-		arith_uint256 full_share_target = arith_uint256(user_target) << 192;
-		arith_uint256 full_coin_target;
-		bool negative = false, overflow = false;
-		full_coin_target.SetCompact((uint32_t)strtoul(templ->nbits, NULL, 16), &negative, &overflow);
-		share_ok = full_hash <= full_share_target ||
-			(!negative && !overflow && full_hash <= full_coin_target);
-	}
 
 	if(!share_ok)
 	{
