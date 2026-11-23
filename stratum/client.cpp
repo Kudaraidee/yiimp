@@ -6,10 +6,22 @@ bool client_suggest_difficulty(YAAMP_CLIENT *client, json_value *json_params)
 	if(json_params->u.array.length>0)
 	{
 		double diff = client_normalize_difficulty(json_params->u.array.values[0]->u.dbl, client);
-		uint64_t user_target = diff_to_target(diff);
 
-		if(user_target >= YAAMP_MINDIFF && user_target <= YAAMP_MAXDIFF)
-			client->difficulty_actual = diff;
+		// Low-difficulty algos derive their share target from difficulty_actual
+		// directly; diff_to_target() would map a sub-0.00006 value above
+		// YAAMP_MAXDIFF and silently drop a valid suggestion.
+		if (client_uses_precise_difficulty())
+		{
+			if (diff > 0 && isfinite(diff))
+				client->difficulty_actual = diff;
+		}
+		else
+		{
+			uint64_t user_target = diff_to_target(diff);
+
+			if(user_target >= YAAMP_MINDIFF && user_target <= YAAMP_MAXDIFF)
+				client->difficulty_actual = diff;
+		}
 	}
 
 	client_send_result(client, "true");

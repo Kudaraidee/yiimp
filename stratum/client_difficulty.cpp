@@ -18,9 +18,24 @@ static bool is_gpu_vardiff()
 	return is_ethash || is_etchash || is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow;
 }
 
+// HomeScrypt's real network difficulty is ~3e-4, far below the 0.002 step of
+// the legacy Bitcoin-style rounding: floor(diff*500)/500 collapses every such
+// value to zero and vardiff stops working. Any algo configured with a sub-0.002
+// min diff hits the same bug, so keep full precision for all of them.
+static bool is_low_diff_vardiff()
+{
+	if (is_homescrypt) return true;
+	return g_stratum_min_diff > 0 && g_stratum_min_diff < 0.002;
+}
+
+bool client_uses_precise_difficulty()
+{
+	return is_gpu_vardiff() || is_low_diff_vardiff();
+}
+
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client)
 {
-	if (is_gpu_vardiff())
+	if (client_uses_precise_difficulty())
 	{
 		// These miners accept fractional difficulty and derive their target
 		// from the exact value. Keep it instead of the even-integer rounding
@@ -86,7 +101,7 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 		return;
 	}
 
-	if (is_gpu_vardiff())
+	if (client_uses_precise_difficulty())
 	{
 		// Fixed-window rate is much more stable than the generic EMA here:
 		// the EMA is only refreshed when a share arrives, so a slow GPU
@@ -153,7 +168,7 @@ void client_adjust_difficulty(YAAMP_CLIENT *client)
 int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 {
 //	debuglog("%s diff %f\n", client->sock->ip, difficulty);
-	if (is_gpu_vardiff())
+	if (client_uses_precise_difficulty())
 	{
 		client->shares_per_minute = g_stratum_eth_vardiff_target;
 		client->vardiff_shares = 0;
@@ -258,24 +273,26 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 	}
 	if (!value) return;
 
-	if (is_gpu_vardiff())
+	if (client_uses_precise_difficulty())
 	{
-		// These miners use the full 256-bit target. An explicit d= or sd=
-		// must be used as-is: client_normalize_difficulty() clamps to the
-		// Bitcoin-style g_stratum_min_diff (difficulty/2), which silently
-		// turned d=2 into 8 on a pool configured with difficulty = 16.
+		// Fractional and sub-0.002 difficulties must be used as-is. The
+		// legacy Bitcoin-style rounding clamped d=2 to 8 with difficulty=16
+		// and rounded every low-diff value down to zero.
 		double diff = atof(value);
 		if (diff > 0 && isfinite(diff))
 		{
 			client->difficulty_actual = diff;
-			if (is_ethash || is_etchash)
+			if (is_gpu_vardiff())
 			{
-				uint8_t be[32];
-				ethash_diff_to_target(diff, be);
-				client->share_target = ethash_be_to_uint256(be);
+				if (is_ethash || is_etchash)
+				{
+					uint8_t be[32];
+					ethash_diff_to_target(diff, be);
+					client->share_target = ethash_be_to_uint256(be);
+				}
+				else
+					diff_to_target(client->share_target, diff);
 			}
-			else
-				diff_to_target(client->share_target, diff);
 
 			client->difficulty_fixed = difficulty_fixed;
 		}
