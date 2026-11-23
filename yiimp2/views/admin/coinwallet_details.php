@@ -37,7 +37,10 @@ if (!empty($info)) {
     $stake = $conv->arraySafeVal($info, 'stake', '');
     if ($stake !== '') $PoS = true;
 }
-$rpcAvailable = !empty($info) && isset($info['balance']);
+// NEB's native getinfo has no `balance` key: the pool DB is authoritative.
+// A truthy info array still means the daemon answered, so show blocks/peers.
+$isNeb        = $coin->algo === 'nebhash' || $coin->symbol === 'NEB';
+$rpcAvailable = !empty($info) && (isset($info['balance']) || $isNeb);
 
 // DCR stake info
 $dcrStake = $dcrTickets = $dcrTicketPrice = null;
@@ -515,7 +518,7 @@ if (!$rpcAvailable) {
     echo "<td class='{$tdR}'>" . Html::encode((string) $index) . "</td>";
 } else {
     $errors  = $info['errors'] ?? '';
-    $balance = $info['balance'] ?? '';
+    $balance = $info['balance'] ?? ($isNeb ? $coin->balance : '');
     $btc     = $conv->bitcoinvaluetoa($balance * $coin->price);
     $conns   = isset($info['connections'])
         ? Html::a(Html::encode((string) $info['connections']), '/admin/coinpeers?id=' . $coin->id)
@@ -564,7 +567,8 @@ elseif ($ETH)     $account = $coin->master_wallet;
 elseif ($coin->symbol === 'BTC') $account = '*';
 
 $txs = [];
-if ($rpcAvailable) {
+// NEB has no wallet listtransactions RPC; the DB block list is authoritative.
+if ($rpcAvailable && !$isNeb) {
     $txs = $remote->listtransactions($account, $maxrows);
     if (empty($txs)) { $account = '*'; $txs = $remote->listtransactions($account, $maxrows); }
     if (empty($txs)) $txs = $remote->listtransactions($account, 200);

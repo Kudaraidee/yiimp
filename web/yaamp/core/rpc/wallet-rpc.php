@@ -621,6 +621,16 @@ class WalletRPC {
 
 		// Bitcoin RPC
         	switch ($method) {
+			case 'getpeerinfo':
+				$res = $this->rpc->__call($method,$params);
+				// NEB reports peer height as `height`; legacy views read
+				// `currentheight`. Keep the native key and add the alias.
+				if (is_array($res)) foreach ($res as &$peer) {
+					if (is_array($peer) && !isset($peer['currentheight']) && isset($peer['height']))
+						$peer['currentheight'] = $peer['height'];
+				}
+				unset($peer);
+				break;
 			case 'getinfo':
 				if ($this->hasGetInfo) {
 					$res = $this->rpc->__call($method,$params);

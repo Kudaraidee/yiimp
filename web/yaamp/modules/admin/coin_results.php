@@ -8,6 +8,7 @@ $PoS = ($coin->algo == 'PoS'); // or if 'stake' key is present in 'getinfo' meth
 $DCR = ($coin->rpcencoding == 'DCR' || $coin->getOfficialSymbol() == 'DCR');
 $DGB = ($coin->rpcencoding == 'DGB' || $coin->getOfficialSymbol() == 'DGB');
 $ETH = ($coin->rpcencoding == 'GETH');
+$isNeb = ($coin->algo == 'nebhash' || $coin->symbol == 'NEB');
 
 $remote = new WalletRPC($coin);
 
@@ -226,7 +227,9 @@ echo '<td><b><a href="/site/block?id=' . $coin->id . '">' . $coin->name . '</a><
 echo '<td width="60"><b>' . $coin->symbol . '</b></td>';
 echo '<td><a href="/site/gomining?algo=' . $coin->algo . '">' . $coin->algo . '</a></td>';
 
-if (!$info || !isset($info['balance']) ) {
+// NEB nodes answer with native getinfo but have no wallet balance RPC; the
+// pool DB is authoritative. Do not hide blocks/conns just for that.
+if (!$info || (!isset($info['balance']) && !$isNeb)) {
     echo '<td colspan="5">ERROR ' . $remote->error . '</td>';
     echo '<td>' . bitcoinvaluetoa($coin->price) . '</td>';
     echo '<td colspan="2">';
@@ -235,7 +238,7 @@ if (!$info || !isset($info['balance']) ) {
 }
 
 $errors      = isset($info['errors']) ? $info['errors'] : '';
-$balance     = isset($info['balance']) ? $info['balance'] : '';
+$balance     = isset($info['balance']) ? $info['balance'] : ($isNeb ? $coin->balance : '');
 $txfee       = isset($info['paytxfee']) ? $info['paytxfee'] : '';
 $connections = isset($info['connections']) ? CHtml::link($info['connections'], '/admin/coinpeers?id=' . $coin->id) : '';
 $blocks      = isset($info['blocks']) ? $info['blocks'] : '';
@@ -316,25 +319,27 @@ else if ($ETH)
 else if ($coin->symbol == "BTC") $account = '*'; // should work for all coins now
 	
 	
-$txs = $remote->listtransactions($account, $maxrows);
+$txs = array();
 
+// NEB has no wallet listtransactions RPC; recent pool blocks come from the DB.
+if (!$isNeb) {
+    $txs = $remote->listtransactions($account, $maxrows);
 
-// Coins with disabled accounting will not show any tx. $account should be "*"
-
-if (empty($txs)) {
+    // Coins with disabled accounting will not show any tx. $account should be "*"
+    if (empty($txs)) {
         $account = '*';
         $txs = $remote->listtransactions($account, $maxrows);
-}
-	
-	
-$txs = $remote->listtransactions($account, $maxrows);
-
-if (empty($txs)) {
-    if (!empty($remote->error)) {
-        echo "<b>RPC Error: {$remote->error}</b><p/>";
     }
-    // retry...
-    $txs = $remote->listtransactions($account, 200);
+
+    $txs = $remote->listtransactions($account, $maxrows);
+
+    if (empty($txs)) {
+        if (!empty($remote->error)) {
+            echo "<b>RPC Error: {$remote->error}</b><p/>";
+        }
+        // retry...
+        $txs = $remote->listtransactions($account, 200);
+    }
 }
 
 $txs_array = array();

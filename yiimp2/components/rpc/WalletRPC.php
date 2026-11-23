@@ -31,6 +31,9 @@ class WalletRPC
     /** Bitcoin: whether the daemon supports getinfo directly */
     private bool $hasGetInfo = false;
 
+    /** NEB nodes only implement their native getinfo/getpeerinfo RPCs. */
+    private bool $isNebhash = false;
+
     /** Ethereum: default account / master wallet address */
     private ?string $account = null;
 
@@ -68,6 +71,7 @@ class WalletRPC
     ) {
         if (is_object($userOrCoin)) {
             $coin = $userOrCoin;
+            $this->isNebhash = ($coin->algo ?? '') === 'nebhash' || ($coin->symbol ?? '') === 'NEB';
             switch ($coin->rpcencoding) {
                 case 'GETH':
                     $this->type    = 'Ethereum';
@@ -104,6 +108,7 @@ class WalletRPC
 
                 default:
                     $this->type       = 'Bitcoin';
+                    $this->coin       = $coin;
                     $this->rpc        = new cBitcoinRPC(
                         (string) ($coin->rpcuser   ?? ''),
                         (string) ($coin->rpcpasswd ?? ''),
@@ -111,8 +116,11 @@ class WalletRPC
                         (int)    ($coin->rpcport   ?? 8332),
                         $url
                     );
-                    $this->hasGetInfo = (bool) ($coin->hasgetinfo ?? false);
-                    if (empty($coin->rpcuser)) {
+                    // NEB implements native getinfo/getpeerinfo but no Bitcoin
+                    // getmininginfo/getwalletinfo/getnetworkinfo calls. Keep the
+                    // DB flag at 0 for stratum's NEB-specific template path.
+                    $this->hasGetInfo = $this->isNebhash || (bool) ($coin->hasgetinfo ?? false);
+                    if (empty($coin->rpcuser) && !$this->isNebhash) {
                         $this->error = 'RPC not configured';
                     }
                     break;
@@ -740,6 +748,23 @@ class WalletRPC
         }
 
         // --- Bitcoin (default) -----------------------------------------------
+
+        // NEB reports each peer's height as `height`; the admin peer table
+        // reads `currentheight`. Normalise it without dropping the native key.
+        if ($method === 'getpeerinfo') {
+            $res         = $this->rpc->call($method, $params);
+            $this->error = $this->rpc->getError();
+            if (is_array($res)) {
+                foreach ($res as &$peer) {
+                    if (is_array($peer) && !isset($peer['currentheight']) && isset($peer['height'])) {
+                        $peer['currentheight'] = $peer['height'];
+                    }
+                }
+                unset($peer);
+            }
+            return $res;
+        }
+
         if ($method === 'getinfo') {
             if ($this->hasGetInfo) {
                 $res = $this->rpc->call('getinfo', $params);
