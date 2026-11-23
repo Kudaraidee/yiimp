@@ -89,7 +89,7 @@ function safetrade_api_query($method, $params='', $returnType='object')
 		}
 	}
 
-	$ret = json_decode($raw, $returnType !== 'array');
+	$ret = json_decode($raw, strtolower((string) $returnType) === 'array');
 	if (json_last_error() !== JSON_ERROR_NONE) {
 		debuglog('safetrade: invalid public api response '.strip_data(substr($raw, 0, 200)));
 		return null;
@@ -161,7 +161,7 @@ function safetrade_api_user($method, $url_params = array(), $request_method='GET
 		return false;
 	}
 
-	$res = json_decode($raw, $returnType !== 'array');
+	$res = json_decode($raw, strtolower((string) $returnType) === 'array');
 	if (json_last_error() !== JSON_ERROR_NONE) {
 		debuglog("safetrade: $method returned invalid JSON ".strip_data(substr($raw, 0, 200)));
 		return false;
