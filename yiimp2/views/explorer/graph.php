@@ -16,8 +16,11 @@ if (empty($json)) {
 	$tm = 0;
 
 	$remote = new WalletRPC($coin);
-	// Ethereum RPC has no batched block calls; keep the graph responsive.
-	$graphBlocks = ($coin->rpcencoding == 'GETH') ? 40 : 500;
+	// Ethereum RPC has no batched block calls; NEB answers one RPC per block
+	// too. Keep both graphs responsive.
+	if ($coin->rpcencoding == 'GETH') $graphBlocks = 40;
+	elseif ($coin->algo === 'nebhash' || $coin->symbol === 'NEB') $graphBlocks = 60;
+	else $graphBlocks = 500;
 	for($i = $coin->block_height; $i > max(0, $coin->block_height-$graphBlocks); $i--)
 	{
 		$hash = $remote->getblockhash($i);

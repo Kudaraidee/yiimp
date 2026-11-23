@@ -34,6 +34,14 @@ class WalletRPC
     /** NEB nodes only implement their native getinfo/getpeerinfo RPCs. */
     private bool $isNebhash = false;
 
+    /**
+     * NEB getblock returns raw hex unless verbose=true, and its verbose tx
+     * entries are objects rather than txid strings. Cache them so the explorer
+     * can still render transactions through getrawtransaction().
+     * @var array<string,array{height:int,hash:string,time:int,tx:array}>
+     */
+    private array $nebTxCache = [];
+
     /** Ethereum: default account / master wallet address */
     private ?string $account = null;
 
@@ -763,6 +771,106 @@ class WalletRPC
                 unset($peer);
             }
             return $res;
+        }
+
+        if ($this->isNebhash && $method === 'getblock') {
+            // NEB's default getblock result is a raw hex string. Always ask for
+            // the verbose object, then make it look like a Bitcoin core block.
+            $params[1] = true;
+            $res         = $this->rpc->call($method, $params);
+            $this->error = $this->rpc->getError();
+            if (is_array($res)) {
+                // NEB uses different field names for the same block properties.
+                if (!isset($res['merkleroot']) && isset($res['bodyroot'])) {
+                    $res['merkleroot'] = $res['bodyroot'];
+                }
+                if (!isset($res['previousblockhash']) && isset($res['parent'])) {
+                    $res['previousblockhash'] = $res['parent'];
+                }
+
+                // NEB reports compact bits instead of `difficulty`.
+                if (!isset($res['difficulty']) && isset($res['bits'])) {
+                    $bits     = (int) $res['bits'];
+                    $shift    = ($bits >> 24) & 0xff;
+                    $mantissa = $bits & 0x00ffffff;
+                    if ($mantissa > 0 && $shift <= 255) {
+                        $res['difficulty'] = pow(2.0, 256 - $shift) / $mantissa;
+                    }
+                }
+
+                // Keep the explorer's txid list intact but retain the verbose
+                // entries for the getrawtransaction() bridge below.
+                if (isset($res['tx']) && is_array($res['tx'])) {
+                    $txids = [];
+                    foreach ($res['tx'] as $tx) {
+                        if (is_array($tx) && isset($tx['txid'])) {
+                            $txid   = (string) $tx['txid'];
+                            $txids[] = $txid;
+                            $this->nebTxCache[$txid] = [
+                                'height' => (int) ($res['height'] ?? 0),
+                                'hash'   => (string) ($res['hash'] ?? ''),
+                                'time'   => (int) ($res['time'] ?? 0),
+                                'tx'     => $tx,
+                            ];
+                        } elseif (is_string($tx)) {
+                            $txids[] = $tx;
+                        }
+                    }
+                    $res['tx'] = $txids;
+                }
+            }
+            return $res;
+        }
+
+        if ($this->isNebhash && ($method === 'getrawtransaction' || $method === 'gettransaction')) {
+            $txid  = (string) ($params[0] ?? '');
+            $entry = $this->nebTxCache[$txid] ?? null;
+            if ($entry) {
+                // NEB needs the block height to look up a mined transaction.
+                $raw         = $this->rpc->call('gettransaction', [$txid, $entry['height']]);
+                $this->error = $this->rpc->getError();
+                $tx          = $entry['tx'];
+
+                $vin = [];
+                if (!empty($tx['coinbase'])) {
+                    $vin[] = ['coinbase' => 'NEB coinbase'];
+                } else {
+                    foreach ($tx['inputs'] ?? [] as $in) {
+                        $inTxid = (string) ($in['txid'] ?? '');
+                        $index  = (int) ($in['index'] ?? 0);
+                        $vin[]  = [
+                            'txid' => $inTxid,
+                            'vout' => $index,
+                            'addr' => 'input ' . substr($inTxid, 0, 8) . '…:' . $index,
+                        ];
+                    }
+                }
+
+                $vout = [];
+                foreach ($tx['outputs'] ?? [] as $out) {
+                    $vout[] = [
+                        'value'        => (float) ($out['amount'] ?? 0) / 1e8,
+                        'n'            => (int) ($out['index'] ?? 0),
+                        'scriptPubKey' => ['hex' => (string) ($out['lock'] ?? '')],
+                    ];
+                }
+
+                $hex  = is_array($raw) ? (string) ($raw['hex'] ?? '') : '';
+                $size = is_array($raw)
+                    ? (int) ($raw['size'] ?? (strlen($hex) / 2))
+                    : (int) ($tx['size'] ?? 0);
+                return [
+                    'txid'          => $txid,
+                    'hex'           => $hex,
+                    'size'          => $size,
+                    'vin'           => $vin,
+                    'vout'          => $vout,
+                    'blockhash'     => $entry['hash'],
+                    'confirmations' => is_array($raw) ? ($raw['confirmations'] ?? 0) : 0,
+                    'height'        => $entry['height'],
+                    'time'          => $entry['time'],
+                ];
+            }
         }
 
         if ($method === 'getinfo') {
