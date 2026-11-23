@@ -23,6 +23,7 @@ extern "C" {
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <stdlib.h>
 #include <strings.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -779,6 +780,58 @@ void nebhash_client_init(YAAMP_CLIENT *client)
 	nebhash_initial_target(target);
 	nebhash_client_set_target_silent(client, target);
 	client->difficulty_actual = nebhash_target_to_diff(target);
+}
+
+void nebhash_apply_password_k(YAAMP_CLIENT *client)
+{
+	if (!client) return;
+
+	// Mirror yiimp's password semantics, but on NEB's k instead of a 64-bit
+	// difficulty: d= pins k for the whole session, sd= only seeds it and
+	// leaves the reference vardiff free to adjust it later. d= wins if both
+	// are present. Invalid or out-of-range values are ignored so a stray
+	// password token can never break an otherwise valid login.
+	const char *value = client_password_param(client->password, "d", 1);
+	bool fixed = true;
+	if (!value)
+	{
+		value = client_password_param(client->password, "sd", 2);
+		fixed = false;
+	}
+	if (!value || !*value) return;
+
+	errno = 0;
+	char *end = NULL;
+	long parsed = strtol(value, &end, 10);
+	while (*end == ' ' || *end == '\t') end++;
+	if (errno || end == value || (*end && *end != ',') || parsed < 1 || parsed > NEB_K_MAX)
+	{
+		stratumlog("nebhash: ignoring invalid password k '%s' for client %d\n",
+			value, client->userid);
+		return;
+	}
+
+	uint8_t share_target[32], target[32];
+	nebhash_current_share_target(share_target);
+	bool has_work = false;
+	for (int i = 0; i < 32; i++) if (share_target[i]) { has_work = true; break; }
+	if (!has_work) return;
+
+	long long now = neb_monotonic_ms();
+	uint32_t k = (uint32_t) parsed;
+	client->neb_k = k;
+	client->neb_k_prev = k;
+	client->neb_k_changed = now;
+	client->neb_vardiff_start = now;
+	client->neb_vardiff_shares = 0;
+	client->difficulty_fixed = fixed;
+
+	nebhash_shift_target(share_target, k, target);
+	nebhash_client_set_target_silent(client, target);
+	client->difficulty_actual = nebhash_target_to_diff(target);
+
+	stratumlog("nebhash: password %s=%ld k for client %d (fixed=%d)\n",
+		fixed ? "d" : "sd", parsed, client->userid, fixed ? 1 : 0);
 }
 
 int nebhash_extranonce2_size()

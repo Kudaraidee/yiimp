@@ -202,6 +202,7 @@ void client_record_difficulty(YAAMP_CLIENT *client);
 void client_adjust_difficulty(YAAMP_CLIENT *client);
 
 void client_initialize_difficulty(YAAMP_CLIENT *client);
+const char *client_password_param(const char *password, const char *key, size_t keylen);
 bool client_configure(YAAMP_CLIENT *client, json_value *json_params);
 
 //////////////////////////////////////////////////////////////////////////

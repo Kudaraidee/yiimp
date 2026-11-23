@@ -250,7 +250,7 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 // Match a comma-separated password token such as "d=2" or "sd=0.1".
 // A plain strstr("d=") also matches "sd=", "xd=", "decred=", etc.; keeping
 // the tokens explicit lets d= and sd= have different meanings.
-static const char *client_password_param(const char *password, const char *key, size_t keylen)
+const char *client_password_param(const char *password, const char *key, size_t keylen)
 {
 	if (!password) return NULL;
 

@@ -85,6 +85,41 @@ def check_error(msg, code):
     assert err[0] == code, msg
 
 
+def le_shift_hex(hex_value, k):
+    """Shift a 32-byte little-endian NEB target left by k bits."""
+    value = int.from_bytes(bytes.fromhex(hex_value), "little")
+    value = (value << k) & ((1 << 256) - 1)
+    return value.to_bytes(32, "little").hex()
+
+
+def check_password_k(args, password, k, label):
+    """d=/sd= must select the session's NEB shift k before job publication."""
+    c = Client(args.host, args.port, args.timeout)
+    try:
+        sid = c.send("mining.subscribe", ["neb-smoke-test/1", PROTOCOL])
+        reply = c.read_response(sid)
+        assert reply.get("error") is None, reply
+
+        aid = c.send("mining.authorize", [args.wallet + ".k", password])
+        reply = c.read_response(aid)
+        assert reply.get("error") is None and reply.get("result") is True, reply
+
+        target_msg = c.read_method("mining.set_target")
+        target = target_msg.get("params", [None])[0]
+        assert is_hex(target, 64), target_msg
+        c.read_method("mining.set_model")
+
+        notify_msg = c.read_method("mining.notify")
+        job = notify_msg.get("params", [None])[0]
+        assert isinstance(job, dict) and is_hex(job.get("share_target"), 64), notify_msg
+
+        expected = le_shift_hex(job["share_target"], k)
+        assert target.lower() == expected.lower(), (label, target, expected, job["share_target"])
+        print("PASS %s -> k=%d" % (label, k))
+    finally:
+        c.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="127.0.0.1")
@@ -146,6 +181,10 @@ def main():
         assert reply.get("error") is None and reply.get("result") is True, reply
         assert not any(m.get("method") == "mining.set_difficulty" for m in c.messages), c.messages
         print("PASS multi-login and no generic set_difficulty")
+
+        check_password_k(args, "d=14", 14, "d= pins k")
+        check_password_k(args, "sd=12", 12, "sd= seeds k")
+        check_password_k(args, "sd=12,d=14", 14, "d= wins over sd=")
 
         eid = c.send("mining.submit", [args.wallet + ".unknown", "deadbeef", "00", "0", "0"])
         check_error(c.read_response(eid), 24)
