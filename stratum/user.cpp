@@ -228,10 +228,11 @@ void db_update_workers(YAAMP_DB *db)
 			job_send_last(client);
 
 		if (is_nebhash) {
-			// NEB speed is assigned from the real share interval in
-			// share_add_worker(); only expire it when the miner goes quiet.
+			// Decay the 600s share-work window every second, even between
+			// shares, so the job log never freezes a lucky burst on screen.
+			nebhash_client_speed(client);
 			if (client->neb_last_share_time &&
-				(long long) time(NULL) - client->neb_last_share_time > 300)
+				(long long) time(NULL) - client->neb_last_share_time > 600)
 				client->speed = 0;
 		} else {
 			client->speed *= 0.8;

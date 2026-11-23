@@ -1,5 +1,6 @@
 
 #include "stratum.h"
+#include "nebhash/work.h"
 
 //void check_job(YAAMP_JOB *job)
 //{
@@ -75,20 +76,10 @@ static void share_add_worker(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, c
 		worker->difficulty += client->difficulty_actual / g_current_algo->diff_multiplier;
 		if (!isaux) {
 			if (is_nebhash) {
-				// NEB difficulty is expected hashes per share (2^256 / target),
-				// but a single share interval is extremely noisy. Average the
-				// target difficulties over a 600s rolling window with a 60s
-				// floor so one lucky share cannot show 40+ Mh/s on a 5 Mh/s GPU.
-				long long now = (long long) time(NULL);
-				if (!client->neb_speed_start || now - client->neb_speed_start > 600) {
-					client->neb_speed_start = now;
-					client->neb_speed_diff = 0;
-				}
-				client->neb_speed_diff += client->difficulty_actual;
-				client->neb_last_share_time = now;
-				double elapsed = (double) (now - client->neb_speed_start);
-				if (elapsed < 60) elapsed = 60;
-				client->speed = client->neb_speed_diff / elapsed;
+				// Use the actual share work in a 600s exponential window. A
+				// target-difficulty/interval estimate made the log jump from
+				// 0 to 84 Mh/s on a steady ~5 Mh/s GPU during a lucky burst.
+				nebhash_client_note_share_speed(client, share_diff);
 			} else {
 				client->speed += client->difficulty_actual / g_current_algo->diff_multiplier * 42;
 			}
