@@ -810,6 +810,9 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 	uint64_t coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
 
 if (g_debuglog_hash) {
+        char full_hash_hex[65] = {0};
+        hexlify(full_hash_hex, submitvalues.hash_bin, 32);
+        debuglog("hashall %s\n", full_hash_hex);
         debuglog("hasc %016lx \n", hash_int_scaled);
         debuglog("shar %016lx \n", user_target);
         debuglog("hash %016lx \n", hash_int);
