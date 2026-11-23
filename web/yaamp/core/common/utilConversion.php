@@ -48,10 +48,22 @@ function hash_to_difficulty($coin, $hash)
 	// zeros on the left, and we ignore the 2 first bytes (0000)
 	$oft = 2 + 1; // $bytes keys start at offset 1
 	for ($i=0; $i<8; $i++) {
-		$target += $bytes[$oft+$i] << ((7-$i)*8);
+		// Float maths avoids a signed 64-bit wrap for bytes >= 0x80.
+		$target += (float) $bytes[$oft+$i] * (float) (1 << ((7-$i)*8));
 	}
 
 	return target_to_diff($target);
+}
+
+// Lumenite Core reports getdifficulty() against powlimit 0x3ffff << 224,
+// while stratum share difficulties use 0xffff << 208. Rescale before
+// comparing the two, otherwise HomeScrypt effort is always ~0 / N/A.
+function block_difficulty_for_shares($coin, $difficulty)
+{
+	if ($coin->algo == 'homescrypt') {
+		return (float) $difficulty * 65535.0 / (262143.0 * 65536.0);
+	}
+	return (float) $difficulty;
 }
 
 function htoi($s)

@@ -56,10 +56,27 @@ class ConversionUtils extends Component
 		// zeros on the left, and we ignore the 2 first bytes (0000)
 		$oft = 2 + 1; // $bytes keys start at offset 1
 		for ($i=0; $i<8; $i++) {
-			$target += $bytes[$oft+$i] << ((7-$i)*8);
+			// Use float maths: a byte >= 0x80 shifted into bit 63 would wrap
+			// to a negative PHP integer and produce a negative difficulty.
+			$target += (float) $bytes[$oft+$i] * (float) (1 << ((7-$i)*8));
 		}
 
 		return $this->target_to_diff($target);
+	}
+
+	/**
+	 * Convert a wallet-reported block difficulty to the scale used by
+	 * stratum share difficulties. Lumenite Core computes getdifficulty()
+	 * against powlimit 0x3ffff << 224, while shares and coins.difficulty use
+	 * the usual compact scale (0xffff << 208). Without this conversion the
+	 * effort for low-difficulty HomeScrypt blocks is reported as 0 / N/A.
+	 */
+	public function block_difficulty_for_shares($coin, $difficulty)
+	{
+		if (($coin->algo ?? '') === 'homescrypt') {
+			return (float) $difficulty * 65535.0 / (262143.0 * 65536.0);
+		}
+		return (float) $difficulty;
 	}
 
 	public function htoi($s)

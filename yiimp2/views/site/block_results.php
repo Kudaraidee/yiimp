@@ -18,7 +18,9 @@ $isLegacy   = Yii::$app->LayoutManager->isLegacy();
 $rows = [];
 foreach ($blocks as $block) {
     $diffUser = (float) $block->difficulty_user;
-    if (!$diffUser && str_starts_with((string) $block->blockhash, '0000')) {
+    // HomeScrypt block hashes are SHA256d, not the PoW digest used for
+    // difficulty, so never derive a share difficulty from them.
+    if (!$diffUser && $coin->algo !== 'homescrypt' && str_starts_with((string) $block->blockhash, '0000')) {
         $diffUser = (float) $conv->hash_to_difficulty($coin, $block->blockhash);
     }
 

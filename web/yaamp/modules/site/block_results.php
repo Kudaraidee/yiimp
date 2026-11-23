@@ -135,7 +135,7 @@ foreach($db_blocks as $db_block)
 
 	echo '<td>'.round_difficulty($db_block->difficulty).'</td>';
 	$diff_user = $db_block->difficulty_user;
-	if (!$diff_user && substr($db_block->blockhash,0,4) == '0000')
+	if (!$diff_user && $coin->algo != 'homescrypt' && substr($db_block->blockhash,0,4) == '0000')
 		$diff_user = hash_to_difficulty($coin, $db_block->blockhash);
 	echo '<td>'.round_difficulty($diff_user).'</td>';
 
