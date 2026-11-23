@@ -84,10 +84,18 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 		job->id, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 }
 
-// The official Lumenite GPU miner does not understand standard Stratum v1
-// jobs. It expects a complete serialized 80-byte header and only substitutes
-// the nonce at bytes 76..79. Build that header from the same template/coinbase
-// the pool will later use to verify and submit the share.
+// MukiMiner expects a complete serialized 80-byte header and only substitutes
+// the nonce at bytes 76..79. Other HomeScrypt miners (rplant's gpuminer, ...)
+// use standard Stratum v1 jobs, so keep the header-only variant just for
+// MukiMiner and let everybody else build the header from coinb1/coinb2.
+static bool homescrypt_uses_header_notify(YAAMP_CLIENT *client)
+{
+	const char *version = client->version;
+	return version && (strstr(version, "Muki") || strstr(version, "muki"));
+}
+
+// Build the 80-byte header from the same template/coinbase the pool will later
+// use to verify and submit the share.
 static void homescrypt_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer)
 {
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
@@ -198,7 +206,7 @@ void job_send_last(YAAMP_CLIENT *client)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
 	}
-	else if (is_homescrypt)
+	else if (is_homescrypt && homescrypt_uses_header_notify(client))
 	{
 		homescrypt_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -231,7 +239,7 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 	{
 		kawpow_job_mining_notify_buffer(job, client, buffer);
 	}
-	else if (is_homescrypt)
+	else if (is_homescrypt && homescrypt_uses_header_notify(client))
 	{
 		homescrypt_job_mining_notify_buffer(job, client, buffer);
 	}
@@ -285,7 +293,7 @@ void job_broadcast(YAAMP_JOB *job)
 		{
 			kawpow_job_mining_notify_buffer(job, client, buffer);
 		}
-		else if (is_homescrypt)
+		else if (is_homescrypt && homescrypt_uses_header_notify(client))
 		{
 			homescrypt_job_mining_notify_buffer(job, client, buffer);
 		}
