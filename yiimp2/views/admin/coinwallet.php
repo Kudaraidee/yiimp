@@ -54,23 +54,36 @@ $coinSym   = Html::encode($coin->symbol);
 
 <style>
 #cw-admin-bar {
+    display: flex; flex-direction: column; gap: 9px;
     background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
-    padding: 11px 14px 12px; margin: 12px 0 10px;
+    padding: 10px 12px; margin: 12px 0 10px;
     box-shadow: 0 1px 2px rgba(20,40,80,.04);
     color: #334155; font-size: 11px;
 }
-#cw-bar-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-#cw-bar-label {
-    font-size: 10px; font-weight: 700; letter-spacing: .12em;
-    color: #8a94a6; text-transform: uppercase; white-space: nowrap;
+#cw-bar-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#cw-live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #2fae5a;
+    box-shadow: 0 0 0 3px rgba(47,174,90,.15);
 }
-#cw-coin { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+#cw-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+#cw-brand-text b { color: #26385a; font-size: 12px; font-weight: 800; letter-spacing: .06em; }
+#cw-brand-text small { color: #8a94a6; font-size: 9px; }
+#cw-coin {
+    display: inline-flex; align-items: center; gap: 7px; padding-left: 10px;
+    border-left: 1px solid #e8eef6; min-width: 0;
+}
 #cw-coin img {
     width: 24px; height: 24px; object-fit: contain; background: #fff;
     border: 1px solid #e8eef6; border-radius: 6px; padding: 2px;
 }
 #cw-coin b { color: #26385a; font-size: 13px; font-weight: 800; }
 #cw-coin span { color: #8a94a6; font-size: 10px; }
+#cw-admin-bar .mc-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: #eef4ff; border: 1px solid #d7e5ff; color: #2c5aa0;
+    font-size: 9px; font-weight: 800; line-height: 14px; text-transform: uppercase;
+    letter-spacing: .04em; white-space: nowrap;
+}
 #cw-live {
     margin-left: auto; display: flex; align-items: center; gap: 6px;
     white-space: nowrap; font-size: 11px; color: #5b6675;
@@ -80,29 +93,39 @@ $coinSym   = Html::encode($coin->symbol);
     box-shadow: 0 0 0 3px rgba(47,174,90,.15);
 }
 #cw-live span { color: #98a3b5; font-size: 10px; font-variant-numeric: tabular-nums; }
-#cw-bar-links, #cw-bar-actions, #cw-bar-nav {
-    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-    border-top: 1px solid #eef2f7; margin-top: 10px; padding-top: 9px;
-}
+#cw-bar-links, #cw-bar-bottom { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#cw-bar-bottom { border-top: 1px solid #eef2f7; padding-top: 9px; }
+#cw-bar-links, #cw-bar-nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#cw-bar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 #cw-bar-links a, #cw-bar-nav a, #cw-bar-actions a {
     display: inline-block; border: 1px solid #dfe5ec; background: #fafbfc;
     color: #64748b; border-radius: 999px; padding: 3px 10px;
     font-size: 10px; font-weight: 700; line-height: 1.6; text-decoration: none;
 }
+#cw-bar-links a b { font-weight: 800; }
 #cw-bar-links a:hover, #cw-bar-nav a:hover, #cw-bar-actions a:hover {
     border-color: #b9d4ff; color: #2c5aa0; background: #f7faff;
 }
-#cw-bar-actions { margin-left: auto; border-top: 0; margin-top: 0; padding-top: 0; }
+#cw-bar-nav a { font-size: 9px; padding: 2px 9px; }
 #cw-bar-actions a.cw-act-danger { color: #b91c1c; border-color: #fecaca; background: #fff8f8; }
 #cw-bar-actions a.cw-act-danger:hover { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
 #cw-bar-actions a.cw-act-primary { background: #2c5aa0; border-color: #2c5aa0; color: #fff; }
 #cw-bar-actions a.cw-act-primary:hover { background: #1f467f; border-color: #1f467f; color: #fff; }
-#cw-bar-nav a { font-size: 9px; padding: 2px 9px; }
 
 #main_results .cw-loading { margin: 0; }
-#main_results .cw-loading .main-left-title { min-height: 40px; padding: 9px 13px; }
+#main_results .main-left-title {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 38px; padding: 9px 13px; background: #f8fafc;
+    border-bottom: 1px solid #e8eef6;
+}
+#main_results .mn-head-main { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; min-width: 0; }
 #main_results .cw-sk-title { font-size: 13px; font-weight: 800; color: #26385a; }
-#main_results .cw-sk-sub { font-size: 10px; color: #8a94a6; margin-left: 8px; }
+#main_results .mn-sub { font-size: 10px; color: #8a94a6; font-weight: 500; }
+#main_results .mc-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: #eef4ff; border: 1px solid #d7e5ff; color: #2c5aa0;
+    font-size: 9px; font-weight: 800; line-height: 14px;
+}
 #main_results .cw-sk-lines { padding: 14px; display: grid; gap: 9px; }
 #main_results .cw-sk-line {
     height: 20px; border-radius: 4px;
@@ -114,31 +137,39 @@ $coinSym   = Html::encode($coin->symbol);
 
 @media (max-width: 720px) {
     #cw-live, #cw-bar-actions { margin-left: 0; }
+    #cw-bar-bottom { align-items: flex-start; }
 }
 </style>
 
 <div id="cw-admin-bar">
     <div id="cw-bar-head">
-        <span id="cw-bar-label">Wallet</span>
+        <span id="cw-live-dot"></span>
+        <span id="cw-brand-text"><b>WALLET</b><small>coin operations · admin console</small></span>
         <span id="cw-coin"><img src="<?= $coinImage ?>" alt=""><b><?= $coinSym ?></b><span><?= $coinName ?></span></span>
+        <span class="mc-badge"><?= Html::encode($coin->algo) ?></span>
         <span id="cw-live"><i></i> live · 30s <span id="cw-last-update">just now</span></span>
     </div>
     <div id="cw-bar-links"><?= $walletLinks ?></div>
-    <div id="cw-bar-actions">
+    <div id="cw-bar-bottom">
+        <div id="cw-bar-nav"><?= $sidebarLinks ?></div>
+        <div id="cw-bar-actions">
 <?php foreach ($actionLinks as [$action, $label, $variant, , $confirm]): ?>
-        <a href="/admin/<?= $action ?>?id=<?= $coin->id ?>"
-           class="<?= $action === 'deleteearnings' ? 'cw-act-danger' : ($variant === 'primary' ? 'cw-act-primary' : '') ?>"
-           <?= $confirm ? 'onclick="return confirm(\'Are you sure?\')"' : '' ?>><?= strtoupper(Html::encode($label)) ?></a>
+            <a href="/admin/<?= $action ?>?id=<?= $coin->id ?>"
+               class="<?= $action === 'deleteearnings' ? 'cw-act-danger' : ($variant === 'primary' ? 'cw-act-primary' : '') ?>"
+               <?= $confirm ? 'onclick="return confirm(\'Are you sure?\')"' : '' ?>><?= strtoupper(Html::encode($label)) ?></a>
 <?php endforeach ?>
+        </div>
     </div>
-    <div id="cw-bar-nav"><?= $sidebarLinks ?></div>
 </div>
 
 <div id="main_results">
     <div class="main-left-box cw-loading">
         <div class="main-left-title">
-            <span class="cw-sk-title"><?= $coinSym ?> wallet</span>
-            <span class="cw-sk-sub">loading balances · markets · transactions…</span>
+            <span class="mn-head-main">
+                <span class="cw-sk-title"><?= $coinSym ?> wallet</span>
+                <span class="mn-sub">loading balances · markets · transactions…</span>
+            </span>
+            <span class="mc-badge">SYNC</span>
         </div>
         <div class="cw-sk-lines">
             <div class="cw-sk-line"></div><div class="cw-sk-line"></div>

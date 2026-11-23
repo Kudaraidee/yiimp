@@ -117,21 +117,34 @@ if ($isLegacy) {
 #cwd a:hover { color: #1f467f; text-decoration: underline; }
 #cwd a.red, #cwd a.red:visited { color: #b91c1c; }
 
-/* Balance strip */
-#cwd .cwd-balance {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    background: #fff; border: 1px solid #d8e2ef; border-radius: 8px;
-    padding: 9px 12px; margin-bottom: 12px;
-    box-shadow: 0 1px 2px rgba(20,40,80,.04);
+/* Balance KPIs */
+#cwd .cwd-kpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px; margin-bottom: 12px;
 }
-#cwd .cwd-bal { display: inline-flex; align-items: baseline; gap: 6px; padding-right: 12px; border-right: 1px solid #eef2f7; }
-#cwd .cwd-bal:last-child { border-right: 0; padding-right: 0; }
-#cwd .cwd-bal em {
-    font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: #8a94a6; white-space: nowrap;
+#cwd .cwd-kpi {
+    border: 1px solid #e8eef6; border-radius: 7px; background: #fcfdff;
+    padding: 9px 11px; min-width: 0;
 }
-#cwd .cwd-bal b { color: #26385a; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
-#cwd .cwd-bal small { color: #98a3b5; font-size: 9px; white-space: nowrap; }
+#cwd .cwd-kpi .k-label {
+    display: block; font-size: 9px; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; color: #98a3b5;
+}
+#cwd .cwd-kpi .k-value {
+    display: block; margin-top: 3px; font-family: monospace; font-size: 15px;
+    font-weight: 700; color: #26385a; overflow-wrap: anywhere;
+}
+#cwd .cwd-kpi .k-sub { display: block; margin-top: 2px; font-size: 9px; color: #8a94a6; }
+#cwd .cwd-kpi.accent .k-value { color: #2c5aa0; }
+#cwd .cwd-kpi.good .k-value { color: #2fae5a; }
+#cwd .cwd-kpi.warn .k-value { color: #c2410c; }
+
+/* Two-column rows */
+#cwd .cwd-grid, #cwd .cwd-split {
+    display: grid; grid-template-columns: minmax(0,1fr) 300px;
+    gap: 12px; align-items: start; margin-bottom: 12px;
+}
+#cwd .cwd-main-col, #cwd .cwd-side-col { min-width: 0; }
 
 /* Cards */
 #cwd .cwd-card {
@@ -140,21 +153,56 @@ if ($isLegacy) {
 }
 #cwd .cwd-card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    min-height: 40px; padding: 9px 13px;
+    min-height: 38px; padding: 9px 13px;
     background: #f8fafc; border-bottom: 1px solid #e8eef6;
 }
+#cwd .mn-head-main { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; min-width: 0; }
 #cwd .cwd-title { color: #26385a; font-size: 13px; font-weight: 800; }
 #cwd .cwd-sub { color: #8a94a6; font-size: 10px; font-weight: 500; }
-#cwd .cwd-scope {
+#cwd .mc-badge {
     display: inline-block; border: 1px solid #d7e5ff; background: #eef4ff; color: #2c5aa0;
     border-radius: 999px; padding: 2px 9px; line-height: 15px;
     font-size: 9px; font-weight: 800; white-space: nowrap;
 }
-#cwd .cwd-scope.muted { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
+#cwd .mc-badge.muted { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
+#cwd .mc-badge.warn { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+#cwd .mc-badge.good { background: #e8f7ee; border-color: #ccebd8; color: #187d46; }
 #cwd .cwd-scroll { overflow: auto; }
-#cwd #markets { max-height: 190px; }
+#cwd #markets { max-height: 200px; }
 #cwd #transactions { max-height: 380px; }
 #cwd #sums { max-height: 420px; }
+
+/* Coin info tiles */
+#cwd .cwd-info-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px;
+}
+#cwd .cwd-info-tile {
+    border: 1px solid #e8eef6; border-radius: 6px; background: #fcfdff;
+    padding: 8px 10px; min-width: 0;
+}
+#cwd .cwd-info-tile.wide { grid-column: 1 / -1; }
+#cwd .cwd-info-tile .i-label {
+    display: block; font-size: 9px; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; color: #98a3b5;
+}
+#cwd .cwd-info-tile .i-value {
+    display: block; margin-top: 3px; font-family: monospace; font-size: 12px;
+    font-weight: 700; color: #26385a; overflow-wrap: anywhere;
+}
+#cwd .cwd-info-tile .k-sub { display: block; margin-top: 2px; font-size: 9px; color: #8a94a6; }
+#cwd .cwd-info-hero { display: flex; align-items: center; gap: 9px; }
+#cwd .cwd-info-hero img {
+    width: 28px; height: 28px; object-fit: contain; padding: 2px;
+    background: #fff; border: 1px solid #e8eef6; border-radius: 6px;
+}
+#cwd .cwd-info-hero b { color: #26385a; font-size: 13px; }
+#cwd .cwd-info-hero small { display: block; color: #8a94a6; font-size: 10px; font-weight: 500; }
+#cwd .cwd-status-pill {
+    display: inline-block; border-radius: 999px; padding: 2px 8px;
+    font-size: 9px; font-weight: 800; line-height: 14px;
+    background: #e8f7ee; border: 1px solid #ccebd8; color: #187d46;
+}
+#cwd .cwd-status-pill.off { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
 
 /* Tables */
 #cwd .cwd-table { width: 100%; border-collapse: collapse; font-size: 11px; }
@@ -177,11 +225,9 @@ if ($isLegacy) {
 #cwd .cwd-table tbody tr.orphan td:first-child { box-shadow: inset 3px 0 0 #dc2626; }
 #cwd .cwd-table td[align="right"] { text-align: right; }
 #cwd .cwd-table td[align="center"] { text-align: center; }
-#cwd #markets .cwd-table { min-width: 920px; }
-#cwd #infos .cwd-table { min-width: 980px; }
+#cwd #markets .cwd-table { min-width: 900px; }
 #cwd #transactions .cwd-table { min-width: 720px; }
 #cwd #sums .cwd-table { min-width: 240px; }
-#cwd #infos img { border: 1px solid #e8eef6; border-radius: 6px; padding: 1px; background: #fff; }
 
 /* Category pills */
 #cwd .cwd-cat {
@@ -198,9 +244,7 @@ if ($isLegacy) {
 #cwd .cwd-cat-ticket { background: #ecfeff; border-color: #cffafe; color: #0e7490; }
 #cwd .cwd-cat-stake, #cwd .cwd-cat-unlock { background: #f5f3ff; border-color: #e9d5ff; color: #7c3aed; }
 
-/* Transactions + daily sums */
-#cwd .cwd-split { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 12px; align-items: start; }
-#cwd .cwd-main-col, #cwd .cwd-side-col { min-width: 0; }
+/* Transactions footer + empty states */
 #cwd .loadfooter { background: #fcfdff; border-top: 1px solid #eef2f7; padding: 8px 13px; }
 #cwd .loadfooter a {
     display: inline-block; border: 1px solid #dfe5ec; background: #fafbfc; color: #64748b;
@@ -209,7 +253,8 @@ if ($isLegacy) {
 }
 #cwd .loadfooter a:hover { border-color: #b9d4ff; color: #2c5aa0; background: #f7faff; }
 #cwd .cwd-empty { color: #98a3b5; text-align: center; padding: 14px 9px; }
-@media (max-width: 1100px) { #cwd .cwd-split { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { #cwd .cwd-grid, #cwd .cwd-split { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { #cwd .cwd-info-grid { grid-template-columns: 1fr; } }
 </style>
 HTML;
 }
@@ -222,13 +267,22 @@ $owedLink = Html::a($owed, '/admin/earning?id=' . $coin->id);
 $clrLink  = Html::a($reserved1, '/admin/payments?id=' . $coin->id);
 
 if ($isLegacy) {
-    echo '<div class="cwd-balance">';
+    $kpis = [];
     if (YIIMP_ALLOW_EXCHANGE && $reserved2 !== null)
-        echo '<span class="cwd-bal"><em>Earnings</em><b>' . Html::encode($reserved2) . ' BTC</b></span>';
-    echo '<span class="cwd-bal"><em>Balance (db)</em><b>' . Html::encode($balance) . ' ' . Html::encode($symbol) . '</b></span>';
-    echo '<span class="cwd-bal"><em>Owned</em><b>' . Html::encode($ownedFmt) . ' ' . Html::encode($symbol) . '</b></span>';
-    echo '<span class="cwd-bal"><em>Owed</em><b>' . $owedLink . ' ' . Html::encode($symbol) . '</b><small>(' . Html::encode($owed_btc) . ' BTC)</small></span>';
-    echo '<span class="cwd-bal"><em>Cleared</em><b>' . $clrLink . ' ' . Html::encode($symbol) . '</b></span>';
+        $kpis[] = ['Earnings', Html::encode($reserved2), 'BTC · exchange pool', 'accent'];
+    $kpis[] = ['Balance (db)', Html::encode($balance), Html::encode($symbol) . ' · pool wallet', ''];
+    $kpis[] = ['Owned', Html::encode($ownedFmt), Html::encode($symbol) . ' · available', 'good'];
+    $kpis[] = ['Owed', $owedLink . ' ' . Html::encode($symbol), '₿ ' . Html::encode($owed_btc) . ' · unpaid', 'accent'];
+    $kpis[] = ['Cleared', $clrLink . ' ' . Html::encode($symbol), 'sent to miners', ''];
+
+    echo '<div class="cwd-kpis">';
+    foreach ($kpis as [$label, $value, $sub, $tone]) {
+        echo '<div class="cwd-kpi' . ($tone !== '' ? ' ' . $tone : '') . '">'
+           . '<span class="k-label">' . $label . '</span>'
+           . '<span class="k-value">' . $value . '</span>'
+           . '<span class="k-sub">' . $sub . '</span>'
+           . '</div>';
+    }
     echo '</div>';
 } elseif (!$isTailwind) {
     echo '<div class="d-flex flex-wrap gap-3 mb-3 small">';
@@ -265,11 +319,14 @@ $bookmarkAdd = Html::a('+', '/admin/bookmark-add?id=' . $coin->id, ['title' => '
 
 $mktHeaders = ['Market', 'Bid', 'Ask', 'Deposit / Send', 'Balance', 'Locked', 'Sent', 'Traded', 'Late', 'Message', $bookmarkAdd . ' Actions'];
 
+if ($isLegacy) echo '<div class="cwd-grid"><div class="cwd-main-col">';
+
 if ($isLegacy) {
     echo '<div class="cwd-card">';
-    echo '<div class="cwd-card-head"><span><span class="cwd-title">Markets &amp; Bookmarks</span>'
-       . '<span class="cwd-sub"> · exchange routes · deposit addresses</span></span>'
-       . '<span class="cwd-scope">' . count($markets) . (count($markets) === 1 ? ' market' : ' markets')
+    echo '<div class="cwd-card-head"><span class="mn-head-main">'
+       . '<span class="cwd-title">Markets &amp; Bookmarks</span>'
+       . '<span class="cwd-sub">exchange routes · deposit addresses</span></span>'
+       . '<span class="mc-badge">' . count($markets) . (count($markets) === 1 ? ' market' : ' markets')
        . ' · ' . count($bookmarks) . ' bookmarks</span></div>';
     echo '<div id="markets" class="cwd-scroll"><table class="dataGrid cwd-table"><thead><tr>';
     foreach ($mktHeaders as $h) echo '<th>' . $h . '</th>';
@@ -437,6 +494,8 @@ if ($isLegacy) echo '</tbody></table></div></div>';
 elseif (!$isTailwind) echo '</tbody></table></div></div></div>';
 else echo '</tbody></table></div></div>';
 
+if ($isLegacy) echo '</div><div class="cwd-side-col">';
+
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 3 — Coin info table
 // ══════════════════════════════════════════════════════════════════════════════
@@ -444,17 +503,12 @@ $extraCols = ($PoS || $DCR ? 1 : 0) + ($DCR ? 1 : 0);
 
 if ($isLegacy) {
     echo '<div class="cwd-card">';
-    echo '<div class="cwd-card-head"><span><span class="cwd-title">Coin Info</span>'
-       . '<span class="cwd-sub"> · ' . Html::encode($coin->symbol) . ' · ' . Html::encode($coin->algo) . '</span></span>'
-       . '<span class="cwd-scope' . ($rpcAvailable ? '' : ' muted') . '">'
+    echo '<div class="cwd-card-head"><span class="mn-head-main">'
+       . '<span class="cwd-title">Coin Info</span>'
+       . '<span class="cwd-sub">' . Html::encode($coin->symbol) . ' · ' . Html::encode($coin->algo) . '</span></span>'
+       . '<span class="mc-badge ' . ($rpcAvailable ? 'good' : 'warn') . '">'
        . ($rpcAvailable ? 'RPC online' : 'RPC offline') . '</span></div>';
-    echo '<div class="cwd-scroll"><table id="infos" class="dataGrid cwd-table"><thead><tr>';
-    foreach (['', '', 'Name', 'Symbol', 'Algo', 'Difficulty', 'Blocks', 'Balance', 'BTC'] as $h)
-        echo '<th>' . $h . '</th>';
-    if ($PoS || $DCR) echo '<th>Stake</th>';
-    if ($DCR)         echo '<th>Ticket price</th>';
-    echo '<th>Conns</th><th>Price</th><th>Reward</th><th>Index *</th>';
-    echo '</tr></thead><tbody>';
+    echo '<div class="cwd-info-grid">';
 } elseif (!$isTailwind) {
     echo '<div class="card shadow-sm mb-3"><div class="card-header py-2 d-flex align-items-center gap-2">';
     echo '<i class="bi bi-info-circle text-secondary"></i><strong class="small">Coin Info</strong>';
@@ -497,7 +551,61 @@ $index    = $coin->difficulty ? round($coin->reward * $coin->price / $coin->diff
 $tdR = $isLegacy ? '' : ($isTailwind ? 'px-3 py-2 text-right font-mono tabular-nums text-gray-600 dark:text-gray-300' : 'text-end small font-monospace');
 $tdL = $isLegacy ? '' : ($isTailwind ? 'px-3 py-2 text-gray-700 dark:text-gray-200' : 'small');
 
-echo $isLegacy ? "<tr class='ssrow'>" : "<tr>";
+if ($isLegacy) {
+    $dbBalance = (float) ($coin->balance ?? 0);
+    $walletAmt = $rpcAvailable ? (float) ($info['balance'] ?? ($isNeb ? $dbBalance : 0)) : $dbBalance;
+    $walletFmt = $conv->altcoinvaluetoa($walletAmt);
+    $walletBtc = $conv->bitcoinvaluetoa($walletAmt * $coin->price);
+
+    $blocksVal = $rpcAvailable ? Html::encode((string) ($info['blocks'] ?? '—')) : '—';
+    $connsVal = $rpcAvailable && isset($info['connections'])
+        ? Html::a(Html::encode((string) $info['connections']), '/admin/coinpeers?id=' . $coin->id)
+        : '—';
+
+    $tiles = [
+        ['Coin', '<span class="cwd-info-hero"><img src="' . Html::encode($coin->image) . '" alt="">'
+            . '<span><b>' . Html::encode($coin->name) . '</b><small>'
+            . Html::encode($coin->symbol) . ' · ' . Html::encode($coin->algo) . '</small></span></span>', 'wide', ''],
+        ['Status', ($coin->enable
+            ? '<span class="cwd-status-pill">enabled</span>'
+            : '<span class="cwd-status-pill off">disabled</span>')
+            . ' <span class="mc-badge ' . ($rpcAvailable ? 'good' : 'warn') . '">'
+            . ($rpcAvailable ? 'RPC online' : 'RPC offline') . '</span>', '', ''],
+        ['Difficulty', Html::encode($diffFmt), 'network target', ''],
+        ['Height', $blocksVal, 'last known block', ''],
+        ['Wallet', Html::encode($walletFmt), '₿ ' . Html::encode($walletBtc), ''],
+        ['Connections', $connsVal, 'peer count', ''],
+        ['Price', '₿ ' . Html::encode($priceFmt), 'per coin', ''],
+        ['Reward', Html::encode((string) $coin->reward), 'per block', ''],
+        ['Index', Html::encode((string) $index), 'reward × price / diff', ''],
+    ];
+    $algoLink = Html::a(Html::encode($coin->algo), '/site/gomining?algo=' . urlencode($coin->algo));
+    $tiles[] = ['Algo', $algoLink, 'mining page', ''];
+    if ($PoS) {
+        $stakeVal = $rpcAvailable ? Html::encode((string) ($info['stake'] ?? '')) : '—';
+        $tiles[] = ['Stake', $stakeVal, ' PoS', ''];
+    }
+    if ($DCR) {
+        $ticketVal = $rpcAvailable
+            ? Html::a(Html::encode("{$dcrStake} ({$dcrTickets})"), '/admin/cointickets?id=' . $coin->id)
+            : '—';
+        $ticketPrice = $rpcAvailable
+            ? Html::a(Html::encode((string) $dcrTicketPrice), 'https://dcrstats.com/', ['target' => '_blank'])
+            : '—';
+        $tiles[] = ['Tickets', $ticketVal, 'locked / live', ''];
+        $tiles[] = ['Ticket price', $ticketPrice, 'DCR', ''];
+    }
+
+    foreach ($tiles as [$label, $value, $sub, $wide]) {
+        echo '<div class="cwd-info-tile' . ($wide !== '' ? ' ' . $wide : '') . '">'
+           . '<span class="i-label">' . $label . '</span>'
+           . '<span class="i-value">' . $value . '</span>'
+           . ($sub !== '' ? '<span class="k-sub">' . $sub . '</span>' : '')
+           . '</div>';
+    }
+    echo '</div></div>';
+} else {
+    echo $isLegacy ? "<tr class='ssrow'>" : "<tr>";
 echo "<td class='{$tdL}'>{$coinImg}</td>";
 echo "<td class='{$tdL}'>{$enBadge}</td>";
 echo "<td class='{$tdL}'><b>" . Html::a(Html::encode($coin->name), Html::encode($coin->blockUrl)) . "</b></td>";
@@ -555,6 +663,9 @@ if (!$rpcAvailable) {
 echo '</tr></tbody></table>';
 if ($isLegacy) echo '</div></div>';
 else echo '</div></div></div>';
+}
+
+if ($isLegacy) echo '</div></div>';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SECTION 4 — Transactions + Daily sums (side-by-side for AdminLTE/Tailwind)
@@ -666,9 +777,10 @@ $moreLink = Html::a('Show more transactions…', $moreUrl);
 
 if ($isLegacy) {
     echo '<div class="cwd-card">';
-    echo '<div class="cwd-card-head"><span><span class="cwd-title">Transactions</span>'
-       . '<span class="cwd-sub"> · last ' . $maxrows . ' entries</span></span>'
-       . '<span class="cwd-scope">' . count($txs_array) . ' entries</span></div>';
+    echo '<div class="cwd-card-head"><span class="mn-head-main">'
+       . '<span class="cwd-title">Transactions</span>'
+       . '<span class="cwd-sub">last ' . $maxrows . ' entries</span></span>'
+       . '<span class="mc-badge">' . count($txs_array) . ' entries</span></div>';
     echo '<div id="transactions" class="cwd-scroll"><table class="dataGrid cwd-table"><thead><tr>';
     foreach (['Time', 'Category', 'Amount', 'Height', 'Difficulty', 'Confirm', 'Address', 'Tx'] as $h)
         echo '<th>' . $h . '</th>';
@@ -802,8 +914,10 @@ if ($isLegacy) {
 // ── Daily sums ────────────────────────────────────────────────────────────────
 if ($isLegacy) {
     echo '<div class="cwd-card">';
-    echo '<div class="cwd-card-head"><span><span class="cwd-title">Daily Summary</span>'
-       . '<span class="cwd-sub"> · by category</span></span></div>';
+    echo '<div class="cwd-card-head"><span class="mn-head-main">'
+       . '<span class="cwd-title">Daily Summary</span>'
+       . '<span class="cwd-sub">by category · last 7 days</span></span>'
+       . '<span class="mc-badge muted">' . count($sums) . ' rows</span></div>';
     echo '<div id="sums" class="cwd-scroll"><table class="dataGrid cwd-table"><thead><tr>';
     foreach (['Day', 'Category', 'Sum', 'BTC'] as $h) echo '<th>' . $h . '</th>';
     echo '</tr></thead><tbody>';
