@@ -69,7 +69,18 @@ function BackendCoinsUpdate()
 		if(isset($info['difficulty']))
 			$difficulty = $info['difficulty'];
 		else if ($isNebRpc && isset($info['bits']))
-			$difficulty = target_to_diff(decode_compact(sprintf('%08x', (int) $info['bits'])));
+		{
+			// NEB compact bits are (shift << 24) | mantissa and the target is
+			// mantissa << shift as a 256-bit little-endian value. Bitcoin's
+			// decode_compact() assumes a 3-byte exponent and divides by zero
+			// here, which aborts the whole update before block_height is set.
+			$nebBits      = (int) $info['bits'];
+			$nebShift     = ($nebBits >> 24) & 0xff;
+			$nebMantissa  = $nebBits & 0x00ffffff;
+			$difficulty   = ($nebMantissa > 0 && $nebShift <= 232)
+				? (pow(2.0, 256 - $nebShift) / $nebMantissa)
+				: 0;
+		}
 		else
 			$difficulty = $remote->getdifficulty();
 
