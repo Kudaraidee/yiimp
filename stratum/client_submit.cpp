@@ -846,17 +846,63 @@ if (g_debuglog_hash) {
 
 if (is_homescrypt && g_debuglog_hash && homescrypt_uses_canonical_merkle(client))
 {
-	YAAMP_JOB_VALUES altvalues;
-	memset(&altvalues, 0, sizeof(altvalues));
-	if (build_submit_values(&altvalues, templ, client->extranonce1, extranonce2, ntime, nonce,
-		versionmask, false))
+	// gpuminer submits only nonces that meet the share target under the header
+	// it actually hashed, so the correct field ordering is the one where every
+	// submitted nonce passes. Enumerate the plausible Stratum byte orders and
+	// log which combinations pass (bit index = merkle*6 + prevhash*2 + nonce).
+	unsigned char cb_bin[1024];
+	binlify(cb_bin, submitvalues.coinbase);
+	char cb_hash[128];
+	sha256_double_hash_hex((char *)cb_bin, cb_hash, strlen(submitvalues.coinbase)/2);
+	string merkleroot = merkle_with_first(templ->txsteps, cb_hash);
+
+	char ver_le[16], nt_le[16], nb_le[16], nonce_rev[16];
+	reverse_hex32(ver_le, templ->version);
+	reverse_hex32(nt_le, ntime);
+	reverse_hex32(nb_le, templ->nbits);
+	reverse_hex32(nonce_rev, nonce);
+
+	char prev_raw[128] = {0}, prev_adv[128] = {0}, prev_full[128] = {0};
+	ser_string_be(templ->prevhash_be, prev_raw, 8);
+	strcpy(prev_adv, templ->prevhash_be);
+	string_be(templ->prevhash_be, prev_full);
+
+	char mr_raw[128] = {0}, mr_word[128] = {0}, mr_full[128] = {0};
+	strcpy(mr_raw, merkleroot.c_str());
+	ser_string_be(mr_raw, mr_word, 8);
+	string_be(mr_raw, mr_full);
+
+	const char *merks[3] = { mr_raw, mr_word, mr_full };
+	const char *prevs[3] = { prev_raw, prev_adv, prev_full };
+	const char *nonces[2] = { nonce, nonce_rev };
+
+	unsigned int mask = 0;
+	int idx = 0;
+	double bestdiff = 0;
+	char bestdesc[16] = "-";
+	for (int a = 0; a < 3; a++)
+	for (int b = 0; b < 3; b++)
+	for (int c = 0; c < 2; c++)
 	{
-		homescrypt_standard_header_ex(&altvalues, templ, client, ntime, nonce, false);
-		uint64_t alt_hash_int = get_hash_difficulty(altvalues.hash_bin);
-		debuglog("HSCMP extra=%s ntime=%s nonce=%s curdiff=%.9f altdiff=%.9f cur=%016lx alt=%016lx target=%016lx\n",
-			extranonce2, ntime, nonce, target_to_diff(hash_int), target_to_diff(alt_hash_int),
-			hash_int_scaled, alt_hash_int / 0x10000, user_target);
+		char header[512];
+		sprintf(header, "%s%s%s%s%s%s", ver_le, prevs[b], merks[a], nt_le, nb_le, nonces[c]);
+		unsigned char header_bin[80];
+		unsigned char hash_bin[32];
+		binlify(header_bin, header);
+		g_current_algo->hash_function((char *)header_bin, (char *)hash_bin, 80);
+		uint64_t v = get_hash_difficulty(hash_bin);
+		if (v / 0x10000 <= user_target)
+			mask |= (1u << idx);
+		double d = target_to_diff(v);
+		if (d > bestdiff)
+		{
+			bestdiff = d;
+			sprintf(bestdesc, "%d%d%d", a, b, c);
+		}
+		idx++;
 	}
+	debuglog("HSTEST nonce=%s mask=%05x best=%s %.9f target=%016lx\n",
+		nonce, mask, bestdesc, bestdiff, user_target);
 }
 
 	// HomeScrypt miners derive their share target from yiimp's 64-bit slice
