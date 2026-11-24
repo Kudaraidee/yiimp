@@ -41,6 +41,14 @@ $badgeLegacy = [
     'paused'     => ['color:#fff;background:#6c757d;',    'paused'],
     'not_seeded' => ['color:#fff;background:#dc3545;',    'not seeded'],
 ];
+$badgeMining = [
+    'running'    => ['accent',    'running'],
+    'ready'      => ['good',      'ready'],
+    'pending'    => ['good',      'pending'],
+    'late'       => ['warn',      'late'],
+    'paused'     => ['muted',     'paused'],
+    'not_seeded' => ['warn',      'not seeded'],
+];
 $badgeAdminlte = [
     'running'    => ['bg-primary',               'running'],
     'ready'      => ['bg-success',               'ready'],
@@ -80,6 +88,7 @@ $countRunning = count(array_filter($jobs, fn($j) => $j['status'] === 'running'))
 $countPaused  = count(array_filter($jobs, fn($j) => $j['paused']));
 $countMissing = count(array_filter($jobs, fn($j) => $j['status'] === 'not_seeded'));
 $countActive  = count($jobs) - $countPaused - $countMissing;
+$toolbarBadge = $balancesLocked ? 'LOCKED' : $countRunning . '/' . count($jobs) . ' RUN';
 
 $intervalFmt = function (int $secs): string {
     if ($secs < 60)   return $secs . 's';
@@ -92,100 +101,134 @@ $intervalFmt = function (int $secs): string {
 <!-- ══════════════════════════════════════════════════════════════════════════
      LEGACY
      ══════════════════════════════════════════════════════════════════════════ -->
-<style>
-#refresh-bar { height:3px; background:#08c; transition:width 1s linear; margin-bottom:.75rem; }
-.job-badge { padding:1px 6px; border-radius:3px; font-size:.8em; display:inline-block; }
-.job-actions form { display:inline; margin-right:2px; }
-</style>
-<div id="refresh-bar" style="width:100%"></div>
+<div class="admn-page">
+<?= Yii::$app->ViewUtils->getAdminMiningToolbar(
+    'Queue Jobs', 'scheduler · admin console', $toolbarBadge, 'refresh · 15s'
+) ?>
+<div id="refresh-bar" class="admn-refresh" style="width:100%"></div>
 
 <?php if (!$tableExists): ?>
-<div class="main-left-box"><div class="main-left-inner">
-<p style="color:red;"><b>The <code>queue</code> table does not exist yet.</b><br>
-Run <code>php yii migrate --migrationPath=@yii/queue/db/migrations</code> then
-<code>php yii queue/seed</code> to initialise the queue.</p>
-</div></div>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Queue Setup Required</span>
+        <span class="admn-sub">worker migrations are missing</span></span>
+        <span class="admn-badge warn">setup</span>
+    </div>
+    <div class="admn-card-body">
+        <p><b>The <code>queue</code> table does not exist yet.</b><br>
+        Run <code>php yii migrate --migrationPath=@yii/queue/db/migrations</code> then
+        <code>php yii queue/seed</code> to initialise the queue.</p>
+    </div>
+</div>
 <?php else: ?>
 
-<div class="main-left-box">
-<div class="main-left-title">Queue Jobs<?php if ($balancesLocked): ?> &mdash; <span style="color:#c55;">&#9888; balances locked</span><?php endif ?></div>
-<div class="main-left-inner">
-<div style="font-size:.85em;margin-bottom:4px;">
-<?= $countRunning ?> running &nbsp;&middot;&nbsp;
-<?= $countActive ?> active &nbsp;&middot;&nbsp;
-<?php if ($countPaused): ?><span style="color:#666"><?= $countPaused ?> paused</span> &nbsp;&middot;&nbsp;<?php endif ?>
-<?php if ($countMissing): ?><span style="color:#c55"><?= $countMissing ?> not seeded</span>&nbsp;&nbsp;<?php endif ?>
-<?= Html::beginForm(['jobs/seed-all'], 'post', ['style' => 'display:inline']) ?>
-<?= Html::submitButton('Seed missing', ['style' => 'font-size:.8em;padding:2px 8px;cursor:pointer;']) ?>
-<?= Html::endForm() ?>
+<div class="admn-kpis">
+    <div class="admn-kpi accent">
+        <span class="k-label">Running</span>
+        <span class="k-value"><?= (int) $countRunning ?></span>
+        <span class="k-sub">workers executing now</span>
+    </div>
+    <div class="admn-kpi good">
+        <span class="k-label">Active</span>
+        <span class="k-value"><?= (int) $countActive ?></span>
+        <span class="k-sub">of <?= count($jobs) ?> registered jobs</span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Paused</span>
+        <span class="k-value"><?= (int) $countPaused ?></span>
+        <span class="k-sub">hold after current run</span>
+    </div>
+    <div class="admn-kpi <?= $countMissing ? 'warn' : 'good' ?>">
+        <span class="k-label">Not seeded</span>
+        <span class="k-value"><?= (int) $countMissing ?></span>
+        <span class="k-sub">missing queue rows</span>
+    </div>
 </div>
-<?= \app\widgets\Alert::widget() ?>
-</div></div>
 
-<div class="main-left-box">
-<div class="main-left-inner">
-<table class="dataGrid2" style="width:100%;table-layout:fixed;">
-<colgroup>
-    <col><!-- job name, flexible -->
-    <col style="width:50px;">
-    <col style="width:80px;">
-    <col style="width:58px;">
-    <col style="width:76px;">
-    <col style="width:136px;">
-</colgroup>
-<thead><tr>
-<th>Job</th>
-<th align="right">Every</th>
-<th align="center">Status</th>
-<th align="right">Runs in</th>
-<th align="right">Last run</th>
-<th>Actions</th>
-</tr></thead>
-<tbody>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Job Control</span>
+        <span class="admn-sub">queue status · manual actions</span></span>
+        <span class="admn-head-actions">
+            <?php if ($balancesLocked): ?>
+            <span class="admn-badge warn" title="PaymentsJob is running">&#9888; balances locked</span>
+            <?php endif ?>
+            <?= Html::beginForm(['jobs/seed-all'], 'post') ?>
+            <?= Html::submitButton('Seed missing', ['class' => 'admn-pill']) ?>
+            <?= Html::endForm() ?>
+        </span>
+    </div>
+    <div class="admn-card-body">
+        <?= \app\widgets\Alert::widget() ?>
+    </div>
+</div>
+
 <?php foreach ($grouped as $domain => $domainJobs):
     [$label] = $domainMeta[$domain] ?? [ucfirst($domain), 'circle'];
 ?>
-<tr style="background:#e8e8e8;">
-    <td colspan="6" style="font-weight:bold;font-size:.8em;padding:3px 6px;color:#444;">
-        <?= Html::encode($label) ?>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title"><?= Html::encode($label) ?></span>
+        <span class="admn-sub">domain · <?= Html::encode($domain) ?></span></span>
+        <span class="admn-badge"><?= count($domainJobs) ?> jobs</span>
+    </div>
+    <div class="admn-card-body flush">
+    <table class="dataGrid2" style="width:100%;table-layout:fixed;">
+    <colgroup>
+        <col><!-- job name, flexible -->
+        <col style="width:50px;">
+        <col style="width:80px;">
+        <col style="width:58px;">
+        <col style="width:76px;">
+        <col style="width:136px;">
+    </colgroup>
+    <thead><tr>
+    <th>Job</th>
+    <th align="right">Every</th>
+    <th align="center">Status</th>
+    <th align="right">Runs in</th>
+    <th align="right">Last run</th>
+    <th>Actions</th>
+    </tr></thead>
+    <tbody>
+    <?php foreach ($domainJobs as $j):
+        [$badgeClass, $badgeText] = $badgeMining[$j['status']] ?? ['muted', $j['status']];
+    ?>
+    <tr class="ssrow<?= $j['status'] === 'not_seeded' ? ' disabled' : '' ?>">
+    <td class="mono" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= Html::encode($j['name']) ?></td>
+    <td align="right" class="admn-muted"><?= $intervalFmt($j['interval']) ?></td>
+    <td align="center"><span class="admn-badge <?= $badgeClass ?>"><?= $badgeText ?></span></td>
+    <td align="right" class="admn-nums"><?= $fmtSecs($j['secsLeft']) ?></td>
+    <td align="right" class="admn-muted admn-nums"><?= $fmtAgo($j['lastRun']) ?></td>
+    <td class="job-actions">
+    <?php if (!$j['paused']): ?>
+    <?= Html::beginForm(['jobs/pause', 'job' => $j['name']]) ?>
+    <?= Html::submitButton('Pause', ['class' => 'admn-pill']) ?>
+    <?= Html::endForm() ?>
+    <?php else: ?>
+    <?= Html::beginForm(['jobs/resume', 'job' => $j['name']]) ?>
+    <?= Html::submitButton('Resume', ['class' => 'admn-pill good']) ?>
+    <?= Html::endForm() ?>
+    <?php endif ?>
+    <?php if (!$j['running']): ?>
+    <?= Html::beginForm(['jobs/run-now', 'job' => $j['name']]) ?>
+    <?= Html::submitButton('▶ Now', [
+        'class'   => 'admn-pill active',
+        'onclick' => 'return confirm("Run ' . Html::encode($j['name']) . ' immediately?")',
+    ]) ?>
+    <?= Html::endForm() ?>
+    <?php endif ?>
     </td>
-</tr>
-<?php foreach ($domainJobs as $j):
-    [$badgeStyle, $badgeText] = $badgeLegacy[$j['status']] ?? ['background:#eee;color:#333;', $j['status']];
-?>
-<tr class="ssrow">
-<td style="font-family:monospace;font-size:.85em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= Html::encode($j['name']) ?></td>
-<td align="right" style="font-size:.8em;color:#666;"><?= $intervalFmt($j['interval']) ?></td>
-<td align="center"><span class="job-badge" style="<?= $badgeStyle ?>"><?= $badgeText ?></span></td>
-<td align="right" style="font-size:.85em;"><?= $fmtSecs($j['secsLeft']) ?></td>
-<td align="right" style="font-size:.85em;color:#666;"><?= $fmtAgo($j['lastRun']) ?></td>
-<td class="job-actions" style="white-space:nowrap;">
-<?php if (!$j['paused']): ?>
-<?= Html::beginForm(['jobs/pause', 'job' => $j['name']]) ?>
-<?= Html::submitButton('Pause', ['style' => 'font-size:.78em;padding:1px 6px;cursor:pointer;']) ?>
-<?= Html::endForm() ?>
-<?php else: ?>
-<?= Html::beginForm(['jobs/resume', 'job' => $j['name']]) ?>
-<?= Html::submitButton('Resume', ['style' => 'font-size:.78em;padding:1px 6px;cursor:pointer;color:#0a5;']) ?>
-<?= Html::endForm() ?>
-<?php endif ?>
-<?php if (!$j['running']): ?>
-<?= Html::beginForm(['jobs/run-now', 'job' => $j['name']]) ?>
-<?= Html::submitButton('▶ Now', [
-    'style'   => 'font-size:.78em;padding:1px 6px;cursor:pointer;',
-    'onclick' => 'return confirm("Run ' . Html::encode($j['name']) . ' immediately?")',
-]) ?>
-<?= Html::endForm() ?>
-<?php endif ?>
-</td>
-</tr>
+    </tr>
+    <?php endforeach ?>
+    </tbody>
+    </table>
+    </div>
+</div>
 <?php endforeach ?>
-<?php endforeach ?>
-</tbody>
-</table>
-</div></div>
 
 <?php endif // tableExists ?>
+</div><!-- /.admn-page -->
 
 
 <?php elseif (!$isTailwind): ?>
