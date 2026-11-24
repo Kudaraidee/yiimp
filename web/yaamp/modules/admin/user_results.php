@@ -4,6 +4,7 @@
 
 $symbol = getparam('symbol');
 $coin = null;
+$is_all = ($symbol == 'all');
 
 if($symbol == 'all')
 	$users = getdbolist('db_accounts', "balance>.001 OR id IN (SELECT DISTINCT userid FROM workers) ORDER BY balance DESC");
@@ -13,6 +14,19 @@ else
 	if(!$coin) return;
 
 	$users = getdbolist('db_accounts', "coinid={$coin->id} AND (balance>.001 OR id IN (SELECT DISTINCT userid FROM workers)) ORDER BY balance DESC");
+}
+
+// Per-row amounts remain in their own coin. Only the "-all-" footer needs
+// prices to convert otherwise meaningless mixed units into BTC equivalents.
+$price_by_coin = array();
+if ($is_all) {
+	foreach ($users as $u) {
+		$cid = (int) $u->coinid;
+		if ($cid > 0 && !isset($price_by_coin[$cid])) {
+			$u_coin = getdbosql('db_coins', "id=:id", array(':id'=>$cid));
+			$price_by_coin[$cid] = $u_coin ? (float) $u_coin->price : 0.0;
+		}
+	}
 }
 
 echo <<<end
@@ -62,9 +76,9 @@ echo <<<end
 </thead><tbody>
 end;
 
-$total_balance = 0;
-$total_paid = 0;
-$total_unsold = 0;
+$total_balance = 0.0;
+$total_paid = 0.0;
+$raw_by_coin = array();
 
 foreach($users as $user)
 {
@@ -77,14 +91,14 @@ foreach($users as $user)
 	$pct_bad = $user_rate? round($user_bad*100/$user_rate, 3): 0;
 
 	$balance = bitcoinvaluetoa($user->balance);
-	$paid = dboscalar("SELECT sum(amount) FROM payouts WHERE account_id=".$user->id);
+	$paid_raw = (float) dboscalar("SELECT sum(amount) FROM payouts WHERE account_id=".$user->id);
 	$d = datetoa2($user->last_earning);
 
 	$miner_count = getdbocount('db_workers', "userid=".$user->id);
 	$block_count = getdbocount('db_blocks', "userid=".$user->id);
-	$block_diff = ($paid && $block_count) ? round(dboscalar("SELECT sum(difficulty) FROM blocks WHERE userid=".$user->id)/$paid, 3): '?';
+	$block_diff = ($paid_raw && $block_count) ? round(dboscalar("SELECT sum(difficulty) FROM blocks WHERE userid=".$user->id)/$paid_raw, 3): '?';
 
-	$paid = bitcoinvaluetoa($paid);
+	$paid = bitcoinvaluetoa($paid_raw);
 
 	$user_bad = Itoa2($user_bad);
 
@@ -137,43 +151,81 @@ foreach($users as $user)
 
 	echo '</tr>';
 
-	$total_balance += $user->balance;
-	$total_paid += $paid;
+	$user_balance = (float) $user->balance;
+	$cid = (int) $user->coinid;
+	if (!isset($raw_by_coin[$cid])) $raw_by_coin[$cid] = array('balance'=>0.0, 'paid'=>0.0);
+
+	$total_balance += $user_balance;
+	$total_paid += $paid_raw;
+	$raw_by_coin[$cid]['balance'] += $user_balance;
+	$raw_by_coin[$cid]['paid'] += $paid_raw;
 }
 
 echo "</tbody>";
 
-// totals colspan
+// ── Totals ────────────────────────────────────────────────────────────────────
+// Single-coin views sum in that coin's own unit. "-all-" mixes units, so show
+// current-price BTC equivalents there instead of adding unrelated numbers.
 $colspan = 7;
-
-$total_balance = bitcoinvaluetoa($total_balance);
-$total_paid = bitcoinvaluetoa($total_paid);
 $user_count = count($users);
 
+$balance_btc = 0.0;
+$paid_btc = 0.0;
+$unpriced = 0;
+if ($is_all) {
+	foreach ($raw_by_coin as $cid => $amounts) {
+		$price = (float) ($price_by_coin[$cid] ?? 0);
+		if ($price > 0) {
+			$balance_btc += $amounts['balance'] * $price;
+			$paid_btc += $amounts['paid'] * $price;
+		} elseif ($amounts['balance'] > 0 || $amounts['paid'] > 0) {
+			$unpriced++;
+		}
+	}
+}
+
+$unit_label = $is_all ? '' : (string) ($coin ? $coin->symbol : $symbol);
+$totals_note = '';
+if ($is_all) {
+	$totals_note = 'est. BTC @ current price';
+	if ($unpriced > 0) $totals_note .= ' · '.$unpriced.' coin(s) without price excluded';
+}
+
+$balance_display = $is_all
+	? '₿ '.bitcoinvaluetoa($balance_btc)
+	: bitcoinvaluetoa($total_balance).' '.$unit_label;
+$paid_display = $is_all
+	? '₿ '.bitcoinvaluetoa($paid_btc)
+	: bitcoinvaluetoa($total_paid).' '.$unit_label;
+$note_html = ($is_all && $totals_note !== '')
+	? ' <small style="font-weight:normal;color:#888;">'.CHtml::encode($totals_note).'</small>'
+	: '';
+
 echo '<tr class="ssfoot" style="border-top: 2px solid #eee;">';
-echo '<th colspan=3><b>Users Total ('.$user_count.')</b></a></th>';
+echo '<th colspan=3><b>Users Total ('.$user_count.')</b>'.$note_html.'</th>';
 for ($c=0; $c<$colspan; $c++) echo '<th></th>';
-echo '<th align="right"><b>'.$total_balance.'</b></th>';
-echo '<th align="right"><b>'.$total_paid.'</b></th>';
+echo '<th align="right"><b>'.CHtml::encode($balance_display).'</b></th>';
+echo '<th align="right"><b>'.CHtml::encode($paid_display).'</b></th>';
 echo '<th></th>';
 echo '</tr>';
 
 if($coin)
 {
+	$unit_suffix = ' '.CHtml::encode($coin->symbol);
 	$balance = bitcoinvaluetoa($coin->balance);
-	$profit = bitcoinvaluetoa($balance - $total_balance);
+	$profit = bitcoinvaluetoa($coin->balance - $total_balance);
 
-	echo '<tr class="ssfoot" style="border-top: 2px solid #eee;"">';
-	echo '<th colspan="3"><b>Wallet Balance</b></a></th>';
+	echo '<tr class="ssfoot" style="border-top: 2px solid #eee;">';
+	echo '<th colspan="3"><b>Wallet Balance</b></th>';
 	for ($c=0; $c<$colspan; $c++) echo '<th></th>';
-	echo '<th align="right"><b>'.$balance.'</b></th>';
+	echo '<th align="right"><b>'.$balance.$unit_suffix.'</b></th>';
 	echo '<th colspan="2"></th>';
 	echo '</tr>';
 
 	echo '<tr class="ssfoot" style="border-top: 2px solid #eee;">';
-	echo '<th colspan="3"><b>Wallet Profit</b></a></th>';
+	echo '<th colspan="3"><b>Wallet Profit</b></th>';
 	for ($c=0; $c<$colspan; $c++) echo '<th></th>';
-	echo '<th align="right"><b>'.$profit.'</b></th>';
+	echo '<th align="right"><b>'.$profit.$unit_suffix.'</b></th>';
 	echo '<th colspan="2"></th>';
 	echo '</tr>';
 }

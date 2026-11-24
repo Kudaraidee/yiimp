@@ -392,6 +392,7 @@ class AdminController extends BaseController
         $this->requireAdmin();
         $symbol = Yii::$app->request->get('symbol', 'all');
         $util   = Yii::$app->YiimpUtils;
+        $conv   = Yii::$app->ConversionUtils;
 
         // ── Resolve coin and user list ────────────────────────────────────────
         $coin = null;
@@ -405,21 +406,14 @@ class AdminController extends BaseController
                 ->all();
         } else {
             $coin = Coins::find()->where(['symbol' => $symbol])->one();
-            if (!$coin) {
-                return $this->renderPartial('user_results', [
-                    'symbol' => $symbol, 'users' => [], 'coin' => null,
-                    'coins' => [], 'rateMap' => [], 'badRateMap' => [],
-                    'minerCountMap' => [], 'blockDataMap' => [], 'paidMap' => [],
-                ]);
-            }
-            $users = Accounts::find()
+            $users = $coin ? Accounts::find()
                 ->where(['coinid' => $coin->id])
                 ->andWhere(['or',
                     ['>', 'balance', 0.001],
                     ['in', 'id', (new \yii\db\Query)->select('userid')->from('workers')->distinct()],
                 ])
                 ->orderBy(['balance' => SORT_DESC])
-                ->all();
+                ->all() : [];
         }
 
         $userIds = array_map(fn($u) => $u->id, $users);
@@ -502,6 +496,57 @@ class AdminController extends BaseController
             }
         }
 
+        // ── Totals ────────────────────────────────────────────────────────────
+        // Per-row amounts stay in the coin's own unit. A single-coin view sums
+        // in that coin; "-all-" mixes units, so use BTC equivalents there.
+        $totalBalance = 0.0;
+        $totalPaid    = 0.0;
+        $rawByCoin    = [];
+        foreach ($users as $user) {
+            $cid     = (int) $user->coinid;
+            $balance = (float) $user->balance;
+            $paid    = (float) ($paidMap[$user->id] ?? 0);
+
+            $totalBalance += $balance;
+            $totalPaid    += $paid;
+
+            if (!isset($rawByCoin[$cid])) $rawByCoin[$cid] = ['balance' => 0.0, 'paid' => 0.0];
+            $rawByCoin[$cid]['balance'] += $balance;
+            $rawByCoin[$cid]['paid']    += $paid;
+        }
+
+        $isAll       = ($symbol === 'all');
+        $balanceBtc  = 0.0;
+        $paidBtc     = 0.0;
+        $unpriced    = 0;
+        if ($isAll) {
+            foreach ($rawByCoin as $cid => $amounts) {
+                $price = (float) ($coins[$cid]->price ?? 0);
+                if ($price > 0) {
+                    $balanceBtc += $amounts['balance'] * $price;
+                    $paidBtc    += $amounts['paid'] * $price;
+                } elseif ($amounts['balance'] > 0 || $amounts['paid'] > 0) {
+                    $unpriced++;
+                }
+            }
+        }
+
+        $unitLabel   = $isAll ? '' : (string) ($coin->symbol ?? $symbol);
+        $balanceFmt  = $isAll
+            ? '₿ ' . $conv->bitcoinvaluetoa($balanceBtc)
+            : $conv->bitcoinvaluetoa($totalBalance) . ' ' . $unitLabel;
+        $paidFmt     = $isAll
+            ? '₿ ' . $conv->bitcoinvaluetoa($paidBtc)
+            : $conv->bitcoinvaluetoa($totalPaid) . ' ' . $unitLabel;
+
+        $totalsNote  = '';
+        if ($isAll) {
+            $totalsNote = 'est. BTC @ current price';
+            if ($unpriced > 0) $totalsNote .= " · {$unpriced} coin(s) without price excluded";
+        }
+        $balanceNote = $isAll ? $totalsNote : 'owed to miners · ' . $unitLabel;
+        $paidNote    = $isAll ? $totalsNote : 'lifetime payouts · ' . $unitLabel;
+
         return $this->renderPartial('user_results', [
             'symbol'        => $symbol,
             'users'         => $users,
@@ -512,6 +557,14 @@ class AdminController extends BaseController
             'minerCountMap' => $minerCountMap,
             'blockDataMap'  => $blockDataMap,
             'paidMap'       => $paidMap,
+            'totalBalance'  => $totalBalance,
+            'totalPaid'     => $totalPaid,
+            'balanceFmt'    => $balanceFmt,
+            'paidFmt'       => $paidFmt,
+            'totalsNote'    => $totalsNote,
+            'balanceNote'   => $balanceNote,
+            'paidNote'      => $paidNote,
+            'isAll'         => $isAll,
         ]);
     }
 
