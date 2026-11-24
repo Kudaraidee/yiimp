@@ -464,6 +464,95 @@ class SafeTradeDriver extends ExchangeDriver
         $saveBalance->save();
     }
 
+    /**
+     * Withdraw USDT to a worker's BEP20 (Binance Smart Chain) address.
+     * Returns the SafeTrade withdrawal id on success, false otherwise.
+     */
+    public function withdrawUsdt(string $address, float $amount): string|false
+    {
+        if ($this->isDisabled()) return false;
+
+        $address = trim($address);
+        if (!preg_match('/^0x[0-9a-fA-F]{40}$/', $address)) {
+            Yii::warning($this->name() . ': invalid BEP20 USDT address ' . $address, __CLASS__);
+            return false;
+        }
+
+        $networkKey = trim((string) $this->config('withdraw_usdt_blockchain_key', 'bsc-tokens'));
+        $currency   = $this->publicApiQuery('trade/public/currencies/usdt', '', 'array');
+        $network    = null;
+        if (is_array($currency)) {
+            foreach (($currency['networks'] ?? []) as $item) {
+                if (($item['blockchain_key'] ?? '') === $networkKey) {
+                    $network = $item;
+                    break;
+                }
+            }
+        }
+        if (!$network || empty($network['withdraw_enabled'])) {
+            Yii::warning($this->name() . ': USDT network ' . $networkKey . ' does not allow withdrawals', __CLASS__);
+            return false;
+        }
+
+        $minWithdraw = (float) ($network['min_withdraw_amount'] ?? 2);
+        if ($amount < $minWithdraw) {
+            Yii::warning(
+                $this->name() . ": USDT withdraw {$amount} is below network minimum {$minWithdraw}",
+                __CLASS__
+            );
+            return false;
+        }
+
+        // Guard against an accidental double withdrawal after a retry.
+        $recent = (int) Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM withdraws
+             WHERE market = :m AND address = :a AND amount = :amt AND time > :t',
+            [':m' => $this->name(), ':a' => $address, ':amt' => $amount, ':t' => time() - 3600]
+        )->queryScalar();
+        if ($recent > 0) {
+            Yii::warning($this->name() . ': duplicate USDT withdraw suppressed for ' . $address, __CLASS__);
+            return false;
+        }
+
+        $body = [
+            'currency'       => 'usdt',
+            'amount'         => $this->roundDown($amount, 6),
+            'blockchain_key' => $networkKey,
+        ];
+
+        $beneficiary = (int) $this->config('withdraw_usdt_beneficiary_id', 0);
+        if ($beneficiary > 0) {
+            $body['beneficiary_id'] = $beneficiary;
+        } else {
+            $emailCode = trim((string) $this->config('withdraw_usdt_email_code', ''));
+            $otpCode   = trim((string) $this->config('withdraw_usdt_otp_code', ''));
+            if ($emailCode === '') {
+                Yii::warning(
+                    $this->name() . ': USDT withdrawal needs withdraw_usdt_beneficiary_id or withdraw_usdt_email_code',
+                    __CLASS__
+                );
+                return false;
+            }
+            $body['address']    = $address;
+            $body['email_code'] = $emailCode;
+            if ($otpCode !== '') $body['otp_code'] = $otpCode;
+        }
+
+        $password = trim((string) $this->config('withdraw_usdt_password', ''));
+        if ($password !== '') $body['withdraw_password'] = $password;
+
+        Yii::info($this->name() . ": withdraw {$amount} USDT ({$networkKey}) to {$address}", __CLASS__);
+        $res = $this->authenticatedRequest('trade/account/withdraws', $body, 'POST', 'array');
+        if (!is_array($res) || !empty($res['errors']) || !isset($res['id'])) {
+            Yii::warning($this->name() . ': USDT withdraw failed ' . json_encode($res), __CLASS__);
+            return false;
+        }
+
+        $uuid = (string) $res['id'];
+        $this->recordWithdrawal($address, $amount, $uuid);
+        return $uuid;
+    }
+
     // ── Operations ────────────────────────────────────────────────────────────
 
     public function updateMarkets(): void

@@ -3,6 +3,7 @@
 namespace app\services;
 
 use Yii;
+use app\exchanges\ExchangeFactory;
 use app\models\Accounts;
 use app\models\Coins;
 use app\models\Earnings;
@@ -31,6 +32,10 @@ class PaymentService
     {
         set_time_limit(300);
 
+        // Quote payouts are not a mined coin wallet. When payout_quote=USDT,
+        // send them through the SafeTrade withdrawal rail instead of RPC.
+        $this->payUsdtQuotePayouts();
+
         $coins = Coins::find()
             ->where(['enable' => 1])
             ->andWhere(['in', 'id',
@@ -42,7 +47,101 @@ class PaymentService
             $this->payCoin($coin);
         }
 
-        Yii::$app->db->createCommand("UPDATE accounts SET balance=0 WHERE coinid=0")->execute();
+        // Legacy quote payouts were BTC and got swept here. USDT quote balances
+        // must not be wiped — they are paid by payUsdtQuotePayouts().
+        if (Yii::$app->YiimpUtils->payoutQuoteSymbol() !== 'USDT') {
+            Yii::$app->db->createCommand("UPDATE accounts SET balance=0 WHERE coinid=0")->execute();
+        }
+    }
+
+    /**
+     * Pay quote-wallet accounts (coinid=0) directly in USDT via SafeTrade.
+     * Gated by the safetrade-usdt_payout_enabled setting and never start a worker.
+     */
+    public function payUsdtQuotePayouts(): void
+    {
+        $util = Yii::$app->YiimpUtils;
+        if ($util->payoutQuoteSymbol() !== 'USDT') {
+            return;
+        }
+        if (!(defined('YIIMP_ALLOW_EXCHANGE') && YIIMP_ALLOW_EXCHANGE)) {
+            return;
+        }
+
+        $settings = Yii::$app->settings;
+        if (!$settings->exchangeGet('safetrade', 'usdt_payout_enabled', false)) {
+            return;
+        }
+
+        $minBalance = max(0.000001, (float) $settings->exchangeGet('safetrade', 'withdraw_min_usdt', 3));
+        $fee        = max(0.0, (float) $settings->exchangeGet('safetrade', 'withdraw_fee_usdt', 1));
+
+        $users = Accounts::find()
+            ->where(['coinid' => 0, 'is_locked' => 0])
+            ->andWhere(['>', 'balance', $minBalance])
+            ->orderBy(['balance' => SORT_DESC])
+            ->all();
+
+        if (empty($users)) {
+            return;
+        }
+
+        $driver = ExchangeFactory::make('safetrade');
+
+        foreach ($users as $row) {
+            $user = Accounts::findOne((int) $row->id);
+            if (!$user) {
+                continue;
+            }
+
+            $address = trim((string) $user->username);
+            if (!preg_match('/^0x[0-9a-fA-F]{40}$/', $address)) {
+                Yii::warning("USDT payout skipped: account {$user->id} has no BEP20 wallet ({$address})", __CLASS__);
+                continue;
+            }
+
+            $pending = Payouts::find()
+                ->where(['account_id' => (int) $user->id, 'idcoin' => 0, 'completed' => 0])
+                ->andWhere(['or', ['errmsg' => null], ['errmsg' => '']])
+                ->exists();
+            if ($pending) {
+                continue;
+            }
+
+            $balance = (float) $user->balance;
+            $amount  = round($balance - $fee, 6);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $payout             = new Payouts();
+            $payout->account_id = (int) $user->id;
+            $payout->idcoin     = 0;
+            $payout->time       = time();
+            $payout->amount     = $this->bitcoinValueToString($balance);
+            $payout->fee        = $this->bitcoinValueToString($fee);
+            $payout->completed  = 0;
+
+            if (!$payout->save()) {
+                continue;
+            }
+
+            $uuid = $driver->withdrawUsdt($address, $amount);
+            if ($uuid === false) {
+                $payout->errmsg = 'SafeTrade USDT withdrawal failed';
+                $payout->save();
+                continue;
+            }
+
+            $payout->tx        = $uuid;
+            $payout->completed = 1;
+            $payout->save();
+
+            $user->balance = $this->bitcoinValueToString(0.0);
+            $user->save();
+
+            Yii::info("USDT payout {$balance} to {$address}, withdrawal {$uuid}", __CLASS__);
+        }
     }
 
     /**

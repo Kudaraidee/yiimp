@@ -9,6 +9,7 @@ use app\models\Coins;
 use app\models\Payouts;
 use app\models\Accounts;
 use app\components\rpc\WalletRPC;
+use app\services\PaymentService;
 
 /**
  * Payout verification and repair.
@@ -18,9 +19,18 @@ use app\components\rpc\WalletRPC;
  *   php yii payout/coinswaps                — find earnings/payouts with mismatched coins
  *   php yii payout/confirmations <symbol>   — list last 72h payouts with confirmation counts
  *   php yii payout/redotx <txid>            — redo payment from a bad fork (YIIMP_CLI_ALLOW_TXS required)
+ *   php yii payout/usdt                     — one-shot SafeTrade USDT quote payout pass
  */
 class PayoutController extends Controller
 {
+    /** One-shot USDT payout pass. Does not start queue workers. */
+    public function actionUsdt(): int
+    {
+        (new PaymentService())->payUsdtQuotePayouts();
+        $this->stdout("USDT quote payout pass complete\n");
+        return ExitCode::OK;
+    }
+
     /** Compare wallet transactions with database payouts; optionally create missing ones. */
     public function actionCheck(string $symbol, string $fixit = ''): int
     {

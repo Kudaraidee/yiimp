@@ -213,13 +213,14 @@ abstract class ExchangeDriver
         }
     }
 
-    final protected function recordWithdrawal(string $address, float $amount): void
+    final protected function recordWithdrawal(string $address, float $amount, string $uuid = ''): void
     {
         Yii::$app->db->createCommand()->insert('withdraws', [
             'market'  => $this->name(),
             'address' => $address,
             'amount'  => $amount,
             'time'    => time(),
+            'uuid'    => $uuid,
         ])->execute();
     }
 

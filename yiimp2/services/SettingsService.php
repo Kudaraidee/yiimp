@@ -131,6 +131,15 @@ class SettingsService extends Component
             'withdraw_email_code' => 'SafeTrade withdrawal email code (required when no beneficiary ID)',
             'withdraw_otp_code'  => 'SafeTrade withdrawal OTP code (optional when no beneficiary ID)',
             'withdraw_password'  => 'SafeTrade withdraw password, if enabled on the account',
+
+            'usdt_payout_enabled' => 'Enable direct USDT payouts to worker wallets (SafeTrade)',
+            'withdraw_min_usdt'  => 'Minimum USDT balance before a payout is attempted',
+            'withdraw_fee_usdt'  => 'SafeTrade USDT network fee deducted from the worker balance',
+            'withdraw_usdt_blockchain_key' => 'SafeTrade USDT network, e.g. bsc-tokens for BEP20',
+            'withdraw_usdt_beneficiary_id' => 'SafeTrade USDT beneficiary ID',
+            'withdraw_usdt_email_code' => 'SafeTrade USDT withdrawal email code',
+            'withdraw_usdt_otp_code'  => 'SafeTrade USDT withdrawal OTP code',
+            'withdraw_usdt_password'  => 'SafeTrade USDT withdrawal password',
         ];
     }
 
