@@ -61,14 +61,15 @@ void remote_create_job(YAAMP_REMOTE *remote, json_value *json_params)
 
 	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE;
 	memset(templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+	str_overflows = 0;
 
-	strncpy(templ->prevhash_be, json_params->u.array.values[1]->u.string.ptr, sizeof(templ->prevhash_be)-1);
-	strncpy(templ->coinb1, json_params->u.array.values[2]->u.string.ptr, 1023);
-	strncpy(templ->coinb2, json_params->u.array.values[3]->u.string.ptr, 1023);
+	STRSET(templ->prevhash_be, json_params->u.array.values[1]->u.string.ptr);
+	STRSET(templ->coinb1, json_params->u.array.values[2]->u.string.ptr);
+	STRSET(templ->coinb2, json_params->u.array.values[3]->u.string.ptr);
 
-	strncpy(templ->version, json_params->u.array.values[5]->u.string.ptr, 16);
-	strncpy(templ->nbits, json_params->u.array.values[6]->u.string.ptr, 16);
-	strncpy(templ->ntime, json_params->u.array.values[7]->u.string.ptr, 16);
+	STRSET(templ->version, json_params->u.array.values[5]->u.string.ptr);
+	STRSET(templ->nbits, json_params->u.array.values[6]->u.string.ptr);
+	STRSET(templ->ntime, json_params->u.array.values[7]->u.string.ptr);
 
 	json_value *json_merkles = json_params->u.array.values[4];
 
@@ -78,10 +79,16 @@ void remote_create_job(YAAMP_REMOTE *remote, json_value *json_params)
 	for(int i=0; i<json_merkles->u.array.length; i++)
 	{
 		const char *merkle = json_merkles->u.array.values[i]->u.string.ptr;
-		if(i>0) strcat(templ->txmerkles, ",");
+		if(i>0) STRADD(templ->txmerkles, ",");
 
 		templ->txsteps.push_back(merkle);
-		sprintf(templ->txmerkles + strlen(templ->txmerkles), "\"%s\"", merkle);
+		STRADDF(templ->txmerkles, "\"%s\"", merkle);
+	}
+
+	if (str_overflows) {
+		stratumlog("remote %d: job dropped, value too long\n", remote->id);
+		delete templ;
+		return;
 	}
 
 	templ->height = getblocheight(templ->coinb1);

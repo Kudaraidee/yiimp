@@ -1046,3 +1046,67 @@ uint64_t share_to_target(double diff)
         uint64_t starget = * (uint64_t *) &targ[24];
         return (starget);
 }
+
+//////////////////////////////////////////////////////////////////////////
+// bounded string writes, see strsafe.h
+
+thread_local int str_overflows = 0;
+
+bool str_fail(const char *what, size_t need, size_t cap)
+{
+	str_overflows++;
+	if (need)
+		stratumlog("ERROR: %s needs %zu bytes, has %zu\n", what, need, cap);
+	else
+		stratumlog("ERROR: %s has no value\n", what);
+	return false;
+}
+
+const char *str_fits(const char *src, size_t cap, const char *what)
+{
+	if (src && strlen(src) >= cap) {
+		str_fail(what, strlen(src) + 1, cap);
+		return "";
+	}
+	return src;
+}
+
+bool str_copy(char *dst, size_t cap, const char *src, const char *what)
+{
+	size_t len = src ? strlen(src) : 0;
+	if (!src || len >= cap) {
+		dst[0] = '\0';
+		return str_fail(what, src ? len + 1 : 0, cap);
+	}
+	memcpy(dst, src, len + 1);
+	return true;
+}
+
+bool str_append(char *dst, size_t cap, const char *src, const char *what)
+{
+	size_t used = strnlen(dst, cap);
+	size_t len = src ? strlen(src) : 0;
+	if (!src || used + len >= cap) {
+		dst[0] = '\0';
+		return str_fail(what, src ? used + len + 1 : 0, cap);
+	}
+	memcpy(dst + used, src, len + 1);
+	return true;
+}
+
+bool str_format(char *dst, size_t cap, bool append, const char *what, const char *fmt, ...)
+{
+	size_t used = append ? strnlen(dst, cap) : 0;
+	int n = -1;
+	if (used < cap) {
+		va_list args;
+		va_start(args, fmt);
+		n = vsnprintf(dst + used, cap - used, fmt, args);
+		va_end(args);
+	}
+	if (n < 0 || used + n >= cap) {
+		dst[0] = '\0';
+		return str_fail(what, used + (n > 0 ? n : 0) + 1, cap);
+	}
+	return true;
+}

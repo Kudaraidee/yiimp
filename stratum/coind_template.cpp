@@ -13,7 +13,7 @@ void coind_getauxblock(YAAMP_COIND *coind)
        (strcmp(coind->symbol, "EAC") == 0) ||
 	   (strcmp(coind->symbol, "LCN") == 0)) {
 		static char wallet_address[1028];
-		if (coind->wallet) sprintf(wallet_address, "[\"%s\"]", coind->wallet);
+		if (coind->wallet) STRFMT(wallet_address, "[\"%s\"]", coind->wallet);
 
 		json = rpc_call(&coind->rpc, "createauxblock", wallet_address, coind);
 		if(!json)
@@ -45,10 +45,10 @@ void coind_getauxblock(YAAMP_COIND *coind)
 
 	const char *p = json_get_string(json_result, "target");
 	if (!p) p = json_get_string(json_result, "_target");
-	if(p) strcpy(coind->aux.target, p);
+	if(p) STRSET(coind->aux.target, p);
 
 	p = json_get_string(json_result, "hash");
-	if(p) strcpy(coind->aux.hash, p);
+	if(p) STRSET(coind->aux.hash, p);
 
 	coind->aux.skip_submitblock = json_get_bool(json_result, "mining_disabled");
 
@@ -88,8 +88,8 @@ YAAMP_JOB_TEMPLATE *coind_create_template_memorypool(YAAMP_COIND *coind)
 //	templ->height = json_get_int(json_result, "height");
 	sprintf(templ->version, "%08x", (unsigned int)json_get_int(json_result, "version"));
 	sprintf(templ->ntime, "%08x", (unsigned int)json_get_int(json_result, "time"));
-	strcpy(templ->nbits, json_get_string(json_result, "bits"));
-	strcpy(templ->prevhash_hex, json_get_string(json_result, "previousblockhash"));
+	STRSET(templ->nbits, json_get_string(json_result, "bits"));
+	STRSET(templ->prevhash_hex, json_get_string(json_result, "previousblockhash"));
 
 	json_value_free(json);
 
@@ -116,6 +116,17 @@ YAAMP_JOB_TEMPLATE *coind_create_template_memorypool(YAAMP_COIND *coind)
 
 	coind->usememorypool = true;
 	return templ;
+}
+
+// a bounded write (strsafe.h) was refused: the template is incomplete
+static YAAMP_JOB_TEMPLATE *coind_drop_overflowed(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ)
+{
+	if (!templ || !str_overflows) return templ;
+	stratumlog("%s: template dropped, RPC value too long\n", coind->symbol);
+	for (int i = 0; i < templ->auxs_size; i++)
+		if (templ->auxs[i]) free(templ->auxs[i]);
+	delete templ;
+	return NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -378,12 +389,12 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 
 	json_value_free(json_blocksubsidy);
 
-	const char *bits = json_get_string(json_result, "bits");
+	const char *bits = str_fits(json_get_string(json_result, "bits"), sizeof(templ->nbits), "templ->nbits");
 	strcpy(templ->nbits, bits ? bits : "");
 	const char *prev = json_get_string(json_result, "previousblockhash");
-	strcpy(templ->prevhash_hex, prev ? prev : "");
+	STRSET(templ->prevhash_hex, prev ? prev : "");
 	const char *flags = json_get_string(json_coinbaseaux, "flags");
-	strcpy(templ->flags, flags ? flags : "");
+	STRSET(templ->flags, flags ? flags : "");
 	strcpy(templ->priceinfo, "");
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -406,13 +417,13 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	// LTC mw-eb
 	const char *mweb = json_get_string(json_result, "mweb");
 	if (mweb) {
-		strcpy(templ->mweb, mweb);
+		STRSET(templ->mweb, mweb);
 	}
 
 	// LBC Claim Tree (with wallet gbt patch)
 	const char *claim = json_get_string(json_result, "claimtrie");
 	if (claim) {
-		strcpy(templ->claim_hex, claim);
+		STRSET(templ->claim_hex, claim);
 		// debuglog("claimtrie: %s\n", templ->claim_hex);
 	}
 	else if (strcmp(coind->symbol, "LBC") == 0) {
@@ -429,7 +440,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 			return NULL;
 		claim = json_get_string(json_obj, "hash");
 		if (claim) {
-			strcpy(templ->claim_hex, claim);
+			STRSET(templ->claim_hex, claim);
 			debuglog("claim_hex: %s\n", templ->claim_hex);
 		}
 	}
@@ -437,7 +448,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		if (strlen(json_get_string(json_result, "priceinfo")) < 1000) {
 			templ->needpriceinfo = json_get_bool(json_result, "needpriceinfo");
             if (templ->needpriceinfo)
-				strcpy(templ->priceinfo, json_get_string(json_result, "priceinfo"));
+				STRSET(templ->priceinfo, json_get_string(json_result, "priceinfo"));
 		}
 	}
 
@@ -445,8 +456,8 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	const char *sc_utxo = json_get_string(json_result, "utxoroot");
 	if (sc_root && sc_utxo) {
 		// LUX Smart Contracts, 144-bytes block headers
-		strcpy(&templ->extradata_hex[ 0], sc_root); // 32-bytes hash (64 in hexa)
-		strcpy(&templ->extradata_hex[64], sc_utxo); // 32-bytes hash too
+		str_copy(&templ->extradata_hex[ 0], 64 + 1, sc_root, "stateroot"); // 32-bytes hash (64 in hexa)
+		str_copy(&templ->extradata_hex[64], sizeof(templ->extradata_hex) - 64, sc_utxo, "utxoroot"); // 32-bytes hash too
 
 		// same weird byte order as previousblockhash field
 		ser_string_be2(sc_root, &templ->extradata_be[ 0], 8);
@@ -515,13 +526,13 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 			continue;
 		}
 
-		string_be(p, hash_be);
+		string_be(str_fits(p, sizeof(hash_be), "tx hash"), hash_be);
 		txhashes.push_back(hash_be);
 
 		const char *txid = json_get_string(json_tx->u.array.values[i], "txid");
 		if(txid && strlen(txid)) {
 			char txid_be[256] = { 0 };
-			string_be(txid, txid_be);
+			string_be(str_fits(txid, sizeof(txid_be), "txid"), txid_be);
 			txids.push_back(txid_be);
 			if (strcmp(hash_be, txid_be)) {
 				templ->has_segwit_txs = true; // if not, its useless to generate a segwit block, bigger
@@ -583,7 +594,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		// default commitment is already computed correctly
 		const char *commitment = json_get_string(json_result, "default_witness_commitment");
 		if (commitment) {
-			sprintf(coind->commitment, "%s", commitment);
+			STRSET(coind->commitment, commitment);
 		} else {
 			templ->has_segwit_txs = false;
 		}
@@ -594,7 +605,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 
 	vector<string>::const_iterator i;
 	for(i = templ->txsteps.begin(); i != templ->txsteps.end(); ++i)
-		sprintf(templ->txmerkles + strlen(templ->txmerkles), "\"%s\",", (*i).c_str());
+		STRADDF(templ->txmerkles, "\"%s\",", (*i).c_str());
 
 	if(templ->txmerkles[0])
 		templ->txmerkles[strlen(templ->txmerkles)-1] = 0;
@@ -616,12 +627,12 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	// create coinbase-string and merkleroot-string
 	int coinbase_len = strlen(templ->coinbase);
 	if (coinbase_len == 0) {
-		sprintf(templ->coinbase, "%s%s%s", templ->coinb1, (is_equihash?"":"0000000000000000"), templ->coinb2);
+		STRFMT(templ->coinbase, "%s%s%s", templ->coinb1, (is_equihash?"":"0000000000000000"), templ->coinb2);
 		coinbase_len = strlen(templ->coinbase);
 	}
 
-	unsigned char coinbase_bin[1024];
-	memset(coinbase_bin, 0, 1024);
+	unsigned char coinbase_bin[sizeof(templ->coinbase)/2];
+	memset(coinbase_bin, 0, sizeof(coinbase_bin));
 	binlify(coinbase_bin, templ->coinbase);
 
 	char doublehash[128]; memset(doublehash, 0, 128);
@@ -661,11 +672,13 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 	YAAMP_JOB_TEMPLATE *templ;
 
 	// DCR gbt block header is not compatible with getwork submit, so...
+	str_overflows = 0;
 
 	if (coind->usegetwork && strcmp(coind->rpcencoding, "DCR") == 0)
 		templ = decred_create_worktemplate(coind);
 	else
 		templ = coind_create_template(coind);
+	templ = coind_drop_overflowed(coind, templ);
 
 	if(!templ)
 	{

@@ -66,6 +66,8 @@ void stratumlogdate(const char *format, ...);
 void clientlog(YAAMP_CLIENT *client, const char *format, ...);
 void rejectlog(const char *format, ...);
 
+#include "strsafe.h"
+
 //////////////////////////////////////////////////////////////////////////
 
 vector<string> merkle_steps(vector<string> input);

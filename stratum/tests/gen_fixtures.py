@@ -3,8 +3,8 @@
 
 fixtures/<case>/  normal templates; expected.txt is the golden master
                   (written by `make -C tests vectors`)
-overflow/<case>/  inputs larger than stratum's fixed buffers, for the
-                  hardened/asan runs (`make -C tests hardened|asan`)
+overflow/<case>/  inputs larger than stratum's fixed buffers; the template
+                  must be rejected (`make -C tests overflow`)
 
 Run from stratum/tests:  python3 gen_fixtures.py
 The data is synthetic but shaped like real bitcoind/dashd answers and fully
@@ -89,16 +89,14 @@ write_case('fixtures', 'btc-segwit', dict(BASE, segwit=1),
 write_case('fixtures', 'btc-empty', BASE, {'getblocktemplate': gbt(ntx=0)})
 write_case('fixtures', 'x11-masternodes', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(2), coinbase_payload='00' * 40)})
+# 40 payees: a 2.8K coinb2, still within the fixed buffers
+write_case('fixtures', 'x11-payees-40', dict(BASE, algo='x11', symbol='TDASH'),
+           {'getblocktemplate': gbt(ntx=2, **payees(40))})
 
 # ---- overflow inputs -------------------------------------------------------
-# 200 payees: script_dests[4096] (stack), coinb2[8K], coinbase[4096],
-# coinbase_bin[1024] (stack) in coind_create_template
+# 200 payees: script_dests[4096] (stack), coinb2[8K], coinbase[4096]
 write_case('overflow', 'payees-200', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(200))})
-# 40 payees: below script_dests, but the coinbase passes 2048 hex chars,
-# so binlify() overruns coinbase_bin[1024]
-write_case('overflow', 'payees-40', dict(BASE, algo='x11', symbol='TDASH'),
-           {'getblocktemplate': gbt(ntx=2, **payees(40))})
 # 10 KB coinbase_payload: coinb2[8K]
 write_case('overflow', 'coinbase-payload', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(1), coinbase_payload='ab' * 5120)})
