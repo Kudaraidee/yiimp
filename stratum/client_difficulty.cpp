@@ -15,7 +15,7 @@ static long long eth_vardiff_window_ms()
 // vardiff: fractional difficulties, fixed window, ~1 share/min.
 static bool is_gpu_vardiff()
 {
-	return is_ethash || is_etchash || is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow;
+	return is_ethash || is_etchash || is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki;
 }
 
 // HomeScrypt's real network difficulty is ~3e-4, far below the 0.002 step of
@@ -215,6 +215,12 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 		// the miner waiting for a job until it reconnects.
 		client_call(client, "mining.set_difficulty", "[%.8g]", difficulty);
 	}
+	else if (is_meraki)
+	{
+		client->share_target = meraki_diff_to_target(difficulty);
+		client_call(client, "mining.set_target", "[\"%s\"]", client->share_target.ToString().c_str());
+		client->next_target = client->share_target;
+	}
 	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
 	{
 		uint256 share_target;
@@ -306,6 +312,8 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 					ethash_diff_to_target(diff, be);
 					client->share_target = ethash_be_to_uint256(be);
 				}
+				else if (is_meraki)
+					client->share_target = meraki_diff_to_target(diff);
 				else
 					diff_to_target(client->share_target, diff);
 			}

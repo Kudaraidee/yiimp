@@ -229,7 +229,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	char script1[4*1024];
 	char script2[32];
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
+	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
 	{
 		// coinbase v_in only current height
 		sprintf(script1, "%s", eheight);
@@ -828,6 +828,46 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         strcat(templ->coinb2, "00000000"); // locktime
 
         coind->reward = (double)miner_amount / 100000000 * coind->reward_mul;
+        return;
+    }
+
+    else if (is_meraki)
+    {
+        // Telestai enforces a 117 TLS (11700000000 sat) development output in
+        // every coinbase. GBT's coinbasevalue includes that output, so pay it
+        // to the fixed mainnet address and keep the remainder for the pool.
+        const json_int_t founder_amount = 11700000000LL;
+        const char* founder_address = "TesBmcgLQsowvYEYPXpSHkkapoTbVV7Xfe";
+
+        if (available <= founder_amount) {
+            debuglog("[%s] coinbasevalue %lld too small for founder output\n",
+                coind->symbol, (long long)available);
+            return;
+        }
+
+        char founder_hash160[64] = { 0 };
+        if (!base58_decode(founder_address, founder_hash160) || !*founder_hash160) {
+            debuglog("[%s] invalid founder address %s\n", coind->symbol, founder_address);
+            return;
+        }
+
+        char founder_script[128] = { 0 };
+        snprintf(founder_script, sizeof(founder_script), "76a914%s88ac", founder_hash160);
+
+        unsigned int outputs = 2 + (templ->has_segwit_txs ? 1 : 0);
+        char outputs_count[4] = { 0 };
+        sprintf(outputs_count, "%02x", outputs);
+        strcat(templ->coinb2, outputs_count);
+
+        json_int_t miner_amount = available - founder_amount;
+        job_pack_tx(coind, templ->coinb2, miner_amount, NULL);
+        script_pack_tx(coind, templ->coinb2, founder_amount, founder_script);
+        if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
+        strcat(templ->coinb2, "00000000");
+
+        coind->reward = (double)miner_amount / 100000000 * coind->reward_mul;
+        debuglog("[%s] founder output %f, pool reward %f\n", coind->symbol,
+            (double)founder_amount / 100000000, coind->reward);
         return;
     }
 

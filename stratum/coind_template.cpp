@@ -291,7 +291,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		// segwit at height 1 and does not currently emit mweb template fields.
 		strcpy(params, "[{\"rules\":[\"segwit\",\"mweb\"]}]");
 	}
-	else if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow) {
+	else if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow || is_meraki) {
 		sprintf(params, "[]");
 	}
 	else {
@@ -680,6 +680,14 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 			templ->header_hash = build_header_hash(templ);
 		}
 	}
+	else if (is_meraki)
+	{
+		// Telestai's Meraki fork uses a fixed 27500-block epoch and its own
+		// KISS99 seed constant, so it must not share the Kawpow context.
+		meraki_update_epoch(coind->id, templ->height);
+		templ->header_seed = meraki_epoch_seed(templ->height);
+		templ->header_hash = build_header_hash(templ);
+	}
 
 	return templ;
 }
@@ -776,6 +784,12 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 		// service; the Bitcoin compact-target calculation below is invalid.
 		coind->difficulty = nebhash_target_hex_to_diff(templ->neb_target);
 	}
+	else if (is_meraki)
+	{
+		uint256 coin_target;
+		decode_nbits(coin_target, (uint32_t)strtoul(templ->nbits, NULL, 16));
+		coind->difficulty = meraki_target_to_diff(coin_target);
+	}
 	else
 	{
 		uint64_t coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
@@ -793,7 +807,7 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 	if (job_last && job_last->templ && (templ->height == job_last->templ->height)) {
 		if (coind->job) coind->job->status = JOB_STATUS_WAITING;
 	}
-	else if (is_evrprogpow && coind->job) {
+	else if ((is_evrprogpow || is_meraki) && coind->job) {
 		// EvrProgpow miners are slow GPUs; at IBD block rates the previous job
 		// can be replaced well before a share is found. Keep it in the job
 		// list (as WAITING) so late shares still validate against its template.

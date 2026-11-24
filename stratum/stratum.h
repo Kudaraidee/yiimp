@@ -78,6 +78,7 @@ extern bool is_firopow;
 extern bool is_phihash;
 extern bool is_meowpow;
 extern bool is_evrprogpow;
+extern bool is_meraki;
 extern bool is_ethash;
 extern bool is_etchash;
 extern bool is_randomscash;
@@ -175,6 +176,8 @@ extern volatile bool g_exiting;
 #include "firopow/hash.h"
 #include "firopow/overrides.h"
 #include "phihash/hash.h"
+#include "meraki/hash.h"
+#include "meraki/meraki.h"
 #include "ethash/params.h"
 #include "ethash/context.h"
 #include "ethash/work.h"

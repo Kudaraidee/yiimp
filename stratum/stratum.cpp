@@ -109,6 +109,7 @@ bool is_firopow = false;
 bool is_phihash = false;
 bool is_meowpow = false;
 bool is_evrprogpow = false;
+bool is_meraki = false;
 bool is_ethash = false;
 bool is_etchash = false;
 bool is_randomscash = false;
@@ -224,6 +225,7 @@ YAAMP_ALGO g_algos[] =
 	{"lyra2z", lyra2z_hash, 0x100, 0, 0},
 	{"lyra2z330", lyra2z330_hash, 0x100, 0, 0},
 	{"m7m", m7m_hash, 0x10000, 0, 0},
+	{"meraki", sha256_double_hash, 1, 0, 0}, // Telestai Progpow variant
 	{"memehash", meme_hash, 1, 0, 0}, /*PepePow Algo*/
 	{"meowpow", sha256_double_hash, 1, 0, 0},
 	{"megabtx", megabtx_hash, 0x100, 0, 0}, /* Bitcore New Algo*/
@@ -484,6 +486,10 @@ int main(int argc, char **argv)
 	else if (!strcmp(g_current_algo->name,"evrprogpow"))
 	{
 		is_evrprogpow = true;
+	}
+	else if (!strcmp(g_current_algo->name,"meraki"))
+	{
+		is_meraki = true;
 	}
 	else if (!strcmp(g_current_algo->name,"ethash"))
 	{

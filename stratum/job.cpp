@@ -312,7 +312,8 @@ void job_check_status() {
 
 		// EvrProgpow (slow GPUs) needs a longer grace period: keep old jobs
 		// around so shares found after a new block are still credited.
-		int maxjobage = is_nebhash ? NEB_JOB_KEEPAGE : (is_evrprogpow ? EVR_JOB_KEEPAGE : MAX_JOBAGE);
+		int maxjobage = is_nebhash ? NEB_JOB_KEEPAGE :
+			((is_evrprogpow || is_meraki) ? EVR_JOB_KEEPAGE : MAX_JOBAGE);
 		tmpjobage = time(NULL) - maxjobage;
 		if (job->jobage <= tmpjobage) {
 //			debuglog("delete timeouted job %i from coin %s height %i\n",
@@ -324,7 +325,7 @@ void job_check_status() {
 
 		// Do not drop EVR jobs just because the node advanced: a share mined
 		// on the previous height is still valid work and must be credited.
-		if (!is_evrprogpow && !is_nebhash && job->templ->height <= job->coind->height) {
+		if (!is_evrprogpow && !is_meraki && !is_nebhash && job->templ->height <= job->coind->height) {
 //			debuglog("delete job %i from coin %s height %i\n",
 //					job->id, job->coind->symbol, job->templ->height);
 			job->deleted = true;

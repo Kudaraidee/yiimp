@@ -111,6 +111,7 @@ int main(int argc, char **argv)
 	is_firopow = !strcmp(g_current_algo->name, "firopow");
 	is_phihash = !strcmp(g_current_algo->name, "phihash");
 	is_meowpow = !strcmp(g_current_algo->name, "meowpow");
+	is_meraki = !strcmp(g_current_algo->name, "meraki");
 	coind->pos = !strcasecmp(coind->rpcencoding, "POS");
 
 	YAAMP_JOB_TEMPLATE *templ = coind_create_template(coind);
