@@ -37,7 +37,7 @@ void rinhash_hash(const char* input, char* output, uint32_t len)
 
     if (argon2d_ctx(&context) != ARGON2_OK) {
         fprintf(stderr, "Argon2d failed!\n");
-        memset(output, 0, 32);
+        memset(output, 0xff, 32);	// fail every target
         return;
     }
 

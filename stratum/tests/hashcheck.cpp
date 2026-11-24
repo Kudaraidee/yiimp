@@ -1,5 +1,5 @@
 // hashcheck: run every hash function of g_algos[] on fixed inputs and compare
-// with recorded vectors (stratum rework, phase 0 safety net).
+// with recorded vectors.
 //
 //   hashcheck --generate [--algo NAME]   print vectors to stdout
 //   hashcheck --check FILE [--algo NAME] compare with FILE, exit 1 on mismatch

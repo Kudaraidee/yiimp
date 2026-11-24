@@ -1,8 +1,7 @@
-# Stratum safety net (phase 0 of docs/stratum_rework_plan.md).
+# Stratum test harness: hash vectors, KATs and template checks.
 #
-# Self-contained on purpose: object list, flags and libraries are read from
-# ../Makefile at make time, so ../Makefile stays untouched (no merge conflicts
-# with upstream) and sources upstream adds there are picked up automatically.
+# Object list, flags and libraries are read from ../Makefile at make time,
+# so new algo sources are picked up without editing this file.
 #
 #   make -C tests check        hash vectors + reference KATs + templates (plain build)
 #   make -C tests vectors      re-generate the golden masters (review the diff!)
@@ -70,8 +69,7 @@ else ifeq ($(VARIANT),warnings)
 else ifeq ($(VARIANT),asan)
   XFLAGS  := $(ASAN_FLAGS)
   XLDFLAGS := -fsanitize=address,undefined
-  # LeakSanitizer does not work in containers without ptrace; leaks are not
-  # what phase 0 is after anyway
+  # LeakSanitizer needs ptrace, unavailable in containers
   export ASAN_OPTIONS ?= detect_leaks=0
 else
   $(error unknown VARIANT $(VARIANT))
