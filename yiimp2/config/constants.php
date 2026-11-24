@@ -36,4 +36,3 @@ if (!defined('YIIMP_MAINTENANCE_MODE'))     define('YIIMP_MAINTENANCE_MODE',    
 if (!defined('YIIMP_LAYOUT'))               define('YIIMP_LAYOUT',               'legacy');
 if (!defined('YIIMP_TAILWIND_CDN'))         define('YIIMP_TAILWIND_CDN',         true);
 if (!defined('YIIMP_GITHUB_SCAN'))          define('YIIMP_GITHUB_SCAN',          false);
-if (!defined('YIIMP_PROFITABILITY_MBTC_FACTOR')) define('YIIMP_PROFITABILITY_MBTC_FACTOR', 1000);
