@@ -13,8 +13,8 @@ This directory adds a `neb-pool/1` stratum listener for NEB v1.0.4 mainnet.
 
 ## Runtime requirements
 
-- NEB node v1.0.4 with work service on `127.0.0.1:3441` and JSON-RPC on
-  `127.0.0.1:8432`.
+- NEB node v1.0.5 (1.0.2+ compatible) with work service on `127.0.0.1:3441`
+  and JSON-RPC on `127.0.0.1:8432`.
 - Pinned dataset `/home/codex/lrs-nodes/neb-node/neb-datasets.bin`
   (`NMDS||LE32(2)||NMD2 arch=1 N=13404||NMD2 arch=1 N=7089`). Slot is
   `height mod 2`.
@@ -40,7 +40,7 @@ This directory adds a `neb-pool/1` stratum listener for NEB v1.0.4 mainnet.
   forwarding is intentionally not used. Block credit is applied only after
   the node returns an accepted two-byte `Result` frame.
 - V1 model frames are not supported. The loader accepts only `NMD2` /
-  `neb2_model` datasets from node v1.0.4.
+  `neb2_model` datasets from node v1.0.5.
 
 ## Smoke test
 
