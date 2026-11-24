@@ -114,7 +114,12 @@ int main(int argc, char **argv)
 	is_meraki = !strcmp(g_current_algo->name, "meraki");
 	coind->pos = !strcasecmp(coind->rpcencoding, "POS");
 
+	str_overflows = 0;
 	YAAMP_JOB_TEMPLATE *templ = coind_create_template(coind);
+	if (templ && str_overflows) {
+		printf("template=REJECTED\n");   // coind_create_job() drops it
+		return 0;
+	}
 	if (!templ) {
 		printf("template=NULL\n");
 		return 0;

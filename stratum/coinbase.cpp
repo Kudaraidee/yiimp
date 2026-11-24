@@ -14,79 +14,76 @@ static void encode_tx_value(char *encoded, json_int_t value)
 		TX_VALUE(value, 32), TX_VALUE(value, 40), TX_VALUE(value, 48), TX_VALUE(value, 56));
 }
 
-static void p2wpkh_pack_tx(YAAMP_COIND *coind, char *data, json_int_t amount, char *payee, bool add_witness = false)
+// Pack helpers append one output to a char array; the array size bounds the
+// write. A bare pointer still compiles but is unbounded and flagged.
+template <typename T> __attribute__((deprecated("pass a char array so the write is bounded")))
+static inline size_t pack_unbounded() { return STR_UNBOUNDED; }
+
+template <typename T> static inline size_t pack_cap(T &&data)
 {
-	char evalue[32];
-	char payee_len[4];
-
-	encode_tx_value(evalue, amount);
-	sprintf(payee_len, "%02x", (unsigned int)(strlen(payee) >> 1) & 0xFF);
-
-	strcat(data, evalue);
-	strcat(data, payee_len);
-	strcat(data, payee);
-
-	if (add_witness) {
-		// add for segwit txs count =1, length = 32, witness '00..00'
-		strcat(data, "01200000000000000000000000000000000000000000000000000000000000000000");
-	}
-}
- 
-static void p2sh_pack_tx(YAAMP_COIND *coind, char *data, json_int_t amount, char *payee)
-{
-	char evalue[32];
-	char coinb2_part[256];
-	char coinb2_len[4];
-	sprintf(coinb2_part, "a9%02x%s87", (unsigned int)(strlen(payee) >> 1) & 0xFF, payee);
-	sprintf(coinb2_len, "%02x", (unsigned int)(strlen(coinb2_part) >> 1) & 0xFF);
-	encode_tx_value(evalue, amount);
-	strcat(data, evalue);
-	strcat(data, coinb2_len);
-	strcat(data, coinb2_part);
+	if constexpr (std::is_array<std::remove_reference_t<T>>::value) return sizeof(data);
+	else return pack_unbounded<T>();
 }
 
-static void script_pack_tx(YAAMP_COIND *coind, char *data, json_int_t amount, const char *script)
+static void p2wpkh_pack_tx_n(YAAMP_COIND *coind, char *data, size_t cap, json_int_t amount, char *payee, bool add_witness = false)
 {
 	char evalue[32];
-	char coinb2_part[256];
-	char coinb2_len[4];
 	encode_tx_value(evalue, amount);
-	sprintf(coinb2_part, "%s", script);
-	sprintf(coinb2_len, "%02x", (unsigned int)(strlen(coinb2_part) >> 1) & 0xFF);
-	strcat(data, evalue);
-	strcat(data, coinb2_len);
-	strcat(data, coinb2_part);
+
+	// for segwit txs add witness count =1, length = 32, witness '00..00'
+	str_format(data, cap, true, "coinbase output", "%s%02x%s%s", evalue, (unsigned int)(strlen(payee) >> 1) & 0xFF, payee,
+		add_witness ? "01200000000000000000000000000000000000000000000000000000000000000000" : "");
 }
 
-static void job_pack_tx(YAAMP_COIND *coind, char *data, json_int_t amount, char *key, bool add_witness = false)
+static void p2sh_pack_tx_n(YAAMP_COIND *coind, char *data, size_t cap, json_int_t amount, char *payee)
 {
-	int ol = strlen(data);
+	char evalue[32];
+	size_t len = strlen(payee);
+	encode_tx_value(evalue, amount);
+	str_format(data, cap, true, "coinbase output", "%s%02xa9%02x%s87", evalue,
+		(unsigned int)((len + 6) >> 1) & 0xFF, (unsigned int)(len >> 1) & 0xFF, payee);
+}
+
+static void script_pack_tx_n(YAAMP_COIND *coind, char *data, size_t cap, json_int_t amount, const char *script)
+{
+	char evalue[32];
+	encode_tx_value(evalue, amount);
+	str_format(data, cap, true, "coinbase output", "%s%02x%s", evalue, (unsigned int)(strlen(script) >> 1) & 0xFF, script);
+}
+
+static void job_pack_tx_n(YAAMP_COIND *coind, char *data, size_t cap, json_int_t amount, char *key, bool add_witness = false)
+{
 	char evalue[32];
 
 	if(coind->p2wpkh) {
-		p2wpkh_pack_tx(coind, data, amount, coind->script_pubkey, add_witness);
+		p2wpkh_pack_tx_n(coind, data, cap, amount, coind->script_pubkey, add_witness);
 		return;
 	}
 
 	if(coind->p2sh_address && !key) {
-		p2sh_pack_tx(coind, data, amount, coind->script_pubkey);
+		p2sh_pack_tx_n(coind, data, cap, amount, coind->script_pubkey);
 		return;
 	}
 
 	encode_tx_value(evalue, amount);
-	sprintf(data+strlen(data), "%s", evalue);
 
 	if(coind->pos && !key)
-		sprintf(data+strlen(data), "2321%sac", coind->pubkey);
-
+		str_format(data, cap, true, "coinbase output", "%s2321%sac", evalue, coind->pubkey);
 	else
-		sprintf(data+strlen(data), "1976a914%s88ac", key? key: coind->script_pubkey);
-
-//	debuglog("pack tx %s\n", data+ol);
-//	debuglog("pack tx %lld\n", amount);
+		str_format(data, cap, true, "coinbase output", "%s1976a914%s88ac", evalue, key? key: coind->script_pubkey);
 }
 
-void coinbase_aux(YAAMP_JOB_TEMPLATE *templ, char *aux_script)
+template <typename T> static inline void script_pack_tx(YAAMP_COIND *coind, T &&data, json_int_t amount, const char *script)
+{
+	script_pack_tx_n(coind, data, pack_cap(data), amount, script);
+}
+
+template <typename T> static inline void job_pack_tx(YAAMP_COIND *coind, T &&data, json_int_t amount, char *key, bool add_witness = false)
+{
+	job_pack_tx_n(coind, data, pack_cap(data), amount, key, add_witness);
+}
+
+void coinbase_aux(YAAMP_JOB_TEMPLATE *templ, char *aux_script, size_t cap)
 {
 	vector<string> hashlist = coind_aux_hashlist(templ->auxs, templ->auxs_size);
 	while(hashlist.size() > 1)
@@ -114,9 +111,9 @@ void coinbase_aux(YAAMP_JOB_TEMPLATE *templ, char *aux_script)
 
 	// DASH based aux coins like OSMI use different magic code
 	if (!strcmp(g_stratum_algo, "x11")) {
-		sprintf(aux_script+strlen(aux_script), "4f534d41%s%02x00000000000000", merkle_hash, templ->auxs_size);
+		str_format(aux_script, cap, true, "aux script", "4f534d41%s%02x00000000000000", merkle_hash, templ->auxs_size);
     } else {
-		sprintf(aux_script+strlen(aux_script), "fabe6d6d%s%02x00000000000000", merkle_hash, templ->auxs_size);
+		str_format(aux_script, cap, true, "aux script", "fabe6d6d%s%02x00000000000000", merkle_hash, templ->auxs_size);
 	}
 }
 
@@ -183,9 +180,9 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 				hexlify(pricehash_hex, pricehash_bin, 32);
 				string_be(pricehash_hex, pricehash_be);
 
-				sprintf(params, "[\"%s\", %i, \"%s\"]", coind->wallet, templ->height, pricehash_be);
+				str_format(params, 4096, false, "params", "[\"%s\", %i, \"%s\"]", coind->wallet, templ->height, pricehash_be);
 			} else {
-				sprintf(params, "[\"%s\", %i]", coind->wallet, templ->height);
+				str_format(params, 4096, false, "params", "[\"%s\", %i]", coind->wallet, templ->height);
 			}
 			//std::cout << "Params:" << params << std::endl;
 			json_value *json = rpc_call(&coind->rpc, "createcoinbaseforaddress", params);
@@ -194,13 +191,13 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			if (json) {
 				json_value *json_result = json_get_object(json, "result");
 				if (json_result) {
-					sprintf(templ->coinb1, "%s", json_get_string(json_result, "coinbaseforhashpart1"));
-					templ->coinb1[strlen(templ->coinb1) - 16] = '\0';
-					sprintf(templ->coinb2, "%s", json_get_string(json_result, "coinbaseforhashpart2"));
+					if (STRSET(templ->coinb1, json_get_string(json_result, "coinbaseforhashpart1")) && strlen(templ->coinb1) >= 16)
+						templ->coinb1[strlen(templ->coinb1) - 16] = '\0';
+					STRSET(templ->coinb2, json_get_string(json_result, "coinbaseforhashpart2"));
 
-					sprintf(templ->coinforsubmitb1, "%s", json_get_string(json_result, "coinbasepart1"));
-					templ->coinforsubmitb1[strlen(templ->coinforsubmitb1) - 16] = '\0';
-					sprintf(templ->coinforsubmitb2, "%s", json_get_string(json_result, "coinbasepart2"));
+					if (STRSET(templ->coinforsubmitb1, json_get_string(json_result, "coinbasepart1")) && strlen(templ->coinforsubmitb1) >= 16)
+						templ->coinforsubmitb1[strlen(templ->coinforsubmitb1) - 16] = '\0';
+					STRSET(templ->coinforsubmitb2, json_get_string(json_result, "coinbasepart2"));
 					templ->isbitcash = true;
 				}
 			}
@@ -241,12 +238,13 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		sprintf(templ->coinb2, "ffffffff");
 	}
 	else {
+		char script2[128];	// the outer script2[32] can't hold the aux merkle data
 		sprintf(script1, "%s%s%s08", eheight, templ->flags, etime);
 
 		sprintf(script2, "067969696d7000"); // "yiimp\0" in hex ascii //"506f6f6c4d696e652e78797a" -- PoolMine.xyz
 
 		if(!coind->pos && !coind->isaux && templ->auxs_size)
-			coinbase_aux(templ, script2);
+			coinbase_aux(templ, script2, sizeof(script2));
 
 		int script_len = strlen(script1)/2 + strlen(script2)/2 + 8;
 		if(!strcmp(g_stratum_algo,"neoscrypt-xaya")) script_len -= 8;
@@ -259,7 +257,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	// segwit commitment, if needed
 	if (templ->has_segwit_txs)
-		sprintf(commitment, "0000000000000000%02x%s", (int) (strlen(coind->commitment)/2), coind->commitment);
+		STRFMT(commitment, "0000000000000000%02x%s", (int) (strlen(coind->commitment)/2), coind->commitment);
 
 	json_int_t available = templ->value;
 
@@ -284,10 +282,11 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		// nonce not included , set length to 0
 
 		// Pool identstring in coinbase-TX
+		char script2[128];	// the outer script2[32] can't hold the aux merkle data
 		sprintf(script2,"7969696d7000"); // "yiimp\0" in hex ascii //"506f6f6c4d696e652e78797a" -- PoolMine.xyz
 
 		if(!coind->pos && !coind->isaux && templ->auxs_size)
-			coinbase_aux(templ, script2);
+			coinbase_aux(templ, script2, sizeof(script2));
 
 		// nonce not included in coinbase of equihash-coins
 		bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
@@ -300,21 +299,21 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 		// segwit commitment, if needed
 		if (templ->has_segwit_txs)
-			sprintf(commitment, "0000000000000000%02x%s", (int) (strlen(coind->commitment)/2), coind->commitment);
+			STRFMT(commitment, "0000000000000000%02x%s", (int) (strlen(coind->commitment)/2), coind->commitment);
 
 		// add coinbase-tx
 		job_pack_tx(coind, templ->coinb2, available, NULL);
 
 		const char *finalsaplingroothash = json_get_string(json_result, "finalsaplingroothash");
 		if (finalsaplingroothash)
-			sprintf(templ->saplingroothash, "%s", finalsaplingroothash);
+			STRSET(templ->saplingroothash, finalsaplingroothash);
 		else
 			sprintf(templ->saplingroothash, "0000000000000000000000000000000000000000000000000000000000000000");
 
 		json_value* template_coinbase = json_get_array(json_result, "coinbasetxn");
 		if (template_coinbase) {
 			const char *coinbasetxn_data = json_get_string(template_coinbase, "data");
-			sprintf(templ->coinbase, "%s", coinbasetxn_data);
+			STRSET(templ->coinbase, coinbasetxn_data);
 			//debuglog("coinbase %s\n",templ->coinbase);
 		}
 
@@ -334,12 +333,12 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 	}
 
 	if(!strcmp(g_stratum_algo,"neoscrypt-xaya")) {
-       	sprintf(templ->xaya_coinbase, "%s%s", templ->coinb1, templ->coinb2);
+       	STRFMT(templ->xaya_coinbase, "%s%s", templ->coinb1, templ->coinb2);
 
 		int coinbase_len = strlen(templ->xaya_coinbase);
 
-		unsigned char coinbase_bin[1024];
-		memset(coinbase_bin, 0, 1024);
+		unsigned char coinbase_bin[sizeof(templ->xaya_coinbase)/2];
+		memset(coinbase_bin, 0, sizeof(coinbase_bin));
 		binlify(coinbase_bin, templ->xaya_coinbase);
 
 		char doublehash[128];
@@ -351,8 +350,8 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 		ser_string_be(merkleroot.c_str(), templ->xaya_merkleroothash, 8);
 
-		char prevhash[128];
-		memset(prevhash, 0, 128);
+		char prevhash[sizeof(templ->prevhash_hex)];
+		memset(prevhash, 0, sizeof(prevhash));
 
 		string_be(templ->prevhash_hex, prevhash);
 		ser_string_be(prevhash, templ->prevhash_be, 8);
@@ -360,7 +359,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		char xaya_header[1024];
 		memset(xaya_header, 0, 1024);
 
-		sprintf(xaya_header, "%s%s%s%s", templ->version, templ->prevhash_be, templ->xaya_merkleroothash, templ->ntime);
+		STRFMT(xaya_header, "%s%s%s%s", templ->version, templ->prevhash_be, templ->xaya_merkleroothash, templ->ntime);
 
 		ser_string_be(xaya_header, templ->xaya_header, 20);
 		strcat(templ->xaya_header, "0000");
@@ -411,7 +410,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			
 			if (payee && amount) {
 				//debuglog("xnode payee: %s\n", payee);
-				strcat(templ->coinb2, "04");
+				STRADD(templ->coinb2, "04");
 				job_pack_tx(coind, templ->coinb2, available, NULL);
 
 				base58_decode(payee, script_payee);
@@ -419,7 +418,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			}
 		} 
 		else {
-			strcat(templ->coinb2, "03");
+			STRADD(templ->coinb2, "03");
 			job_pack_tx(coind, templ->coinb2, available, NULL);
 		}
 
@@ -429,7 +428,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		base58_decode("HLFmojjH6qLBTh5EXtbY9j9v4BCkNpmt95", script_payee);
 		job_pack_tx(coind, templ->coinb2, 1.5 * 100000000, script_payee);
 
-		strcat(templ->coinb2, "00000000"); // locktime
+		STRADD(templ->coinb2, "00000000"); // locktime
 		coind->reward = (double)available/100000000*coind->reward_mul;
 
 		return;
@@ -525,13 +524,13 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
             json_int_t amount = json_get_int(znode_masternode, "amount");
             if (payee && amount) {
                 //debuglog("bznode payee: %s\n", payee);
-                strcat(templ->coinb2, "06");
+                STRADD(templ->coinb2, "06");
                 job_pack_tx(coind, templ->coinb2, available, NULL);
                 base58_decode(payee, script_payee);
                 job_pack_tx(coind, templ->coinb2, amount, script_payee);
             }
         } else {
-            strcat(templ->coinb2, "05");
+            STRADD(templ->coinb2, "05");
             job_pack_tx(coind, templ->coinb2, available, NULL);
         }
         base58_decode("HE7NSv3jevUAPjwsLGpoYSz9ftzV9S36Xq", script_payee);
@@ -542,7 +541,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         job_pack_tx(coind, templ->coinb2, 0.1 * 100000000, script_payee);
         base58_decode("H94j1zMAbWwHWcEq8hUogAMALpVzj34M6Q", script_payee);
         job_pack_tx(coind, templ->coinb2, 0.3 * 100000000, script_payee);
-        strcat(templ->coinb2, "00000000"); // locktime
+        STRADD(templ->coinb2, "00000000"); // locktime
         coind->reward = (double)available/100000000*coind->reward_mul;
         return;
     }
@@ -557,20 +556,20 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			json_int_t amount = json_get_int(znode_masternode, "amount");
 			if (payee && amount) {
 				//debuglog("bznode payee: %s\n", payee);
-				strcat(templ->coinb2, "04");
+				STRADD(templ->coinb2, "04");
 				job_pack_tx(coind, templ->coinb2, available, NULL);
 				base58_decode(payee, script_payee);
 				job_pack_tx(coind, templ->coinb2, amount, script_payee);
 			}
 		} else {
-			strcat(templ->coinb2, "03");
+			STRADD(templ->coinb2, "03");
 			job_pack_tx(coind, templ->coinb2, available, NULL);
 		}
 		base58_decode("XWfdnGbXnBxeegrPJEvnYaNuwf6DXCruMX", script_payee);
 		job_pack_tx(coind, templ->coinb2, 6.75 * 100000000, script_payee);
 		base58_decode("XQ4WEZTFP83gVhhLBKavwopz7U84JucR8w", script_payee);
 		job_pack_tx(coind, templ->coinb2, 2.25 * 100000000, script_payee);
-		strcat(templ->coinb2, "00000000"); // locktime
+		STRADD(templ->coinb2, "00000000"); // locktime
 		coind->reward = (double)available/100000000*coind->reward_mul;
 		return;
 	}
@@ -608,17 +607,17 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		available -= charity_amount;
 		base58_decode(coind->charity_address, script_payee);
 		sprintf(payees, "%02x", npayees);
-		strcat(templ->coinb2, payees);
-		if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
+		STRADD(templ->coinb2, payees);
+		if (templ->has_segwit_txs) STRADD(templ->coinb2, commitment);
 		char echarity_amount[32];
 		encode_tx_value(echarity_amount, charity_amount);
-		strcat(templ->coinb2, echarity_amount);
+		STRADD(templ->coinb2, echarity_amount);
 		char coinb2_part[1024] = { 0 };
 		char coinb2_len[3] = { 0 };
 		sprintf(coinb2_part, "a9%02x%s87", (unsigned int)(strlen(script_payee) >> 1) & 0xFF, script_payee);
 		sprintf(coinb2_len, "%02x", (unsigned int)(strlen(coinb2_part) >> 1) & 0xFF);
-		strcat(templ->coinb2, coinb2_len);
-		strcat(templ->coinb2, coinb2_part);
+		STRADD(templ->coinb2, coinb2_len);
+		STRADD(templ->coinb2, coinb2_part);
 		if (masternodes_enabled && masternode_payments) {
 			//duplicated: revisit ++todo
 			const char *payee = json_get_string(json_result, "payee");
@@ -630,7 +629,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			}
 		}
 		job_pack_tx(coind, templ->coinb2, available, NULL);
-		strcat(templ->coinb2, "00000000"); // locktime
+		STRADD(templ->coinb2, "00000000"); // locktime
 
 		coind->reward = (double)available / 100000000 * coind->reward_mul;
 		return;
@@ -669,10 +668,10 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			}
 		}
 		sprintf(payees, "%02x", npayees);
-		strcat(templ->coinb2, payees);
-		strcat(templ->coinb2, script_dests);
+		STRADD(templ->coinb2, payees);
+		STRADD(templ->coinb2, script_dests);
 		job_pack_tx(coind, templ->coinb2, available, NULL);
-		strcat(templ->coinb2, "00000000"); // locktime
+		STRADD(templ->coinb2, "00000000"); // locktime
 		coind->reward = (double)available/100000000*coind->reward_mul;
 		//debuglog("%s %d dests %s\n", coind->symbol, npayees, script_dests);
 		return;
@@ -708,13 +707,13 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			available -= part_amount;
 
  			// total outputs
-			strcat(templ->coinb2, "03");
+			STRADD(templ->coinb2, "03");
 
  			// pack the tx
 			job_pack_tx(coind, templ->coinb2, available, NULL);
 			job_pack_tx(coind, templ->coinb2, part_amount, founder_script);
 			job_pack_tx(coind, templ->coinb2, part_amount, masternode_script);
-			strcat(templ->coinb2, "00000000");
+			STRADD(templ->coinb2, "00000000");
 			coind->reward = (double)available/100000000*coind->reward_mul;
 			return;
     }
@@ -740,16 +739,16 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		job_pack_tx(coind, script_dests, developer_amount, developer_script_payee);
 
 		sprintf(payees, "%02x", npayees);
-		strcat(templ->coinb2, payees);
-		strcat(templ->coinb2, script_dests);
-		strcat(templ->coinb2, "00000000");
+		STRADD(templ->coinb2, payees);
+		STRADD(templ->coinb2, script_dests);
+		STRADD(templ->coinb2, "00000000");
 
 		if (coinbase_payload && strlen(coinbase_payload) > 0)
 		{
    			char coinbase_payload_size[18];
 	        ser_compactsize((unsigned int)(strlen(coinbase_payload) >> 1), coinbase_payload_size);
-	        strcat(templ->coinb2, coinbase_payload_size);
-	        strcat(templ->coinb2, coinbase_payload);
+	        STRADD(templ->coinb2, coinbase_payload_size);
+	        STRADD(templ->coinb2, coinbase_payload);
 		}
 
 		coind->reward = ((double)(miner_amount + developer_amount)) / 100000000 * coind->reward_mul;
@@ -771,14 +770,14 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         sprintf(devscript_len, "%02x", strlen(devscript2) >> 1);
         if (templ->has_segwit_txs) outputs++;
         sprintf(outputs_count, "%02x", outputs);
-        strcat(templ->coinb2, outputs_count);
+        STRADD(templ->coinb2, outputs_count);
         job_pack_tx(coind, templ->coinb2, available, NULL);
         coind->reward = (double)available/100000000*coind->reward_mul;
-        strcat(templ->coinb2, dev_amount);
-        strcat(templ->coinb2, devscript_len);
-        strcat(templ->coinb2, devscript2);
-        if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
-        strcat(templ->coinb2, "00000000");
+        STRADD(templ->coinb2, dev_amount);
+        STRADD(templ->coinb2, devscript_len);
+        STRADD(templ->coinb2, devscript2);
+        if (templ->has_segwit_txs) STRADD(templ->coinb2, commitment);
+        STRADD(templ->coinb2, "00000000");
         return;
     }
 
@@ -909,7 +908,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         base58_decode(community_address, script_payee);
 
         // two outputs: miner + community
-        strcat(templ->coinb2, "02");
+        STRADD(templ->coinb2, "02");
 
         // miner output (pool)
         job_pack_tx(coind, templ->coinb2, miner_amount, NULL);
@@ -917,9 +916,9 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         // community output (autonomous address)
         job_pack_tx(coind, templ->coinb2, community_amount, script_payee);
 
-		if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
+		if (templ->has_segwit_txs) STRADD(templ->coinb2, commitment);
 
-        strcat(templ->coinb2, "00000000"); // locktime
+        STRADD(templ->coinb2, "00000000"); // locktime
         coind->reward = (double)miner_amount / 100000000 * coind->reward_mul;
 
         debuglog("[%s] community fund added %s (%f)\n", coind->symbol, community_address, (double)community_amount/100000000);
@@ -941,7 +940,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         base58_decode(foundationreserve_address, script_payee);
 
         // two outputs: miner + community
-        strcat(templ->coinb2, "02");
+        STRADD(templ->coinb2, "02");
 
         // miner output (pool)
         job_pack_tx(coind, templ->coinb2, miner_amount, NULL);
@@ -949,9 +948,9 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         // community output (autonomous address)
         job_pack_tx(coind, templ->coinb2, foundationreserve_amount, script_payee);
 
-		if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
+		if (templ->has_segwit_txs) STRADD(templ->coinb2, commitment);
 
-        strcat(templ->coinb2, "00000000"); // locktime
+        STRADD(templ->coinb2, "00000000"); // locktime
         coind->reward = (double)miner_amount / 100000000 * coind->reward_mul;
 
         debuglog("[%s] Foundation Reserve fund added %s (%f)\n", coind->symbol, foundationreserve_address, (double)foundationreserve_amount/100000000);
@@ -1128,23 +1127,23 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 	} */
 
 	sprintf(payees, "%02x", npayees);
-	strcat(templ->coinb2, payees);
-	if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
-	if (!pays.empty()) strcat(templ->coinb2, script_dests);
+	STRADD(templ->coinb2, payees);
+	if (templ->has_segwit_txs) STRADD(templ->coinb2, commitment);
+	if (!pays.empty()) STRADD(templ->coinb2, script_dests);
 	if (templ->is_p2wpkh) {
-		strcpy(templ->coinb2_p2wpkh, templ->coinb2);
+		STRSET(templ->coinb2_p2wpkh, templ->coinb2);
 		job_pack_tx(coind, templ->coinb2_p2wpkh, available, NULL, (coind->p2wpkh));
 	}
 
 	job_pack_tx(coind, templ->coinb2, available, NULL);
-	if(strcmp(coind->symbol, "DEM") == 0){if(coind->txmessage){strcat(templ->coinb2, "00");}} //fixes eMark. Also GIO-GravioCoin and FLO-FlorinCoin, but they are pos/dead
+	if(strcmp(coind->symbol, "DEM") == 0){if(coind->txmessage){STRADD(templ->coinb2, "00");}} //fixes eMark. Also GIO-GravioCoin and FLO-FlorinCoin, but they are pos/dead
 
-	strcat(templ->coinb2, "00000000"); // locktime
+	STRADD(templ->coinb2, "00000000"); // locktime
 	if(!pays.empty() and coinbase_payload and strlen(coinbase_payload) > 0) {
 		char coinbase_payload_size[18];
 		ser_compactsize((unsigned int)(strlen(coinbase_payload) >> 1), coinbase_payload_size);
-		strcat(templ->coinb2, coinbase_payload_size);
-		strcat(templ->coinb2, coinbase_payload);
+		STRADD(templ->coinb2, coinbase_payload_size);
+		STRADD(templ->coinb2, coinbase_payload);
 	}
 	//debuglog("Coinbase -- %s proc 10!\n", coind->symbol);
 

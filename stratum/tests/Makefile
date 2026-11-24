@@ -126,7 +126,7 @@ $(STRATUM): $(OBJ_MAIN) $(OBJ_CORE) | libs
 FIXTURES := $(sort $(dir $(wildcard fixtures/*/coind.conf)))
 OVERFLOW := $(sort $(dir $(wildcard overflow/*/coind.conf)))
 
-check: check-ref check-hash check-templ
+check: check-ref check-hash check-templ overflow
 
 check-ref: $(HASHCHECK)
 	$(HASHCHECK) --reference vectors/reference.txt
@@ -146,15 +146,16 @@ vectors: $(HASHCHECK) $(TEMPLCHECK)
 	$(HASHCHECK) --generate > vectors/hash.txt
 	@for d in $(FIXTURES); do $(TEMPLCHECK) $$d > $${d}expected.txt; echo "wrote $${d}expected.txt"; done
 
-# overflow cases: inputs larger than the fixed buffers. Not pass/fail yet;
-# shows how each build reacts (silent corruption, FORTIFY abort, ASan report).
+# overflow cases: inputs larger than the fixed buffers must be rejected
+# cleanly, without a crash, FORTIFY abort or ASan report
 overflow: $(TEMPLCHECK)
-	@for d in $(OVERFLOW); do \
-	  echo "=== $$d ($(VARIANT))"; \
+	@fail=0; for d in $(OVERFLOW); do \
 	  $(TEMPLCHECK) $$d > $(OUT)/overflow.out 2> $(OUT)/overflow.err; rc=$$?; \
-	  echo "exit=$$rc"; head -c 2000 $(OUT)/overflow.err; \
-	  grep -E '^(template|coinbase|coinb2|merkleroot)=' $(OUT)/overflow.out | cut -c1-120; \
-	done
+	  if [ $$rc -eq 0 ] && grep -q '^template=REJECTED' $(OUT)/overflow.out && ! grep -q . $(OUT)/overflow.err; then \
+	    echo "OVERFLOW ok   $$d"; \
+	  else echo "OVERFLOW FAIL $$d (exit=$$rc)"; head -c 2000 $(OUT)/overflow.err; \
+	    grep -E '^(template|ERROR)|ERROR:' $(OUT)/overflow.out | cut -c1-120; fail=1; fi; \
+	done; exit $$fail
 
 hardened:
 	$(MAKE) VARIANT=hardened tools $(B)/hardened/stratum overflow
