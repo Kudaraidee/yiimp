@@ -680,11 +680,36 @@ elseif ($ETH)     $account = $coin->master_wallet;
 elseif ($coin->symbol === 'BTC') $account = '*';
 
 $txs = [];
-// NEB has no wallet listtransactions RPC; the DB block list is authoritative.
 if ($rpcAvailable && !$isNeb) {
     $txs = $remote->listtransactions($account, $maxrows);
     if (empty($txs)) { $account = '*'; $txs = $remote->listtransactions($account, $maxrows); }
     if (empty($txs)) $txs = $remote->listtransactions($account, 200);
+} elseif ($isNeb) {
+    // NEB's native work service has no wallet listtransactions RPC. Confirmed
+    // blocks in the pool DB are the authoritative transaction list for this
+    // coin. Fetch newest-first, then reverse so the existing krsort() below
+    // yields newest-first output without special-casing the renderer.
+    $nebBlocks = \app\models\Blocks::find()
+        ->select(['id', 'height', 'confirmations', 'time', 'amount', 'difficulty', 'category', 'blockhash', 'txhash'])
+        ->where(['coin_id' => $coin->id])
+        ->andWhere(['>=', 'time', $list_since])
+        ->orderBy(['time' => SORT_DESC, 'id' => SORT_DESC])
+        ->limit($maxrows)
+        ->all();
+
+    foreach (array_reverse($nebBlocks) as $blockRow) {
+        $txs[] = [
+            'time'          => (int) $blockRow->time,
+            'category'      => (string) $blockRow->category,
+            'amount'        => (float) $blockRow->amount,
+            'confirmations' => (int) $blockRow->confirmations,
+            'txid'          => (string) $blockRow->txhash,
+            'blockhash'     => (string) $blockRow->blockhash,
+            'height'        => (int) $blockRow->height,
+            'difficulty'    => (float) $blockRow->difficulty,
+            'address'       => $coin->master_wallet,
+        ];
+    }
 }
 
 $txs_array = [];
@@ -818,7 +843,9 @@ foreach ($txs_array as $tx) {
     if ($category === 'spent') continue;
 
     $block = null;
-    if (isset($tx['blockhash'])) $block = $remote->getblock($tx['blockhash']);
+    // NEB block metadata comes from the DB rows above; its native RPC's
+    // getblock() returns raw hex unless a second argument is supplied.
+    if (!$isNeb && isset($tx['blockhash'])) $block = $remote->getblock($tx['blockhash']);
 
     if (!isset($tx['time'])) {
         $dbg = json_encode($tx);
@@ -844,14 +871,20 @@ foreach ($txs_array as $tx) {
     }
 
     $txCell = '';
-    if (!empty($block) && isset($tx['txid'])) {
+    if (isset($tx['txid']) && (!empty($block) || $isNeb)) {
         $txid  = $tx['txid'];
         $label = substr($txid, 0, 7);
         $txCell = $coin->createExplorerLink($label, ['txid' => $txid], ['target' => '_blank']);
     }
 
-    $heightCell = $block ? Html::encode((string) $block['height'])        : '';
-    $diffCell   = $block ? $conv->round_difficulty($block['difficulty'])  : '';
+    if ($block) {
+        $heightCell = Html::encode((string) $conv->arraySafeVal($block, 'height', ''));
+        $diffCell   = $conv->round_difficulty($conv->arraySafeVal($block, 'difficulty', 0));
+    } else {
+        $heightCell = Html::encode((string) $conv->arraySafeVal($tx, 'height', ''));
+        $diffValue  = $conv->arraySafeVal($tx, 'difficulty', 0);
+        $diffCell   = $diffValue ? $conv->round_difficulty($diffValue) : '';
+    }
     $confsCell  = Html::encode((string) $conv->arraySafeVal($tx, 'confirmations'));
     $amtCell    = Html::encode((string) $tx['amount']);
 
