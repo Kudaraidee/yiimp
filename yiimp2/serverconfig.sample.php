@@ -102,7 +102,10 @@ defined('YIIMP_MYSQLDUMP_USER') or define('YIIMP_MYSQLDUMP_USER', 'root');
 defined('YIIMP_MYSQLDUMP_PASS') or define('YIIMP_MYSQLDUMP_PASS', '');
 
 // ── GitHub (coin wallet version scanning) ────────────────────────────────────
-defined('GITHUB_ACCESSTOKEN') or define('GITHUB_ACCESSTOKEN', '<github-username>:<personal-access-token>');
+// Daily GithubVersionsJob: mails new wallet releases of installed coins.
+// Off by default. Without a token GitHub allows 60 requests/hour.
+defined('YIIMP_GITHUB_SCAN')  or define('YIIMP_GITHUB_SCAN', false);
+// defined('GITHUB_ACCESSTOKEN') or define('GITHUB_ACCESSTOKEN', '<github-username>:<personal-access-token>');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SMTP (admin notifications and payout alerts)
