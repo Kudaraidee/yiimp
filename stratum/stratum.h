@@ -268,7 +268,6 @@ void sha3d_hash_hex(const char *input, char *output, unsigned int len);
 #include "algos/megabtx.h"
 #include "algos/megamec.h"
 #include "algos/x11kvs.h"
-#include "algos/x22.h"
 #include "algos/phi5.h"
 #include "algos/lyra2z330.h"
 #include "algos/gr.h"
