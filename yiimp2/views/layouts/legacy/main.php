@@ -42,9 +42,13 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
     ]);
 
     $mining = Mining::find()->one();
-	$nextpayment = $mining ? date('H:i T', $mining->last_payout+YIIMP_PAYMENTS_FREQ) : '';
-	$eta = $mining ? ($mining->last_payout+YIIMP_PAYMENTS_FREQ) - time() : 0;
-	$eta_mn = $eta ? 'in '.round($eta / 60).' minutes' : '';
+    $nextTimestamp = $mining ? (int) ($mining->last_payout + YIIMP_PAYMENTS_FREQ) : 0;
+    $nextpayment = $nextTimestamp ? date('H:i T', $nextTimestamp) : '';
+    $eta = $nextTimestamp ? $nextTimestamp - time() : 0;
+    $eta_mn = $eta > 0 ? 'in '.round($eta / 60).' minutes' : 'due';
+    $eta_text = $eta > 0
+        ? ($eta >= 86400 ? floor($eta / 86400).'d '.gmdate('H:i:s', $eta % 86400) : gmdate('H:i:s', $eta))
+        : 'due';
 
     $items_navbar = [
             ['label' => 'Home', 'url' => ['/site/index']],
@@ -114,8 +118,49 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
         'options' => ['class' => 'navbar-nav'],
         'items' => $items
     ]);
-    echo Html::tag('div', 'Next Payout: '.$nextpayment, 
-                    ['class' => 'navbar-text ms-auto' ]);
+    $nextPayoutHtml = 'Next Payout: '.Html::encode($nextpayment);
+    if ($nextTimestamp) {
+        $nextPayoutHtml .= ' <span class="nextpayout-countdown" data-next-payout="'.$nextTimestamp.'">'
+            . '('.$eta_text.')</span>';
+
+        $this->registerJs(<<<'JS'
+(function () {
+    var el = document.getElementById('nextpayout');
+    if (!el) return;
+    var countdown = el.querySelector('.nextpayout-countdown');
+    if (!countdown) return;
+
+    var target = parseInt(countdown.getAttribute('data-next-payout'), 10) * 1000;
+    if (!target) return;
+
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    function format(left) {
+        if (left <= 0) return 'due';
+        var days = Math.floor(left / 86400);
+        left %= 86400;
+        var h = Math.floor(left / 3600);
+        left %= 3600;
+        var m = Math.floor(left / 60);
+        return (days ? days + 'd ' : '') + pad(h) + ':' + pad(m) + ':' + pad(left % 60);
+    }
+    function tick() {
+        var left = Math.max(0, Math.floor((target - Date.now()) / 1000));
+        var text = '(' + format(left) + ')';
+        if (countdown.textContent !== text) countdown.textContent = text;
+        el.setAttribute('title', left > 0 ? 'in ' + format(left) : 'due');
+    }
+
+    tick();
+    setInterval(tick, 1000);
+})();
+JS, \yii\web\View::POS_END);
+    }
+
+    echo Html::tag('div', $nextPayoutHtml, [
+        'id' => 'nextpayout',
+        'class' => 'navbar-text ms-auto',
+        'title' => $eta_mn,
+    ]);
     NavBar::end();
    ?>
 </header>

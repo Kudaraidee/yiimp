@@ -133,11 +133,50 @@ function showPageHeader()
 	echo '<span style="float: right;">';
 
 	$mining = getdbosql('db_mining');
-	$nextpayment = date('H:i T', $mining->last_payout+YAAMP_PAYMENTS_FREQ);
-	$eta = ($mining->last_payout+YAAMP_PAYMENTS_FREQ) - time();
-	$eta_mn = 'in '.round($eta / 60).' minutes';
+	$nextTimestamp = (int) ($mining->last_payout+YAAMP_PAYMENTS_FREQ);
+	$nextpayment = date('H:i T', $nextTimestamp);
+	$eta = $nextTimestamp - time();
+	$eta_mn = $eta > 0 ? 'in '.round($eta / 60).' minutes' : 'due';
+	$eta_text = $eta > 0
+		? ($eta >= 86400 ? floor($eta / 86400).'d '.gmdate('H:i:s', $eta % 86400) : gmdate('H:i:s', $eta))
+		: 'due';
 
-	echo '<span id="nextpayout" style="font-size: .8em;" title="'.$eta_mn.'">Next Payout: '.$nextpayment.'</span>';
+	echo '<span id="nextpayout" style="font-size: .8em;" title="'.$eta_mn.'">Next Payout: '.$nextpayment.
+		' <span class="nextpayout-countdown" data-next-payout="'.$nextTimestamp.'">('.$eta_text.')</span></span>';
+
+	echo <<<'JS'
+<script>
+(function () {
+	var el = document.getElementById('nextpayout');
+	if (!el) return;
+	var countdown = el.querySelector('.nextpayout-countdown');
+	if (!countdown) return;
+
+	var target = parseInt(countdown.getAttribute('data-next-payout'), 10) * 1000;
+	if (!target) return;
+
+	function pad(n) { return n < 10 ? '0' + n : '' + n; }
+	function format(left) {
+		if (left <= 0) return 'due';
+		var days = Math.floor(left / 86400);
+		left %= 86400;
+		var h = Math.floor(left / 3600);
+		left %= 3600;
+		var m = Math.floor(left / 60);
+		return (days ? days + 'd ' : '') + pad(h) + ':' + pad(m) + ':' + pad(left % 60);
+	}
+	function tick() {
+		var left = Math.max(0, Math.floor((target - Date.now()) / 1000));
+		var text = '(' + format(left) + ')';
+		if (countdown.textContent !== text) countdown.textContent = text;
+		el.setAttribute('title', left > 0 ? 'in ' + format(left) : 'due');
+	}
+
+	tick();
+	setInterval(tick, 1000);
+})();
+</script>
+JS;
 
 	echo "</div>";
 	echo "</div>";
