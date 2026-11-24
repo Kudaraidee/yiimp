@@ -453,9 +453,8 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 
 	// LTC mw-eb
 	const char *mweb = json_get_string(json_result, "mweb");
-	if (mweb) {
-		STRSET(templ->mweb, mweb);
-	}
+	if (mweb && *mweb && !(templ->mweb = strdup(mweb)))
+		str_fail("templ->mweb", strlen(mweb) + 1, 0);
 
 	// LBC Claim Tree (with wallet gbt patch)
 	const char *claim = json_get_string(json_result, "claimtrie");
@@ -588,7 +587,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		}
 	}
 
-	if (strlen(templ->mweb) > 0) templ->has_segwit_txs = true;
+	if (templ->mweb) templ->has_segwit_txs = true;
 
 	if (templ->has_filtered_txs) {
 		// coinbasevalue is a total with all tx fees, need to reduce it if some are skipped

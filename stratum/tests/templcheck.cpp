@@ -152,7 +152,7 @@ int main(int argc, char **argv)
 	print_field("merkleroot", templ->merkleroot);
 	print_field("extradata_hex", templ->extradata_hex);
 	print_field("claim_hex", templ->claim_hex);
-	snprintf(num, sizeof(num), "%zu", strlen(templ->mweb)); print_field("mweb_len", num);
+	snprintf(num, sizeof(num), "%zu", templ->mweb ? strlen(templ->mweb) : 0); print_field("mweb_len", num);
 	print_field("commitment", coind->commitment);
 	snprintf(num, sizeof(num), "%.8f", coind->reward); print_field("reward", num);
 

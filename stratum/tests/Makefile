@@ -136,9 +136,10 @@ check-hash: $(HASHCHECK)
 
 check-templ: $(TEMPLCHECK)
 	@fail=0; for d in $(FIXTURES); do \
-	  if $(TEMPLCHECK) $$d > $(OUT)/templ.out 2>&1 && diff -u $${d}expected.txt $(OUT)/templ.out > $(OUT)/templ.diff; then \
+	  if $(TEMPLCHECK) $$d > $(OUT)/templ.out 2>&1 && ! grep -q '^template=' $(OUT)/templ.out \
+	     && diff -u $${d}expected.txt $(OUT)/templ.out > $(OUT)/templ.diff; then \
 	    echo "TEMPL ok   $$d"; \
-	  else echo "TEMPL FAIL $$d"; cat $(OUT)/templ.diff; fail=1; fi; \
+	  else echo "TEMPL FAIL $$d"; grep '^template=' $(OUT)/templ.out || cat $(OUT)/templ.diff; fail=1; fi; \
 	done; exit $$fail
 
 # golden masters from the current code; review `git diff` before committing

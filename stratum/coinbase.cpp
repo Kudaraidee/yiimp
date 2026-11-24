@@ -637,7 +637,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	else if(!strcmp(coind->symbol, "GLT")) //multiple payee names
 	{
-		char script_dests[2048] = { 0 };
+		char script_dests[sizeof(templ->coinb2)] = { 0 };
 		char script_payee[128] = { 0 };
         char script_treasury[128] = { 0 };
 		char payees[4];
@@ -722,7 +722,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 	{
 		char payees[4];
 		int npayees = 2;
-		char script_dests[4096] = { 0 };
+		char script_dests[sizeof(templ->coinb2)] = { 0 };
 
 		json_int_t coinbase_value = json_get_int(json_result, "coinbasevalue");
 		json_value *developer = json_get_object(json_result, "developer");
@@ -1095,7 +1095,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	char payees[4]; // addresses count
 	int npayees = (templ->has_segwit_txs) ? 2 : 1;
-	char script_dests[4096] = { 0 };
+	char script_dests[sizeof(templ->coinb2)] = { 0 };
 
 	if (!pays.empty()) {
 		for (const auto & p : pays) {
