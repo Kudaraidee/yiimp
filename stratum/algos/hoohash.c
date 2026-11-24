@@ -223,8 +223,10 @@ static void hoohash_hash_impl(const void* data, size_t len, uint8_t* out32)
     // Enforce the preimage definition: header bytes from nVersion..nNonce (80 bytes).
     // This prevents accidental consensus changes if callers pass a different length.
     if (len != 80) {
-        // Zero output buffer on error to ensure deterministic behavior
-        memset(out32, 0, HOOHASH_HASH_SIZE);
+        // Deterministic error result: all 0xff is the worst possible hash and
+        // fails every target. All-zero would be the best one: it passed every
+        // share and block target check.
+        memset(out32, 0xff, HOOHASH_HASH_SIZE);
         return;
     }
 
