@@ -65,48 +65,97 @@ if ($result !== null) {
         : $colorizeJson($result);
 }
 
+// Header KPIs. A daemon can answer with no `balance` key, so fall back to the
+// pool DB balance for display without treating the daemon as offline.
+$rpcOnline   = !empty($info);
+$height      = $rpcOnline && isset($info['blocks']) ? (string) $info['blocks'] : '—';
+$connections = $rpcOnline && isset($info['connections']) ? (string) $info['connections'] : '—';
+$balanceRaw  = $rpcOnline && isset($info['balance'])
+    ? (float) $info['balance']
+    : (float) ($coin->balance ?? 0);
+$balance     = Yii::$app->ConversionUtils->altcoinvaluetoa($balanceRaw);
+
 ?>
 
 <?php if ($isLegacy): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
-     LEGACY
+     LEGACY — mining-style admin chrome
      ══════════════════════════════════════════════════════════════════════════ -->
-<?= Yii::$app->ViewUtils->getAdminSideBarLinks() ?><br><br>
-<?= Yii::$app->ViewUtils->getAdminWalletLinks($coin, $info, 'console') ?><br><br>
-
-<?php if (!$info): ?>
-<p style="color:darkred;"><?= Html::encode($coin->symbol) ?>: unable to connect to wallet daemon.</p>
-<?php else: ?>
-
-<style>
-div.console-form { margin-right: 8px; }
-div.rpcerror, div.terminal {
-    white-space: pre; font-family: monospace; unicode-bidi: embed; padding: 4px; overflow-x: auto;
-}
-div.rpcerror { color: darkred; background: transparent; margin-bottom: -8px; }
-div.terminal { color: silver; background: black; min-height: 180px; margin: 8px 8px 8px 0; }
-.terminal s { text-decoration: none; color: #ffffcf; }
-.terminal s.key { color: #ffff7f; }
-.terminal s a { color: #ffffcf; text-decoration: none; }
-.terminal s a:hover { text-decoration: underline; }
-.terminal u { text-decoration: none; color: #ff7f7f; }
-.terminal i { font-style: normal; color: #ff7fff; }
-.terminal b { font-style: normal; color: #ff3f3f; }
-</style>
-
-<div class="console-form">
-<form action="<?= Html::encode($actionUrl) ?>" method="post">
-<?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
-<input class="main-text-input" value="<?= Html::encode($query) ?>" type="text" name="query"
-       placeholder="RPC command" style="width:50%;margin-right:4px;" autofocus>
-<input class="main-submit-button" type="submit" value="Execute" style="width:80px;">
-</form>
+<?php
+$walletLinks = str_replace([' || ', '<br/>', '<br />'], '',
+    Yii::$app->ViewUtils->getAdminWalletLinks($coin, $info, 'console'));
+?>
+<div class="admn-page">
+<?= Yii::$app->ViewUtils->getAdminMiningToolbar(
+    'RPC Console',
+    $coin->symbol . ' · ' . $coin->algo . ' · coin operations',
+    'CONSOLE',
+    'static · on demand'
+) ?>
+<div class="admn-selectbar">
+    <label>Coin</label>
+    <div class="admn-toolbar-links"><?= $walletLinks ?></div>
 </div>
 
-<?php if ($rpcErr): ?>
-<div class="rpcerror"><?= Html::encode(is_string($rpcErr) ? $rpcErr : json_encode($rpcErr)) ?></div>
-<?php endif ?>
-<div class="terminal"><?= $termOutput ?></div>
+<div class="admn-kpis">
+    <div class="admn-kpi <?= $rpcOnline ? 'good' : 'warn' ?>">
+        <span class="k-label">RPC</span>
+        <span class="k-value"><?= $rpcOnline ? 'Online' : 'Offline' ?></span>
+        <span class="k-sub">wallet daemon</span>
+    </div>
+    <div class="admn-kpi accent">
+        <span class="k-label">Height</span>
+        <span class="k-value"><?= Html::encode($height) ?></span>
+        <span class="k-sub">last known block</span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Connections</span>
+        <span class="k-value"><?= Html::encode($connections) ?></span>
+        <span class="k-sub">daemon peers</span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Balance</span>
+        <span class="k-value"><?= Html::encode($balance) ?></span>
+        <span class="k-sub"><?= Html::encode($coin->symbol) ?> · pool / wallet</span>
+    </div>
+</div>
+
+<?php if (!$info): ?>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">RPC Unavailable</span>
+        <span class="admn-sub">console disabled until the daemon answers</span></span>
+        <span class="admn-badge warn">offline</span>
+    </div>
+    <div class="admn-card-body">
+        Unable to connect to <b><?= Html::encode($coin->symbol) ?></b> wallet daemon.
+        Check the coin RPC settings from the wallet page before running commands.
+    </div>
+</div>
+<?php else: ?>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">RPC Console</span>
+        <span class="admn-sub">raw wallet commands · <?= Html::encode($coin->symbol) ?></span></span>
+        <span class="admn-head-actions">
+            <span class="admn-badge good">ready</span>
+            <span class="admn-badge muted"><?= $query !== '' ? Html::encode($query) : 'idle' ?></span>
+        </span>
+    </div>
+    <div class="admn-card-body">
+        <form action="<?= Html::encode($actionUrl) ?>" method="post" class="admn-console-form">
+            <?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
+            <input class="admn-input mono" value="<?= Html::encode($query) ?>" type="text" name="query"
+                   placeholder="RPC command, e.g. getmininginfo" autofocus>
+            <button type="submit" class="admn-pill primary">Execute</button>
+        </form>
+
+        <?php if ($rpcErr): ?>
+        <div class="admn-console-error"><?= Html::encode(is_string($rpcErr) ? $rpcErr : json_encode($rpcErr)) ?></div>
+        <?php endif ?>
+        <div class="admn-console-terminal"><?= $termOutput ?: '<span class="admn-console-idle">Waiting for command…</span>' ?></div>
+    </div>
+</div>
 
 <?php Yii::$app->ViewUtils->JavascriptReady("
     \$('input[name=query]').focus();
@@ -121,7 +170,7 @@ div.terminal { color: silver; background: black; min-height: 180px; margin: 8px 
 ") ?>
 
 <?php endif ?>
-
+</div><!-- /.admn-page -->
 
 <?php elseif (!$isTailwind): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════

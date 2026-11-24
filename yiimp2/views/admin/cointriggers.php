@@ -29,31 +29,83 @@ $helpVars = [
     '$A'   => 'wallet address',
 ];
 
+// Summary counts for the mining-style header.
+$ruleCount      = count($notifications);
+$activeCount    = 0;
+$triggeredCount = 0;
+$lastChecked    = 0;
+foreach ($notifications as $triggerRule) {
+    if ($triggerRule->enabled) $activeCount++;
+    if ($triggerRule->lasttriggered && $triggerRule->lasttriggered == $triggerRule->lastchecked) {
+        $triggeredCount++;
+    }
+    $lastChecked = max($lastChecked, (int) $triggerRule->lastchecked);
+}
+
 ?>
 
 <?php if ($isLegacy): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
-     LEGACY
+     LEGACY — mining-style admin chrome
      ══════════════════════════════════════════════════════════════════════════ -->
-<?= Yii::$app->ViewUtils->getAdminSideBarLinks() ?>
-<br><br>
-<?= Yii::$app->ViewUtils->getAdminWalletLinks($coin, $info, 'triggers') ?>
-<br><br>
+<?php
+$walletLinks = str_replace([' || ', '<br/>', '<br />'], '',
+    Yii::$app->ViewUtils->getAdminWalletLinks($coin, $info, 'triggers'));
+?>
+<div class="admn-page">
+<?= Yii::$app->ViewUtils->getAdminMiningToolbar(
+    'Triggers',
+    $coin->symbol . ' · ' . $coin->algo . ' · notification rules',
+    $ruleCount . ' RULES',
+    'static · on load'
+) ?>
+<div class="admn-selectbar">
+    <label>Coin</label>
+    <div class="admn-toolbar-links"><?= $walletLinks ?></div>
+</div>
+
+<div class="admn-kpis">
+    <div class="admn-kpi accent">
+        <span class="k-label">Rules</span>
+        <span class="k-value"><?= (int) $ruleCount ?></span>
+        <span class="k-sub">configured for this coin</span>
+    </div>
+    <div class="admn-kpi good">
+        <span class="k-label">Active</span>
+        <span class="k-value"><?= (int) $activeCount ?></span>
+        <span class="k-sub">enabled rules</span>
+    </div>
+    <div class="admn-kpi <?= $triggeredCount ? 'warn' : '' ?>">
+        <span class="k-label">Triggered</span>
+        <span class="k-value"><?= (int) $triggeredCount ?></span>
+        <span class="k-sub">pending attention</span>
+    </div>
+    <div class="admn-kpi">
+        <span class="k-label">Last check</span>
+        <span class="k-value"><?= $lastChecked ? Html::encode($conv->datetoa2($lastChecked)) : '—' ?></span>
+        <span class="k-sub">latest rule poll</span>
+    </div>
+</div>
 
 <?php if (!$info): ?>
-<p style="color:red;">Unable to connect to wallet daemon.</p>
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Triggers Unavailable</span>
+        <span class="admn-sub">rules are shown when the daemon answers</span></span>
+        <span class="admn-badge warn">offline</span>
+    </div>
+    <div class="admn-card-body">
+        Unable to connect to <b><?= Html::encode($coin->symbol) ?></b> wallet daemon.
+    </div>
+</div>
 <?php else: ?>
-
-<style>
-td.red { color: darkred; }
-table.dataGrid a.red { color: darkred; }
-div.trigform { float: left; width: 460px; }
-div.trighelp { float: left; color: #555; background: #ffffe0; padding: 8px; border: 1px solid #d0d0b0; margin-top: 32px; }
-.trighelp ul { margin: 4px; padding: 0; column-count: 2; }
-.trighelp li { list-style: none; width: 140px; font-family: monospace; }
-span.cmd { color: gray; }
-</style>
-
+<div class="admn-card">
+    <div class="admn-card-head">
+        <span class="admn-head-main"><span class="admn-title">Notification Triggers</span>
+        <span class="admn-sub">wallet conditions · alert routing</span></span>
+        <span class="admn-badge <?= $triggeredCount ? 'warn' : 'good' ?>"><?= (int) $ruleCount ?> rules</span>
+    </div>
+    <div class="admn-card-body flush">
 <?php Yii::$app->ViewUtils->showTableSorter('maintable', "{
     tableClass: 'dataGrid',
     textExtraction: { 5: function(node, table, n) { return \$(node).attr('data'); } },
@@ -64,64 +116,115 @@ span.cmd { color: gray; }
 <th>Type</th><th>Condition</th><th>Value</th><th width="50%">Description / Command</th>
 <th>Status</th><th width="80">Last check</th><th align="right" width="180">Operations</th>
 </tr></thead><tbody>
+<?php if (empty($notifications)): ?>
+<tr><td colspan="7" class="admn-empty">No triggers defined.</td></tr>
+<?php endif ?>
 <?php foreach ($notifications as $rule): ?>
 <?php
-    $ops = $rule->enabled
-        ? '<a href="/admin/cointrigger-enable?id=' . $rule->id . '&en=0">disable</a>'
-        : '<a href="/admin/cointrigger-enable?id=' . $rule->id . '&en=1">enable</a>';
-    $ops .= ' &nbsp;<a class="red" href="/admin/cointrigger-del?id=' . $rule->id . '">delete</a>';
+    $rid        = (int) $rule->id;
+    $triggered  = $rule->lasttriggered && $rule->lasttriggered == $rule->lastchecked;
 
-    $triggered = $rule->lasttriggered && $rule->lasttriggered == $rule->lastchecked;
+    $ops = $rule->enabled
+        ? '<a href="/admin/cointrigger-enable?id=' . $rid . '&en=0">disable</a>'
+        : '<a href="/admin/cointrigger-enable?id=' . $rid . '&en=1">enable</a>';
+    $ops .= ' <a class="red" href="/admin/cointrigger-del?id=' . $rid . '">delete</a>';
     if ($triggered) {
-        $status = '<span style="color:green">Triggered</span>';
-        $ops = '<a href="/admin/cointrigger-reset?id=' . $rule->id . '">reset</a> &nbsp;' . $ops;
-    } else {
-        $status = '';
+        $ops = '<a href="/admin/cointrigger-reset?id=' . $rid . '">reset</a> ' . $ops;
     }
+
+    if ($triggered) {
+        $status = '<span class="admn-badge good">Triggered</span>';
+    } elseif ($rule->enabled) {
+        $status = '<span class="admn-badge">Active</span>';
+    } else {
+        $status = '<span class="admn-badge muted">Off</span>';
+    }
+
     $desc = Html::encode($rule->description ?? '');
     if (!empty($rule->description) && !empty($rule->notifycmd)) $desc .= '<br/>';
-    $desc .= '<span class="cmd">' . Html::encode($rule->notifycmd ?? '') . '</span>';
+    $desc .= '<span class="admn-muted mono">' . Html::encode($rule->notifycmd ?? '') . '</span>';
 ?>
-<tr class="ssrow <?= $rule->enabled ? '' : 'disabled' ?>">
+<tr class="ssrow<?= $rule->enabled ? '' : ' disabled' ?>">
     <td><b><?= Html::encode($rule->notifytype) ?></b></td>
-    <td><?= Html::encode($rule->conditiontype) ?></td>
-    <td><?= Html::encode($rule->conditionvalue) ?></td>
+    <td class="mono"><?= Html::encode($rule->conditiontype) ?></td>
+    <td class="mono"><?= Html::encode($rule->conditionvalue) ?></td>
     <td><?= $desc ?></td>
     <td><?= $status ?></td>
-    <td data="<?= $rule->lastchecked ?>"><?= $conv->datetoa2($rule->lastchecked) ?></td>
-    <td align="right"><?= $ops ?></td>
+    <td data="<?= (int) $rule->lastchecked ?>"><?= Html::encode($conv->datetoa2($rule->lastchecked)) ?></td>
+    <td class="admn-actions" align="right"><?= $ops ?></td>
 </tr>
 <?php endforeach ?>
 </tbody></table>
-<br>
-
-<div class="trigform">
-<form action="<?= Html::encode($addUrl) ?>" method="post">
-<?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
-<label>Type</label>
-<select name="notifytype" style="margin-bottom:8px;">
-<?php foreach ($notifyTypes as $v => $l): ?><option value="<?= $v ?>"><?= $l ?></option><?php endforeach ?>
-</select><br>
-<input type="text" name="conditiontype"  placeholder="Condition like 'balance >'" style="width:190px;margin-right:4px;">
-<input type="text" name="conditionvalue" placeholder="Value" style="width:100px;margin-right:4px;">
-<input type="submit" value="Add rule"><br>
-<input type="text" name="notifycmd"    placeholder="Email or Command (optional)" style="width:400px;margin-top:6px;"><br>
-<input type="text" name="description" placeholder="Description (optional)" style="width:400px;margin-top:6px;">
-</form>
+    </div>
 </div>
 
-<div class="trighelp">
-<b>Command variables:</b>
-<ul>
-<?php foreach ($helpVars as $var => $desc): ?>
-<li><?= Html::encode($var) ?> &nbsp;<?= Html::encode($desc) ?></li>
-<?php endforeach ?>
-</ul>
-</div>
-<div style="clear:both;margin-bottom:24px;"></div>
+<div class="admn-grid">
+    <div class="admn-card">
+        <div class="admn-card-head">
+            <span class="admn-head-main"><span class="admn-title">Add Trigger</span>
+            <span class="admn-sub">create a wallet condition</span></span>
+            <span class="admn-badge muted">POST</span>
+        </div>
+        <div class="admn-card-body">
+            <form action="<?= Html::encode($addUrl) ?>" method="post" class="admn-form">
+                <?= Html::hiddenInput(Yii::$app->request->csrfParam, Yii::$app->request->csrfToken) ?>
+                <div class="admn-form-row">
+                    <div class="admn-field grow">
+                        <label>Type</label>
+                        <select name="notifytype" class="admn-input">
+                        <?php foreach ($notifyTypes as $v => $l): ?>
+                            <option value="<?= Html::encode($v) ?>"><?= Html::encode($l) ?></option>
+                        <?php endforeach ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="admn-form-row">
+                    <div class="admn-field grow">
+                        <label>Condition</label>
+                        <input type="text" name="conditiontype" class="admn-input mono" placeholder="Condition like 'balance >'">
+                    </div>
+                    <div class="admn-field narrow">
+                        <label>Value</label>
+                        <input type="text" name="conditionvalue" class="admn-input mono" placeholder="Value">
+                    </div>
+                </div>
+                <div class="admn-form-row">
+                    <div class="admn-field grow">
+                        <label>Command / Email <span class="admn-muted">(optional)</span></label>
+                        <input type="text" name="notifycmd" class="admn-input mono" placeholder="Email address or shell command">
+                    </div>
+                </div>
+                <div class="admn-form-row">
+                    <div class="admn-field grow">
+                        <label>Description <span class="admn-muted">(optional)</span></label>
+                        <input type="text" name="description" class="admn-input" placeholder="Human-readable label">
+                    </div>
+                </div>
+                <div class="admn-form-row">
+                    <button type="submit" class="admn-pill primary">Add rule</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
+    <div class="admn-card">
+        <div class="admn-card-head">
+            <span class="admn-head-main"><span class="admn-title">Command Variables</span>
+            <span class="admn-sub">expand in notify commands</span></span>
+            <span class="admn-badge">HELP</span>
+        </div>
+        <div class="admn-card-body">
+            <div class="admn-help-list">
+            <?php foreach ($helpVars as $var => $helpDesc): ?>
+                <span class="h-var"><?= Html::encode($var) ?></span>
+                <span class="h-desc"><?= Html::encode($helpDesc) ?></span>
+            <?php endforeach ?>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif ?>
-
+</div><!-- /.admn-page -->
 
 <?php elseif (!$isTailwind): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
