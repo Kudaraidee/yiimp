@@ -14,13 +14,95 @@ $backUrl = Yii::$app->request->referrer ?: '/admin/dashboard';
 
 <?php if ($isLegacy): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
-     LEGACY
+     LEGACY — mining-style database console (same chrome as /site/mining)
      ══════════════════════════════════════════════════════════════════════════ -->
-<?= Yii::$app->ViewUtils->getAdminSideBarLinks() ?>
-&nbsp;-&nbsp;<a href='<?= Html::encode($backUrl) ?>'>&larr; Back</a><br>
-<style>#refresh-bar{height:3px;background:#08c;transition:width 1s linear;margin-bottom:.5rem;}</style>
-<div id="refresh-bar" style="width:100%"></div>
-<div id="main_results"></div>
+<style>
+#dbconn_results { display:flex; flex-direction:column; gap:16px; }
+#dbconn_results .ad-toolbar {
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:9px 12px; margin:0; border:1px solid #d8e2ef; border-radius:7px;
+    background:#fff; box-shadow:0 1px 2px rgba(20,40,80,.04);
+}
+#dbconn_results .ad-toolbar-brand {
+    display:flex; align-items:center; gap:9px; padding-right:12px;
+    border-right:1px solid #e8eef6;
+}
+#dbconn_results .ad-live-dot {
+    width:8px; height:8px; border-radius:50%; background:#2fae5a;
+    box-shadow:0 0 0 3px rgba(47,174,90,.15);
+}
+#dbconn_results .ad-brand-text { display:flex; flex-direction:column; line-height:1.25; }
+#dbconn_results .ad-brand-text b { color:#26385a; font-size:13px; }
+#dbconn_results .ad-brand-text small { color:#8a94a6; font-size:9px; }
+#dbconn_results .mc-badge {
+    display:inline-block; padding:2px 7px; border-radius:999px; background:#eef4ff;
+    border:1px solid #d7e5ff; color:#2c5aa0; font-size:9px; font-weight:700;
+    line-height:14px; white-space:nowrap; text-decoration:none;
+}
+#dbconn_results .ad-toolbar-links { display:flex; flex-wrap:wrap; gap:6px; flex:1 1 auto; }
+#dbconn_results .ad-toolbar-links a {
+    display:inline-block; padding:3px 8px; border-radius:999px; border:1px solid #dfe7f2;
+    background:#f8fafc; color:#4a586c; font-size:10px; line-height:15px;
+    text-decoration:none; white-space:nowrap;
+}
+#dbconn_results .ad-toolbar-links a:hover {
+    background:#eef4ff; border-color:#c9d9f5; color:#2c5aa0; text-decoration:none;
+}
+#dbconn_results .dbc-live {
+    margin-left:auto; white-space:nowrap; font-size:11px; color:#5b6675;
+    display:flex; align-items:center; gap:6px;
+}
+#dbconn_results .dbc-live i {
+    width:7px; height:7px; border-radius:50%; background:#2fae5a;
+    box-shadow:0 0 0 3px rgba(47,174,90,.15);
+}
+#dbconn_results .dbc-live b { font-family:monospace; color:#26385a; }
+#dbconn_results .ad-admin-nav {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:5px 12px; margin-top:-8px; font-size:10px; color:#8a94a6;
+}
+#dbconn_results .ad-admin-nav > span {
+    font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#a7b0c0;
+}
+#dbconn_results .ad-admin-nav a { color:#5b6675; text-decoration:none; }
+#dbconn_results .ad-admin-nav a:hover { color:#2c5aa0; text-decoration:underline; }
+#dbconn_results .dbc-progress {
+    height:3px; margin-top:-8px; border-radius:2px; overflow:hidden;
+    background:#e8eef6;
+}
+#dbconn_results #refresh-bar {
+    height:100%; width:100%; background:#2c5aa0;
+    transition:width 1s linear;
+}
+@media (max-width:900px) {
+    #dbconn_results .dbc-live { margin-left:0; }
+    #dbconn_results .ad-toolbar-brand { border-right:0; }
+}
+</style>
+
+<div id="dbconn_results">
+
+    <div class="ad-toolbar">
+        <div class="ad-toolbar-brand">
+            <span class="ad-live-dot"></span>
+            <span class="ad-brand-text"><b>DB Connections</b><small>database diagnostics · live</small></span>
+            <span class="mc-badge">AUTO · 30s</span>
+        </div>
+        <div class="ad-toolbar-links">
+            <a href="<?= Html::encode($backUrl) ?>">&larr; Back</a>
+        </div>
+        <span class="dbc-live"><i></i> next refresh in <b id="refresh-secs">30</b>s</span>
+    </div>
+
+    <div class="ad-admin-nav">
+        <span>Admin</span>
+        <?= str_replace('&nbsp;', '', Yii::$app->ViewUtils->getAdminSideBarLinks()) ?>
+    </div>
+
+    <div class="dbc-progress"><div id="refresh-bar"></div></div>
+    <div id="main_results"></div>
+
+</div>
 
 
 <?php elseif (!$isTailwind): ?>

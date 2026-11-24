@@ -6,6 +6,7 @@ $this->title = 'Memcache Stats';
 
 $isTailwind = Yii::$app->LayoutManager->isTailwind();
 $isLegacy   = Yii::$app->LayoutManager->isLegacy();
+$conv       = Yii::$app->ConversionUtils;
 
 // ── Fetch memcache stats ──────────────────────────────────────────────────────
 $stat = null;
@@ -38,66 +39,330 @@ if ($stat && (float) $stat['cmd_get'] > 0) {
 $mbRead    = $stat ? round((float) $stat['bytes_read']       / (1024 * 1024), 2) : null;
 $mbWrite   = $stat ? round((float) $stat['bytes_written']    / (1024 * 1024), 2) : null;
 $mbMax     = $stat ? round((float) $stat['limit_maxbytes']   / (1024 * 1024), 0) : null;
+$mbUsed    = $stat ? round((float) $stat['bytes']            / (1024 * 1024), 2) : null;
 $usedPct   = ($stat && $mbMax > 0) ? round($stat['bytes'] / $stat['limit_maxbytes'] * 100, 1) : null;
+$uptimeText = $stat ? $conv->sectoa((int) $stat['uptime']) : '—';
+
+// Human-readable snapshot of the raw stats, used by the mono counters card.
+$rawLines = [];
+if ($stat) {
+    foreach ([
+        'version', 'pid', 'uptime', 'rusage_user', 'rusage_system',
+        'total_items', 'curr_connections', 'total_connections',
+        'connection_structures', 'cmd_get', 'cmd_set', 'get_hits',
+        'get_misses', 'bytes_read', 'bytes_written', 'limit_maxbytes',
+        'evictions',
+    ] as $key) {
+        $rawLines[] = str_pad($key, 22) . ' ' . (string) ($stat[$key] ?? '');
+    }
+}
 
 ?>
 
 <?php if ($isLegacy): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════
-     LEGACY
+     LEGACY — mining-style cache console (same chrome as /site/mining)
      ══════════════════════════════════════════════════════════════════════════ -->
-<?= Yii::$app->ViewUtils->getAdminSideBarLinks() ?>
-&nbsp;-&nbsp;<a href='<?= Html::encode($backUrl) ?>'>&larr; Back</a>&nbsp;-&nbsp;<a href='/admin/memcached'>Refresh</a><br>
+<style>
+#memcached_results { display:flex; flex-direction:column; gap:16px; }
+#memcached_results .ad-toolbar {
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:9px 12px; margin:0; border:1px solid #d8e2ef; border-radius:7px;
+    background:#fff; box-shadow:0 1px 2px rgba(20,40,80,.04);
+}
+#memcached_results .ad-toolbar-brand {
+    display:flex; align-items:center; gap:9px; padding-right:12px;
+    border-right:1px solid #e8eef6;
+}
+#memcached_results .ad-live-dot {
+    width:8px; height:8px; border-radius:50%; background:#2fae5a;
+    box-shadow:0 0 0 3px rgba(47,174,90,.15);
+}
+#memcached_results .ad-brand-text { display:flex; flex-direction:column; line-height:1.25; }
+#memcached_results .ad-brand-text b { color:#26385a; font-size:13px; }
+#memcached_results .ad-brand-text small { color:#8a94a6; font-size:9px; }
+#memcached_results .mc-badge {
+    display:inline-block; padding:2px 7px; border-radius:999px; background:#eef4ff;
+    border:1px solid #d7e5ff; color:#2c5aa0; font-size:9px; font-weight:700;
+    line-height:14px; white-space:nowrap; text-decoration:none;
+}
+#memcached_results .ad-toolbar-links { display:flex; flex-wrap:wrap; gap:6px; flex:1 1 auto; }
+#memcached_results .ad-toolbar-links a {
+    display:inline-block; padding:3px 8px; border-radius:999px; border:1px solid #dfe7f2;
+    background:#f8fafc; color:#4a586c; font-size:10px; line-height:15px;
+    text-decoration:none; white-space:nowrap;
+}
+#memcached_results .ad-toolbar-links a:hover {
+    background:#eef4ff; border-color:#c9d9f5; color:#2c5aa0; text-decoration:none;
+}
+#memcached_results .mc-live {
+    margin-left:auto; white-space:nowrap; font-size:11px; color:#5b6675;
+    display:flex; align-items:center; gap:6px;
+}
+#memcached_results .mc-live i {
+    width:7px; height:7px; border-radius:50%; background:#2fae5a;
+    box-shadow:0 0 0 3px rgba(47,174,90,.15);
+}
+#memcached_results .ad-admin-nav {
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:5px 12px; margin-top:-8px; font-size:10px; color:#8a94a6;
+}
+#memcached_results .ad-admin-nav > span {
+    font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#a7b0c0;
+}
+#memcached_results .ad-admin-nav a { color:#5b6675; text-decoration:none; }
+#memcached_results .ad-admin-nav a:hover { color:#2c5aa0; text-decoration:underline; }
 
-<?php if (!$stat): ?>
-<p style="color:red;"><b>Could not connect to Memcache server.</b></p>
-<?php else: ?>
-<hr>
-<table>
-<tr><td>Memcache server version</td><td><?= Html::encode($stat['version']) ?></td></tr>
-<tr><td>Process id</td><td><?= Html::encode($stat['pid']) ?></td></tr>
-<tr><td>Server uptime</td><td><?= Html::encode($stat['uptime']) ?> seconds</td></tr>
-<tr><td>CPU user time</td><td><?= round($stat['rusage_user'], 1) ?> seconds</td></tr>
-<tr><td>CPU system time</td><td><?= round($stat['rusage_system'], 1) ?> seconds</td></tr>
-<tr><td>Total items stored</td><td><?= Html::encode($stat['total_items']) ?></td></tr>
-<tr><td>Open connections</td><td><?= Html::encode($stat['curr_connections']) ?></td></tr>
-<tr><td>Total connections since start</td><td><?= Html::encode($stat['total_connections']) ?></td></tr>
-<tr><td>Connection structures</td><td><?= Html::encode($stat['connection_structures']) ?></td></tr>
-<tr><td>Cumulative GET requests</td><td><?= Html::encode($stat['cmd_get']) ?></td></tr>
-<tr><td>Cumulative SET requests</td><td><?= Html::encode($stat['cmd_set']) ?></td></tr>
-<tr><td>Cache hits</td><td><?= Html::encode($stat['get_hits']) ?><?= $hitRate !== null ? " ({$hitRate}%)" : '' ?></td></tr>
-<tr><td>Cache misses</td><td><?= Html::encode($stat['get_misses']) ?><?= $missRate !== null ? " ({$missRate}%)" : '' ?></td></tr>
-<tr><td>Bytes read from network</td><td><?= $mbRead ?> MB</td></tr>
-<tr><td>Bytes written to network</td><td><?= $mbWrite ?> MB</td></tr>
-<tr><td>Max storage size</td><td><?= $mbMax ?> MB</td></tr>
-<tr><td>Evictions</td><td><?= Html::encode($stat['evictions']) ?></td></tr>
-</table>
-<?php endif ?>
+#memcached_results .mc-summary {
+    background:#f8fbff; border:1px solid #d8e2ef; border-left:3px solid #2c5aa0;
+    border-radius:6px; padding:8px 14px; display:flex; gap:22px; flex-wrap:wrap;
+    font-size:12px; color:#4a586c;
+}
+#memcached_results .mc-summary b { color:#223a5e; }
+#memcached_results .mc-summary .sep { color:#ccd4e0; }
 
-<div style="margin-top:8px;margin-bottom:24px;margin-right:16px;">
-<?php if (empty($res)): ?>
-<p><i>No URL timing data available.</i></p>
-<?php else: ?>
-<table class="dataGrid">
-<thead><tr>
-<th>URL</th>
-<th align="right">Count</th>
-<th align="right">Time</th>
-<th align="right">Average</th>
-</tr></thead>
-<tbody>
-<?php foreach ($res as $item): ?>
-<tr class="ssrow">
-<td><a href="/<?= Html::encode($item[0]) ?>"><?= Html::encode($item[0]) ?></a></td>
-<td align="right"><?= $item[1] ?></td>
-<td align="right"><?= round($item[2], 3) ?></td>
-<td align="right"><?= round($item[3], 3) ?></td>
-</tr>
-<?php endforeach ?>
-</tbody>
-</table>
-<?php endif ?>
+#memcached_results .main-left-box {
+    border:1px solid #d8e2ef; border-radius:7px; background:#fff;
+    box-shadow:0 1px 2px rgba(20,40,80,.04); overflow:hidden; margin:0;
+}
+#memcached_results .main-left-title {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    min-height:34px; padding:9px 12px; background:#f8fafc;
+    border-bottom:1px solid #e8eef6; color:#26385a; font-size:13px; font-weight:800;
+}
+#memcached_results .mn-head-main { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; min-width:0; }
+#memcached_results .mn-sub { font-size:10px; color:#8a94a6; font-weight:500; }
+#memcached_results .main-left-inner { padding:0; overflow-x:auto; }
+
+#memcached_results .mc-kpis {
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px; padding:12px 14px;
+}
+#memcached_results .mc-kpi {
+    border:1px solid #e8eef6; border-radius:6px; background:#fcfdff;
+    padding:8px 10px; min-width:0;
+}
+#memcached_results .mc-kpi .k-label {
+    display:block; font-size:9px; font-weight:800; letter-spacing:.06em;
+    text-transform:uppercase; color:#98a3b5;
+}
+#memcached_results .mc-kpi .k-value {
+    display:block; margin-top:3px; font-family:monospace; font-size:15px;
+    font-weight:700; color:#26385a; overflow-wrap:anywhere;
+}
+#memcached_results .mc-kpi .k-sub { display:block; margin-top:2px; font-size:9px; color:#8a94a6; }
+#memcached_results .mc-kpi.accent .k-value { color:#2c5aa0; }
+#memcached_results .mc-kpi.good .k-value { color:#2fae5a; }
+#memcached_results .mc-kpi.warn .k-value { color:#c2410c; }
+
+#memcached_results .mc-filter {
+    display:flex; align-items:center; gap:10px; padding:8px 12px;
+    border-top:1px solid #eef2f7; border-bottom:1px solid #e8eef6; background:#fff;
+}
+#memcached_results .mc-filter label {
+    font-size:10px; font-weight:700; letter-spacing:.12em;
+    color:#8a94a6; text-transform:uppercase;
+}
+#memcached_results .mc-filter input {
+    width:260px; padding:4px 9px; border:1px solid #dfe5ec; border-radius:7px;
+    background:#fafbfc; font:11px/1.4 inherit; color:#26385a; outline:0;
+}
+#memcached_results .mc-filter input:focus { border-color:#a9c4ea; background:#fff; }
+#memcached_results .mc-count { font-size:10px; color:#8a94a6; font-variant-numeric:tabular-nums; }
+
+#memcached_results table.dataGrid { width:100%; border-collapse:collapse; font-size:11px; }
+#memcached_results table.dataGrid th {
+    padding:6px 10px; background:#f8fafc; border-bottom:1px solid #e8eef6;
+    color:#8a94a6; font-size:9px; font-weight:700; letter-spacing:.05em;
+    text-transform:uppercase; text-align:left; white-space:nowrap;
+}
+#memcached_results table.dataGrid th.num { text-align:right; }
+#memcached_results table.dataGrid td {
+    padding:5px 10px; border-bottom:1px solid #eef2f7; vertical-align:middle;
+}
+#memcached_results table.dataGrid tr:hover td { background:#f7faff; }
+#memcached_results table.dataGrid td.mono { font-family:monospace; color:#33405a; }
+#memcached_results table.dataGrid td.num {
+    text-align:right; font-family:monospace; font-variant-numeric:tabular-nums; color:#4a586c;
+}
+#memcached_results table.dataGrid td.slow { color:#c2410c; font-weight:700; }
+#memcached_results table.dataGrid td.warn { color:#b45309; }
+#memcached_results .mc-empty { padding:18px; text-align:center; color:#98a3b5; font-size:11px; }
+#memcached_results .mc-foot {
+    padding:8px 12px; border-top:1px solid #e8eef6; background:#f8fafc;
+    display:flex; gap:20px; flex-wrap:wrap; font-size:10px; color:#8a94a6;
+}
+#memcached_results .mc-foot b { color:#4a586c; font-family:monospace; }
+#memcached_results pre.mc-config {
+    margin:0; padding:12px; font-family:monospace; font-size:11px; color:#33405a;
+    background:#fcfdff; overflow-x:auto; white-space:pre;
+}
+#memcached_results .mc-error {
+    padding:14px; border:1px solid #fecaca; background:#fef2f2;
+    border-radius:6px; color:#b91c1c; font-size:12px; font-weight:700;
+}
+@media (max-width:900px) {
+    #memcached_results .mc-live { margin-left:0; }
+    #memcached_results .ad-toolbar-brand { border-right:0; }
+    #memcached_results .mc-filter input { width:100%; }
+}
+</style>
+
+<div id="memcached_results">
+
+    <div class="ad-toolbar">
+        <div class="ad-toolbar-brand">
+            <span class="ad-live-dot"></span>
+            <span class="ad-brand-text"><b>Memcache</b><small>cache diagnostics · live</small></span>
+            <span class="mc-badge">MEMCACHED</span>
+        </div>
+        <div class="ad-toolbar-links">
+            <a href="<?= Html::encode($backUrl) ?>">&larr; Back</a>
+            <a href="/admin/memcached">&#8635; Refresh</a>
+        </div>
+        <span class="mc-live"><i></i> snapshot · page load</span>
+    </div>
+
+    <div class="ad-admin-nav">
+        <span>Admin</span>
+        <?= str_replace('&nbsp;', '', Yii::$app->ViewUtils->getAdminSideBarLinks()) ?>
+    </div>
+
+    <?php if ($stat): ?>
+    <div class="mc-summary">
+        <span>Server <b>v<?= Html::encode($stat['version']) ?></b></span>
+        <span class="sep">|</span>
+        <span>PID <b><?= Html::encode($stat['pid']) ?></b></span>
+        <span class="sep">|</span>
+        <span>Uptime <b><?= Html::encode($uptimeText) ?></b></span>
+        <span class="sep">|</span>
+        <span>Items <b><?= number_format((int) $stat['total_items']) ?></b></span>
+        <span class="sep">|</span>
+        <span>Network <b><?= $mbRead ?> / <?= $mbWrite ?> MB</b></span>
+    </div>
+    <?php endif ?>
+
+    <?php if (!$stat): ?>
+    <div class="main-left-box">
+        <div class="main-left-title">
+            <span class="mn-head-main"><span>Cache Performance</span><span class="mn-sub">memcache status</span></span>
+            <span class="mc-badge">OFFLINE</span>
+        </div>
+        <div class="main-left-inner" style="padding:12px;">
+            <div class="mc-error">Could not connect to Memcache server.</div>
+        </div>
+    </div>
+    <?php else: ?>
+    <div class="main-left-box">
+        <div class="main-left-title">
+            <span class="mn-head-main"><span>Cache Performance</span><span class="mn-sub">since server start</span></span>
+            <span class="mc-badge">LIVE</span>
+        </div>
+        <div class="mc-kpis">
+            <div class="mc-kpi accent">
+                <span class="k-label">Hit rate</span>
+                <span class="k-value"><?= $hitRate !== null ? $hitRate . '%' : '—' ?></span>
+                <span class="k-sub"><?= number_format((int) $stat['get_hits']) ?> / <?= number_format((int) $stat['cmd_get']) ?> GET</span>
+            </div>
+            <div class="mc-kpi <?= ($usedPct ?? 0) > 85 ? 'warn' : '' ?>">
+                <span class="k-label">Memory used</span>
+                <span class="k-value"><?= $usedPct !== null ? $usedPct . '%' : '—' ?></span>
+                <span class="k-sub"><?= $mbUsed ?> / <?= $mbMax ?> MB</span>
+            </div>
+            <div class="mc-kpi">
+                <span class="k-label">Open connections</span>
+                <span class="k-value"><?= number_format((int) $stat['curr_connections']) ?></span>
+                <span class="k-sub"><?= number_format((int) $stat['total_connections']) ?> lifetime</span>
+            </div>
+            <div class="mc-kpi <?= (int) $stat['evictions'] > 0 ? 'warn' : 'good' ?>">
+                <span class="k-label">Evictions</span>
+                <span class="k-value"><?= number_format((int) $stat['evictions']) ?></span>
+                <span class="k-sub">items removed for space</span>
+            </div>
+        </div>
+        <div class="mc-foot">
+            <span><b>GET</b> <?= number_format((int) $stat['cmd_get']) ?></span>
+            <span><b>SET</b> <?= number_format((int) $stat['cmd_set']) ?></span>
+            <span><b>Misses</b> <?= number_format((int) $stat['get_misses']) ?><?= $missRate !== null ? ' (' . $missRate . '%)' : '' ?></span>
+            <span><b>Structs</b> <?= number_format((int) $stat['connection_structures']) ?></span>
+            <span><b>CPU</b> <?= round($stat['rusage_user'], 1) ?> / <?= round($stat['rusage_system'], 1) ?> s</span>
+        </div>
+    </div>
+    <?php endif ?>
+
+    <div class="main-left-box">
+        <div class="main-left-title">
+            <span class="mn-head-main"><span>URL Timing</span><span class="mn-sub">cached page render cost</span></span>
+            <span class="mc-badge"><?= count($res) ?> URLS</span>
+        </div>
+        <div class="mc-filter">
+            <label for="mc-url-filter">Filter</label>
+            <input type="search" id="mc-url-filter" placeholder="url…" autocomplete="off">
+            <span class="mc-count" id="mc-url-count">showing <?= count($res) ?> / <?= count($res) ?></span>
+        </div>
+        <div class="main-left-inner">
+            <?php if (empty($res)): ?>
+            <div class="mc-empty">No URL timing data available.</div>
+            <?php else: ?>
+            <table id="mc-url-table" class="dataGrid">
+            <thead><tr>
+                <th>URL</th>
+                <th class="num">Count</th>
+                <th class="num">Total (s)</th>
+                <th class="num">Avg (s)</th>
+            </tr></thead>
+            <tbody>
+            <?php foreach ($res as $item): ?>
+            <?php
+                $avg = $item[3];
+                $avgCls = $avg > 1 ? 'slow' : ($avg > 0.5 ? 'warn' : '');
+            ?>
+            <tr>
+                <td class="mono"><a href="/<?= Html::encode($item[0]) ?>"><?= Html::encode($item[0]) ?></a></td>
+                <td class="num"><?= number_format((int) $item[1]) ?></td>
+                <td class="num"><?= round($item[2], 3) ?></td>
+                <td class="num <?= $avgCls ?>"><?= round($avg, 3) ?></td>
+            </tr>
+            <?php endforeach ?>
+            </tbody>
+            </table>
+            <?php endif ?>
+        </div>
+    </div>
+
+    <?php if ($rawLines): ?>
+    <div class="main-left-box">
+        <div class="main-left-title">
+            <span class="mn-head-main"><span>Raw counters</span><span class="mn-sub">memcache stats snapshot</span></span>
+            <span class="mc-badge">STATS</span>
+        </div>
+        <div class="main-left-inner">
+            <pre class="mc-config"><?= Html::encode(implode("\n", $rawLines)) ?></pre>
+        </div>
+    </div>
+    <?php endif ?>
+
 </div>
+
+<?php $this->registerJs('
+(function () {
+    var input = document.getElementById("mc-url-filter");
+    var table = document.getElementById("mc-url-table");
+    var count = document.getElementById("mc-url-count");
+    if (!input || !table) return;
+    var rows = Array.prototype.slice.call(table.tBodies[0].rows);
+    input.addEventListener("input", function () {
+        var q = input.value.toLowerCase();
+        var shown = 0;
+        rows.forEach(function (r) {
+            var hit = r.textContent.toLowerCase().indexOf(q) !== -1;
+            r.style.display = hit ? "" : "none";
+            if (hit) shown++;
+        });
+        if (count) count.textContent = "showing " + shown + " / " + rows.length;
+    });
+})();
+'); ?>
 
 
 <?php elseif (!$isTailwind): ?>
