@@ -142,7 +142,7 @@ void db_update_algos(YAAMP_DB *db)
 		if (g_list_coind.first) {
 			CLI li = g_list_coind.first;
 			YAAMP_COIND *coind = (YAAMP_COIND *)li->data;
-			sprintf(symbol,"'%s'", coind->symbol);
+			STRFMT(symbol, "'%s'", coind->symbol);
 		}
 	}
 
@@ -238,8 +238,8 @@ void db_update_coinds(YAAMP_DB *db)
 		else
 			coind->newcoind = false;
 
-		strcpy(coind->name, row[1]);
-		strcpy(coind->symbol, row[20]);
+		STRSET(coind->name, row[1]);
+		STRSET(coind->symbol, row[20]);
 		// optional coin filters
 		if(coind->newcoind) {
 			bool ignore = false;
@@ -251,8 +251,8 @@ void db_update_coinds(YAAMP_DB *db)
 			}
 		}
 
-		if(row[7]) strcpy(coind->wallet, row[7]);
-		if(row[6]) strcpy(coind->rpcencoding, row[6]);
+		if(row[7]) STRSET(coind->wallet, row[7]);
+		if(row[6]) STRSET(coind->rpcencoding, row[6]);
 		if(row[6]) coind->pos = strcasecmp(row[6], "POS")? false: true;
 		if(row[10]) coind->hassubmitblock = atoi(row[10]);
 
@@ -261,30 +261,30 @@ void db_update_coinds(YAAMP_DB *db)
 		if(row[2]) {
 			char buffer[1024];
 			char cert[1024];
-			strcpy(buffer, row[2]);
+			STRSET(buffer, row[2]);
 			// sample ssl host : "https://mycert@127.0.0.1"
 			if (strstr(buffer, "https://") != NULL) {
-				strcpy(buffer, row[2] + 8);
+				STRSET(buffer, row[2] + 8);
 				if (strstr(buffer, "@") != NULL) {
 					int p = (strstr(buffer, "@") - buffer);
-					strcpy(cert, buffer); cert[p] = '\0';
-					strcpy(buffer, row[2] + 8 + p + 1);
+					STRSET(cert, buffer); cert[p] = '\0';
+					STRSET(buffer, row[2] + 8 + p + 1);
 				} else {
-					strcpy(cert, "yiimp");
+					STRSET(cert, "yiimp");
 				}
 				coind->rpc.ssl = 1;
-				sprintf(coind->rpc.cert, "/usr/share/ca-certificates/%s.crt", cert);
+				STRFMT(coind->rpc.cert, "/usr/share/ca-certificates/%s.crt", cert);
 			}
-			strcpy(coind->rpc.cert, "");
-			strcpy(coind->rpc.host, buffer);
+			STRSET(coind->rpc.cert, "");
+			STRSET(coind->rpc.host, buffer);
 		}
 
 		if(row[3]) coind->rpc.port = atoi(row[3]);
 
 		if(row[4] && row[5])
 		{
-			char buffer[1024];
-			sprintf(buffer, "%s:%s", row[4], row[5]);
+			char buffer[sizeof(coind->rpc.credential)/4*3 - 3];	// its base64 must fit credential
+			STRFMT(buffer, "%s:%s", row[4], row[5]);
 
 			base64_encode(coind->rpc.credential, buffer);
 			coind->rpc.coind = coind;
@@ -297,7 +297,7 @@ void db_update_coinds(YAAMP_DB *db)
 		if(row[13]) coind->auto_ready = atoi(row[13]);
 		if(row[15]) coind->pool_ttf = atoi(row[15]);
 
-		if(row[16]) strcpy(coind->charity_address, row[16]);
+		if(row[16]) STRSET(coind->charity_address, row[16]);
 		if(row[17]) coind->charity_amount = atof(row[17]);
 		if(row[18]) coind->charity_percent = atof(row[18]);
 		if(row[19]) coind->reward_mul = atof(row[19]);
@@ -312,14 +312,14 @@ void db_update_coinds(YAAMP_DB *db)
 		if(row[24]) coind->usememorypool = atoi(row[24]);
 		if(row[25]) coind->hasmasternodes = atoi(row[25]);
 
-		if(row[26]) strcpy(coind->algo, row[26]);
-		if(row[27]) strcpy(coind->symbol2, row[27]); // if pool + aux, prevent double submit
+		if(row[26]) STRSET(coind->algo, row[26]);
+		if(row[27]) STRSET(coind->symbol2, row[27]); // if pool + aux, prevent double submit
 
 		if(row[28]) coind->rpc.curl = atoi(row[28]) != 0;
 		if(row[29]) coind->rpc.ssl = atoi(row[29]) != 0;
-		if(row[30]) strcpy(coind->rpc.cert, row[30]);
+		if(row[30]) STRSET(coind->rpc.cert, row[30]);
 
-		if(row[31]) strcpy(coind->account, row[31]);
+		if(row[31]) STRSET(coind->account, row[31]);
 		if(row[32]) coind->multialgos = atoi(row[32]);
 		if(row[33] && atoi(row[33]) > 0) g_stratum_max_cons = atoi(row[33]);
 		if(row[34] && atol(row[34]) > 0) g_max_shares = atol(row[34]);
@@ -328,7 +328,7 @@ void db_update_coinds(YAAMP_DB *db)
 		if(row[36]) coind->auto_exchange = atoi(row[36]) > 0;
 		if(row[37]) coind->rpcdebug = atoi(row[37]) > 0;
 
-		if(row[38]) strcpy(coind->personalization, row[38]);
+		if(row[38]) STRSET(coind->personalization, row[38]);
 
 		// use powlimit from coin, if not set - algo, defaults to 32
 		if(row[39]) coind->powlimit_bits = atoi(row[39]);
@@ -447,10 +447,10 @@ void db_update_remotes(YAAMP_DB *db)
 			remote->status = YAAMP_REMOTE_RESET;
 
 		remote->speed = atof(row[1]);
-		strcpy(remote->host, row[2]);
+		STRSET(remote->host, row[2]);
 		remote->port = atoi(row[3]);
-		strcpy(remote->username, row[4]);
-		strcpy(remote->password, row[5]);
+		STRSET(remote->username, row[4]);
+		STRSET(remote->password, row[5]);
 		remote->updated = atoi(row[6]);
 		remote->price = atof(row[7]);
 		remote->touch = true;

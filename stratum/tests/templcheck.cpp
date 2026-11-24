@@ -29,7 +29,16 @@ extern "C" time_t time(time_t *t)
 	if (t) *t = fixed;
 	return fixed;
 }
-YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind);   // coind_template.cpp, not in a header
+// not in a header (client_submit.cpp, coind_template.cpp)
+void build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
+	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce, uint32_t versionbits);
+YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind);
+
+// newer code declares build_submit_values(..., bool compute_hash = true):
+// prefer that form when it exists
+template <typename... A> static auto submit_values(int, A... a) -> decltype(build_submit_values(a..., true), void())
+{ build_submit_values(a..., true); }
+template <typename... A> static void submit_values(long, A... a) { build_submit_values(a...); }
 
 static void set_str(char *dst, size_t cap, const char *val, const char *key)
 {
@@ -146,5 +155,12 @@ int main(int argc, char **argv)
 	snprintf(num, sizeof(num), "%zu", strlen(templ->mweb)); print_field("mweb_len", num);
 	print_field("commitment", coind->commitment);
 	snprintf(num, sizeof(num), "%.8f", coind->reward); print_field("reward", num);
+
+	// a share on this job, as client_submit() builds it
+	static YAAMP_JOB_VALUES submit;
+	submit_values(0, &submit, templ, "01020304", "00000000", (const char *)templ->ntime, "00000000", (uint32_t)0);
+	print_field("submit_coinbase", submit.coinbase);
+	print_field("submit_header", submit.header_be);
+	print_field("submit_hash", submit.hash_hex);
 	return 0;
 }

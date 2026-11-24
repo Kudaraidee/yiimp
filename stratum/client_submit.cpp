@@ -85,11 +85,11 @@ bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *tem
 	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce,
 	uint32_t versionbits, bool compute_hash)
 {
-	sprintf(submitvalues->coinbase, "%s%s%s%s", templ->coinb1, nonce1, nonce2, templ->coinb2);
+	STRFMT(submitvalues->coinbase, "%s%s%s%s", templ->coinb1, nonce1, nonce2, templ->coinb2);
 	int coinbase_len = strlen(submitvalues->coinbase);
 
-	unsigned char coinbase_bin[1024];
-	memset(coinbase_bin, 0, 1024);
+	unsigned char coinbase_bin[sizeof(submitvalues->coinbase)/2];
+	memset(coinbase_bin, 0, sizeof(coinbase_bin));
 	binlify(coinbase_bin, submitvalues->coinbase);
 
 	char doublehash[128];
@@ -106,11 +106,11 @@ bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *tem
 
 	// for p2wpkh
 	if (templ->is_p2wpkh) {
-		sprintf(submitvalues->coinbase, "%s%s%s%s", templ->coinb1_p2wpkh, nonce1, nonce2, templ->coinb2_p2wpkh);
+		STRFMT(submitvalues->coinbase, "%s%s%s%s", templ->coinb1_p2wpkh, nonce1, nonce2, templ->coinb2_p2wpkh);
 	}
 
 	if(templ->isbitcash) {
-		sprintf(submitvalues->coinbase, "%s%s%s%s", templ->coinforsubmitb1, nonce1, nonce2, templ->coinforsubmitb2);
+		STRFMT(submitvalues->coinbase, "%s%s%s%s", templ->coinforsubmitb1, nonce1, nonce2, templ->coinforsubmitb2);
 	}
 
 #ifdef MERKLE_DEBUGLOG
@@ -165,7 +165,7 @@ bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *tem
 			ntime, templ->nbits, nonce, templ->extradata_be);
 		ser_string_be(submitvalues->header, submitvalues->header_be, 36); // 80+64 / sizeof(u32)
 	} else if (!strcmp(g_stratum_algo, "neoscrypt-xaya")) {
-		sprintf(submitvalues->xaya_header, "%s%s%s", templ->xaya_header, nonce1, nonce2);
+		STRFMT(submitvalues->xaya_header, "%s%s%s", templ->xaya_header, nonce1, nonce2);
 
 		int xaya_header_len = strlen(submitvalues->xaya_header);
 		binlify(submitvalues->xaya_header_bin, submitvalues->xaya_header);
@@ -181,7 +181,7 @@ bool build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *tem
 		sprintf(submitvalues->header, "%s%s%s%s%s%s", templ->version, templ->prevhash_be, submitvalues->merkleroot_be,
 			ntime, templ->nbits, nonce);
 		ser_string_be(submitvalues->header, submitvalues->header_be, 20);
-		sprintf(submitvalues->header_be, "%s%s", submitvalues->header_be, templ->priceinfo);
+		STRADD(submitvalues->header_be, templ->priceinfo);
 	} else
 	{
 		uint32_t templ_version = strtoul(templ->version, NULL, 16);
@@ -334,11 +334,11 @@ static void build_submit_values_decred(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB
 		// not used yet
 		char doublehash[128] = { 0 };
 
-		sprintf(submitvalues->coinbase, "%s%s%s%s", templ->coinb1, nonce1, nonce2, templ->coinb2);
+		STRFMT(submitvalues->coinbase, "%s%s%s%s", templ->coinb1, nonce1, nonce2, templ->coinb2);
 		int coinbase_len = strlen(submitvalues->coinbase);
 
-		unsigned char coinbase_bin[1024];
-		memset(coinbase_bin, 0, 1024);
+		unsigned char coinbase_bin[sizeof(submitvalues->coinbase)/2];
+		memset(coinbase_bin, 0, sizeof(coinbase_bin));
 		binlify(coinbase_bin, submitvalues->coinbase);
 
 		YAAMP_HASH_FUNCTION merkle_hash = sha256_double_hash_hex;
@@ -407,6 +407,7 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 
 	for(i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
 		block_size += strlen((*i).c_str());
+	block_size += strlen(templ->mweb);
 
 	char *block_hex = (char *)malloc(block_size);
 	if(!block_hex) return;
@@ -687,11 +688,11 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 	int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
 
 	if (is_equihash) {
-		string_be(json_params->u.array.values[2]->u.string.ptr, ntime);
-		strcpy(nonce,json_params->u.array.values[3]->u.string.ptr);
+		string_be(str_fits(json_params->u.array.values[2]->u.string.ptr, sizeof(ntime), "ntime"), ntime);
+		STRSET(nonce, json_params->u.array.values[3]->u.string.ptr);
 		if ((json_params->u.array.length == 5) &&
 			(strlen(json_params->u.array.values[4]->u.string.ptr) <= 2800))
-			strcpy(equihash_solution, json_params->u.array.values[4]->u.string.ptr);
+			STRSET(equihash_solution, json_params->u.array.values[4]->u.string.ptr);
 	}
 	else {
 		strncpy(extranonce2, json_params->u.array.values[2]->u.string.ptr, 31);
@@ -789,8 +790,8 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 	if(is_decred && client->extranonce2size > 4) {
 		char extra1_id[16], extra2_id[16];
 		int cmpoft = client->extranonce2size*2 - 8;
-		strcpy(extra1_id, &client->extranonce1[cmpoft]);
-		strcpy(extra2_id, &extranonce2[cmpoft]);
+		STRSET(extra1_id, &client->extranonce1[cmpoft]);
+		STRSET(extra2_id, &extranonce2[cmpoft]);
 		int extradiff = (int) strcmp(extra2_id, extra1_id);
 		int extranull = (int) !strcmp(extra2_id, "00000000");
 		if (extranull && client->extranonce2size > 8)
