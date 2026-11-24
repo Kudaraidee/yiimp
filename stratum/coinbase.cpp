@@ -775,10 +775,10 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	struct pay
 	{
-		const char *name;
-		const char *script;
+		const char *name {nullptr};
+		const char *script {nullptr};
 		json_int_t amount {0};
-		const char *payee;
+		const char *payee {nullptr};
 	};
 	pay paysOldMN;
 	paysOldMN.name = "masternode";

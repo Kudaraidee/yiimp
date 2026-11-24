@@ -1012,6 +1012,7 @@ void sha256_hash_hex(const char *input, char *output, unsigned int len)
 
 unsigned char *SHA256(const unsigned char *d, size_t n, unsigned char *md) {
 	sha256_hash((const char *)d, (char *)md, n);
+	return (unsigned char *)md;
 }
 
 void sha3d_hash_hex(const char *input, char *output, unsigned int len)

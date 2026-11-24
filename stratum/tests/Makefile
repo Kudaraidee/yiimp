@@ -1,6 +1,6 @@
 # Stratum test harness: hash vectors, KATs and template checks.
 #
-# Object list, flags and libraries are read from ../Makefile at make time,
+# Sources, flags and libraries are read from ../GNUmakefile at make time,
 # so new algo sources are picked up without editing this file.
 #
 #   make -C tests check        hash vectors + reference KATs + templates (plain build)
@@ -12,8 +12,8 @@
 #                              -> build/warnings.txt
 #   make -C tests clean
 #
-# Needs the normal stratum build first for the algo libraries:
-#   make -C .. buildonly   (done automatically by the targets above)
+# Needs the algo libraries of the normal stratum build:
+#   make -C .. libs        (done automatically by the targets above)
 #
 # Build environment = the image's baseimage stage, e.g. with podman:
 #   podman build --target baseimage -t yiimp-stratum-build -f Dockerfile.yiimp .
@@ -29,22 +29,24 @@ B       := build
 VARIANT ?= plain
 OUT     := $(B)/$(VARIANT)
 
-# --- read settings from ../Makefile ------------------------------------------
-topvar = $(shell $(MAKE) -s --no-print-directory -C $(TOP) --eval 'print-var-: ; @echo $$($(1))' print-var-)
+# --- read settings from ../GNUmakefile ---------------------------------------
+# under a parent make, MAKEFLAGS can add "make[N]: Entering directory" lines
+topvar = $(shell $(MAKE) -s --no-print-directory -C $(TOP) print-$(1) 2>/dev/null | grep -v '^make')
 
-TOP_CC      := $(call topvar,CC)
-TOP_CFLAGS  := $(call topvar,CFLAGS)
-TOP_SQL     := $(call topvar,SQLFLAGS)
-TOP_OBJECTS := $(call topvar,OBJECTS)
-TOP_LDLIBS  := $(call topvar,LDLIBS)
+TOP_CC       := $(call topvar,CC)
+TOP_CXX      := $(call topvar,CXX)
+TOP_CPPFLAGS := $(call topvar,CORE_CPPFLAGS)
+TOP_OPT      := $(call topvar,CORE_OPT)
+TOP_SRCS     := $(call topvar,CORE_SRCS)
+TOP_LDLIBS   := $(call topvar,LINK_LIBS)
 
-# ../Makefile lists .c files of some subdirs in OBJECTS unconverted; normalise
-CORE_OBJS := $(patsubst %.c,%.o,$(TOP_OBJECTS))
+CORE_OBJS := $(addsuffix .o,$(basename $(TOP_SRCS)))
 # stratum.o is rebuilt without main(); rpc is replaced by rpc_mock in templcheck
 MAIN_OBJ  := stratum.o
 RPC_OBJS  := rpc.o rpc_curl.o
 
-# library paths in LDLIBS are relative to ..; flags stay as they are
+# include and library paths are relative to ..; flags stay as they are
+INCS := $(foreach f,$(TOP_CPPFLAGS),$(if $(filter -I/%,$(f)),$(f),$(patsubst -I%,-I$(TOP)/%,$(f))))
 LIBS := $(foreach l,$(TOP_LDLIBS),$(if $(filter -%,$(l)),$(l),$(TOP)/$(l)))
 
 # --- variants ----------------------------------------------------------------
@@ -75,8 +77,7 @@ else
   $(error unknown VARIANT $(VARIANT))
 endif
 
-CXXFLAGS_ALL := $(TOP_CFLAGS) $(TOP_SQL) $(XFLAGS) -I$(TOP) -MMD -MP
-CFLAGS_ALL   := $(TOP_CFLAGS) $(XFLAGS) -I$(TOP) -MMD -MP
+CFLAGS_ALL := $(INCS) $(TOP_OPT) $(XFLAGS) -I$(TOP) -MMD -MP
 
 # --- objects -----------------------------------------------------------------
 OBJ_CORE   := $(addprefix $(OUT)/,$(filter-out $(MAIN_OBJ),$(CORE_OBJS)))
@@ -95,11 +96,11 @@ STRATUM    := $(OUT)/stratum
 all tools: $(HASHCHECK) $(TEMPLCHECK)
 
 libs:
-	$(MAKE) -C $(TOP) buildonly
+	$(MAKE) -C $(TOP) libs
 
 $(OUT)/%.o: $(TOP)/%.cpp
 	@mkdir -p $(dir $@)
-	$(TOP_CC) $(CXXFLAGS_ALL) -c $< -o $@
+	$(TOP_CXX) $(CFLAGS_ALL) -c $< -o $@
 
 $(OUT)/%.o: $(TOP)/%.c
 	@mkdir -p $(dir $@)
@@ -107,20 +108,20 @@ $(OUT)/%.o: $(TOP)/%.c
 
 $(OUT)/stratum_nomain.o: $(TOP)/stratum.cpp
 	@mkdir -p $(dir $@)
-	$(TOP_CC) $(CXXFLAGS_ALL) -Dmain=stratum_main -c $< -o $@
+	$(TOP_CXX) $(CFLAGS_ALL) -Dmain=stratum_main -c $< -o $@
 
 $(OUT)/tests/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(TOP_CC) $(CXXFLAGS_ALL) -c $< -o $@
+	$(TOP_CXX) $(CFLAGS_ALL) -c $< -o $@
 
 $(HASHCHECK): $(OUT)/tests/hashcheck.o $(OBJ_NOMAIN) $(OBJ_CORE) | libs
-	$(TOP_CC) $^ $(LIBS) $(XLDFLAGS) -o $@
+	$(TOP_CXX) -no-pie $^ $(LIBS) $(XLDFLAGS) -o $@
 
 $(TEMPLCHECK): $(OUT)/tests/templcheck.o $(OUT)/tests/rpc_mock.o $(OBJ_NOMAIN) $(filter-out $(OBJ_RPC),$(OBJ_CORE)) | libs
-	$(TOP_CC) $^ $(LIBS) $(XLDFLAGS) -o $@
+	$(TOP_CXX) -no-pie $^ $(LIBS) $(XLDFLAGS) -o $@
 
 $(STRATUM): $(OBJ_MAIN) $(OBJ_CORE) | libs
-	$(TOP_CC) $^ $(LIBS) $(XLDFLAGS) -o $@
+	$(TOP_CXX) -no-pie $^ $(LIBS) $(XLDFLAGS) -o $@
 
 # --- runs --------------------------------------------------------------------
 FIXTURES := $(sort $(dir $(wildcard fixtures/*/coind.conf)))
