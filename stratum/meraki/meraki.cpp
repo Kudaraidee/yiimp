@@ -129,7 +129,7 @@ bool meraki_submit(YAAMP_CLIENT* client, json_value* json_params)
     uint256 coin_target;
     decode_nbits(coin_target, (uint32_t)strtoul(templ->nbits, NULL, 16));
 
-    if (hash < coin_target) {
+    if (hash <= coin_target) {
         kawpow_block(client, job, templ, nonce, mixhash, hash);
         job_signal();
     }

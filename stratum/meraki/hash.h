@@ -20,7 +20,7 @@ extern std::vector<meraki_coin_context*> meraki_contexts;
 
 int meraki_epoch_for_height(int height);
 uint256 meraki_epoch_seed(int height);
-// Telestai uses Diff1 = 0x00000000ff0000... (1/256 of the Firo/Yiimp scale).
+// Telestai uses Diff1 = 00000000ff00... (Ravencoin scale, not Firo scale).
 uint256 meraki_diff_to_target(double difficulty);
 double meraki_target_to_diff(uint256& target);
 void meraki_update_epoch(const int coinid, int& height);

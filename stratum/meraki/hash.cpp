@@ -8,6 +8,8 @@
 #include "meraki/helpers.hpp"
 #include "meraki/lib/meraki/progpow.hpp"
 
+#include <cmath>
+
 std::vector<meraki_coin_context*> meraki_contexts;
 
 int meraki_epoch_for_height(int height)
@@ -23,11 +25,21 @@ uint256 meraki_epoch_seed(int height)
 
 uint256 meraki_diff_to_target(double difficulty)
 {
-    // diff_to_target() uses Yiimp's Firo-scale Diff1 (0x0000ffff...).
-    // Telestai's Diff1 is 0x00ff..., so shift the target down 8 bits.
+    if (!(difficulty > 0.0) || !std::isfinite(difficulty))
+        return uint256{};
+
     uint256 firo_target;
     diff_to_target(firo_target, difficulty);
-    return ArithToUint256(UintToArith256(firo_target) >> 8);
+
+    // Telestai Diff1 is 00000000ff00..., while diff_to_target() uses the
+    // Firo-scale 0000ffff0000...: Firo Diff1 = Telestai Diff1 * 257/256.
+    // Clamp rather than wrap when the Firo target is already near 2^256.
+    const arith_uint256 max_target = ~arith_uint256(0);
+    arith_uint256 target = UintToArith256(firo_target);
+    if (target > (max_target >> 8))
+        return ArithToUint256(max_target);
+
+    return ArithToUint256((target << 8) / arith_uint256(257));
 }
 
 double meraki_target_to_diff(uint256& target)

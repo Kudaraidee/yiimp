@@ -833,41 +833,65 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
     else if (is_meraki)
     {
-        // Telestai enforces a 117 TLS (11700000000 sat) development output in
-        // every coinbase. GBT's coinbasevalue includes that output, so pay it
-        // to the fixed mainnet address and keep the remainder for the pool.
-        const json_int_t founder_amount = 11700000000LL;
-        const char* founder_address = "TesBmcgLQsowvYEYPXpSHkkapoTbVV7Xfe";
+        // Telestai v3.0.3 GBT reports coinbasevalue as vout[0] (the miner
+        // payout) and describes the required vout[1] with
+        // CommunityAutonomousAddress/Value. Older 2.1.x templates included
+        // the founder output in coinbasevalue and exposed a "founder" object.
+        const char *dev_address = json_get_string(json_result, "CommunityAutonomousAddress");
+        json_int_t dev_amount = json_get_int(json_result, "CommunityAutonomousValue");
+        bool include_dev_in_value = false;
+        bool require_dev = (dev_address && *dev_address);
 
-        if (available <= founder_amount) {
-            debuglog("[%s] coinbasevalue %lld too small for founder output\n",
-                coind->symbol, (long long)available);
+        if (!require_dev)
+        {
+            json_value *founder = json_get_object(json_result, "founder");
+            if (founder)
+            {
+                dev_address = json_get_string(founder, "payee");
+                dev_amount = json_get_int(founder, "amount");
+                include_dev_in_value = true;
+                require_dev = true;
+            }
+        }
+
+        if (!require_dev || dev_amount <= 0)
+        {
+            debuglog("[%s] GBT has no valid Telestai community/founder fields\n", coind->symbol);
             return;
         }
 
-        char founder_hash160[64] = { 0 };
-        if (!base58_decode(founder_address, founder_hash160) || !*founder_hash160) {
-            debuglog("[%s] invalid founder address %s\n", coind->symbol, founder_address);
+        char dev_hash160[64] = { 0 };
+        if (!base58_decode(dev_address, dev_hash160) || !*dev_hash160) {
+            debuglog("[%s] invalid Telestai community address %s\n", coind->symbol, dev_address);
             return;
         }
 
-        char founder_script[128] = { 0 };
-        snprintf(founder_script, sizeof(founder_script), "76a914%s88ac", founder_hash160);
+        char dev_script[128] = { 0 };
+        snprintf(dev_script, sizeof(dev_script), "76a914%s88ac", dev_hash160);
 
         unsigned int outputs = 2 + (templ->has_segwit_txs ? 1 : 0);
         char outputs_count[4] = { 0 };
         sprintf(outputs_count, "%02x", outputs);
         strcat(templ->coinb2, outputs_count);
 
-        json_int_t miner_amount = available - founder_amount;
+        json_int_t miner_amount = available;
+        if (include_dev_in_value)
+            miner_amount -= dev_amount;
+
+        if (miner_amount <= 0) {
+            debuglog("[%s] bad coinbase split: available=%lld dev=%lld\n",
+                coind->symbol, (long long)available, (long long)dev_amount);
+            return;
+        }
+
         job_pack_tx(coind, templ->coinb2, miner_amount, NULL);
-        script_pack_tx(coind, templ->coinb2, founder_amount, founder_script);
+        script_pack_tx(coind, templ->coinb2, dev_amount, dev_script);
         if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
         strcat(templ->coinb2, "00000000");
 
         coind->reward = (double)miner_amount / 100000000 * coind->reward_mul;
-        debuglog("[%s] founder output %f, pool reward %f\n", coind->symbol,
-            (double)founder_amount / 100000000, coind->reward);
+        debuglog("[%s] community output %f, pool reward %f\n", coind->symbol,
+            (double)dev_amount / 100000000, coind->reward);
         return;
     }
 
