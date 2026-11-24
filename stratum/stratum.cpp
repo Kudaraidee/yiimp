@@ -16,6 +16,11 @@ CommonList g_list_block;
 CommonList g_list_submit;
 CommonList g_list_source;
 
+// NEB's work service can pause job frames for several minutes during chain
+// resync/reorg while miners keep working on the last valid job. The generic
+// two-minute watchdog would kill and restart the stratum in that case.
+#define YAAMP_MAXJOBDELAY_NEB (15*60)
+
 int g_tcp_port;
 
 int g_tcp_tls_port = 0;
@@ -655,8 +660,9 @@ void *monitor_thread(void *p)
 		// miners, is idle by design: it has nobody to broadcast jobs to, so the
 		// stale-job watchdog must not restart it. Only treat a missing job as a
 		// deadlock when coins are loaded and miners are actually connected.
+		int maxjobdelay = !strcmp(g_stratum_algo, "nebhash") ? YAAMP_MAXJOBDELAY_NEB : YAAMP_MAXJOBDELAY;
 		if(g_list_coind.count > 0 && g_list_client.count > 0 &&
-		   g_last_broadcasted + YAAMP_MAXJOBDELAY < time(NULL))
+		   g_last_broadcasted + maxjobdelay < time(NULL))
 		{
 			g_exiting = true;
 			stratumlogdate("%s dead lock, exiting...\n", g_stratum_algo);
