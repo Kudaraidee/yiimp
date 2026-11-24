@@ -273,6 +273,7 @@ foreach ($list as $coin) {
     $solo_hash_sfx   = $pool_solo   ? $conv->Itoa2($pool_solo)   . 'h/s' : '';
 
     $btcmhd_fmt = $conv->mbitcoinvaluetoa($btcmhd);
+    $profitUnit = $util->get_algo_profit_unit($coin->algo);
 
     // TTF tooltip
     $ttfTitle = '';
@@ -333,7 +334,7 @@ foreach ($list as $coin) {
            . "<span class='mn-val'>" . ($pool_hash_sfx !== '' ? Html::encode($pool_hash_sfx) : '—') . "</span>"
            . "<span class='mn-cap'>pool hash</span></td>";
         echo "<td class='{$profitClass}' data='" . Html::encode((string) $btcmhd) . "'>"
-           . "<span class='mn-val'>{$btcmhd_fmt}</span><span class='mn-cap'>mBTC/MH/day</span></td>";
+           . "<span class='mn-val'>{$btcmhd_fmt}</span><span class='mn-cap'>mBTC/{$profitUnit}/day</span></td>";
         echo "</tr>";
 
     } elseif (!$isTailwind) {
@@ -386,7 +387,7 @@ echo '</tbody>';
 // ── Table close ───────────────────────────────────────────────────────────────
 if ($isLegacy) {
     echo '</table></div>';
-    echo "<div class='mn-foot'><span>* 24h estimate in mBTC/MH/day · per GH for sha &amp; blake</span>"
+    echo "<div class='mn-foot'><span>* 24h estimate in mBTC/MH/day · per GH for sha, blake &amp; nebhash</span>"
        . "<span>** pool hash from last 5min shares<br>*** estimated time at full pool speed</span></div>";
     echo '</div></div><br>';
 } elseif (!$isTailwind) {

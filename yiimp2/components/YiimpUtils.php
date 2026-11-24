@@ -42,9 +42,8 @@ class YiimpUtils extends Component
 			'yespowerARWN'		=> 0.001,
 			'mike'		=> 0.001,
 			'power2b'	=> 0.001,
-			// NEB difficulty is expected hashes per block, so the per-MH rate
-			// needs the extra mBTC normalization to be visible/comparable.
-			'nebhash'	=> 1000,
+			// NEB profitability is quoted per GH (BTC->mBTC and MH->GH).
+			'nebhash'	=> 1000000,
 		);
 
 		if(!isset($a[$algo])) {
@@ -53,6 +52,12 @@ class YiimpUtils extends Component
 
 		return $a[$algo];
 	}
+
+	/** Unit used by yiimp_profitability() for this algo's coefficient. */
+	public function get_algo_profit_unit($algo) {
+		return $this->get_algo_norm($algo) >= 1000000 ? 'GH' : 'MH';
+	}
+
 	public function get_algo_list() {
 
 	$cached_algolist = Yii::$app->cache->get("YIIMP_algo_list");

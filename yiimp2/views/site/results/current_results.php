@@ -255,8 +255,9 @@ foreach ($algos as $item) {
         $nethash     = Yii::$app->YiimpUtils->display_network_hashrate($coin);
         $nethash_sfx = $nethash ? strtoupper($conv->Itoa2($nethash)) . 'H/s' : '—';
 
-        $btcmhd = $conv->mbitcoinvaluetoa(Yii::$app->YiimpUtils->yiimp_profitability($coin));
-        $isBest = ($algo === $best_algo);
+        $btcmhd     = $conv->mbitcoinvaluetoa(Yii::$app->YiimpUtils->yiimp_profitability($coin));
+        $profitUnit = Yii::$app->YiimpUtils->get_algo_profit_unit($algo);
+        $isBest     = ($algo === $best_algo);
 
         $initials = strtoupper(substr($coin->symbol, 0, 3));
         $img = !empty($coin->image)
@@ -311,7 +312,7 @@ foreach ($algos as $item) {
             echo "<td class='num" . ($isBest ? ' good' : '') . "' data='{$btcmhd}'"
                . " title='best algo estimate'>";
             echo "<span class='big mono'>" . ($isBest ? $btcmhd . '*' : $btcmhd) . '</span>';
-            echo '<span class="sub">mBTC/MH</span>';
+            echo "<span class=\"sub\">mBTC/{$profitUnit}</span>";
             echo '</td>';
         }
 
@@ -339,7 +340,7 @@ echo '</tr>';
 echo '</tbody></table></div>';
 
 // ── Footer note + wrapper close ───────────────────────────────────────────────
-$note = '* mBTC/MH/day, per GH for sha &amp; blake';
+$note = '* mBTC/MH/day, per GH for sha, blake &amp; nebhash';
 if ($isLegacy) {
     echo "<div class='ps-foot'><span>" . $note . "</span><span>live · 60s</span></div>";
     echo '</div></div><br>';
