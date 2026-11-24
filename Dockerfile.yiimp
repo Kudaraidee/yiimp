@@ -8,7 +8,7 @@ RUN set -xe \
     && : "---------- add tools ----------" \
     && apt-get install -y git bc dumb-init supervisor cron logrotate vim less nano mc memcached haproxy apache2 libapache2-mod-php sudo \
     && : "---------- add build-tools ----------" \
-    && apt-get install -y automake autotools-dev build-essential libtool libasan6 python3 python3-venv libaugeas0 \
+    && apt-get install -y automake autotools-dev build-essential libtool libasan8 python3 python3-venv libaugeas0 \
     && : "---------- Persistent dependencies ----------" \
     && apt-get install -y libgd-dev libicu-dev libmariadb-dev-compat libxml2-dev libonig-dev libcurl4-openssl-dev libssl-dev libxslt1-dev libzip-dev libz-dev libmemcached-dev libgmp-dev libsodium-dev \
     && : "---------- php extensions ----------" \

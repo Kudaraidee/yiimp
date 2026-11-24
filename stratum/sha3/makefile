@@ -1,7 +1,8 @@
 
 CC=gcc
+include ../arch.mk
 
-CFLAGS= -O3 -march=native -fno-strict-aliasing -fwrapv
+CFLAGS= -O3 -march=$(ARCH) -fno-strict-aliasing -fwrapv
 LDFLAGS=-O2
 
 SOURCES=sha2.c sph_jh.c sph_blake.c sph_bmw.c sph_groestl.c sph_skein.c sph_keccak.c sph_luffa.c sph_cubehash.c sph_shavite.c \
@@ -15,7 +16,8 @@ OUTPUT=libhash.a
 all: $(SOURCES) $(OUTPUT)
 
 $(OUTPUT): $(OBJECTS)
-	ar rc $@ $(OBJECTS)
+	rm -f $@
+	ar rcs $@ $(OBJECTS)
 	touch ../stratum.cpp
 
 .cpp.o:
@@ -28,6 +30,6 @@ blake2s.o: blake2s.c
 	$(CC) $(CFLAGS) -std=gnu99 -c $<
 
 clean:
-	rm *.o
+	rm -f *.o $(OUTPUT)
 
 
