@@ -177,7 +177,6 @@ void sha256_double_hash_hex(const char *input, char *output, unsigned int len);
 void sha3d_hash_hex(const char *input, char *output, unsigned int len);
 
 #include "algos/a5a.h"
-#include "algos/aurum.h"
 #include "algos/balloon.h"
 #include "algos/c11.h"
 #include "algos/x11.h"
