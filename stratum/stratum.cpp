@@ -160,6 +160,7 @@ YAAMP_ALGO g_algos[] =
 	{"anime", anime_hash, 1, 0, 0},
 	{"argon2d250", argon2d_crds_hash, 0x10000, 0, 0 }, // Credits Argon2d Implementation
 	{"argon2d500", argon2d_dyn_hash, 0x10000, 0, 0 }, // Dynamic Argon2d Implementation
+	{"argon2d4096", argon2d_uis_hash, 0x10000, 0, 0 }, // Argon2d4096/UIS, Argon2 v1.3
 	{"argon2d1000", argon2d1000_hash, 0x10000, 0, 0 }, // Argon2d1000 Implementation
 	{"argon2d16000", argon2d16000_hash, 0x10000, 0, 0 }, // Argon2d16000 Implementation
 	{"astralhash", astralhash_hash, 0x100, 0, 0},
