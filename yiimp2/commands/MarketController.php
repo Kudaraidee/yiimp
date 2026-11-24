@@ -15,6 +15,8 @@ use app\services\MarketService;
  *
  * Usage:
  *   php yii market/quotes                             — refresh stablecoin BTC rates
+ *   php yii market/sell <SYM> [AMOUNT] --dryRun=1     — controlled one-shot deposit send
+ *   php yii market/deposit <SYM> <MARKET> <ADDRESS>   — set a validated exchange deposit address
  *   php yii market/list <SYM>                         — list all markets for a coin
  *   php yii market/histo <SYM> <exchange>             — last 100 market history entries
  *   php yii market/prune <SYM>                        — prune old market history
@@ -25,6 +27,16 @@ use app\services\MarketService;
  */
 class MarketController extends Controller
 {
+    /** Used by market/sell only. Never set from config. */
+    public bool $dryRun = false;
+
+    public function options($actionID): array
+    {
+        return in_array($actionID, ['sell'], true)
+            ? array_merge(parent::options($actionID), ['dryRun'])
+            : parent::options($actionID);
+    }
+
     private function findCoin(string $symbol): ?Coins
     {
         $c = Coins::find()->where(['symbol' => $symbol])->one();
@@ -50,6 +62,75 @@ class MarketController extends Controller
             $rate = (float) Yii::$app->settings->get(strtolower($symbol) . '_btc', 0);
             $this->stdout(sprintf("%-6s %s BTC\n", $symbol, $rate > 0 ? $rate : 'no rate'));
         }
+        return ExitCode::OK;
+    }
+
+    /**
+     * Controlled one-shot wallet send to the selected market's deposit address.
+     * This does not touch the queue and never starts a worker.
+     */
+    public function actionSell(string $symbol, ?float $amount = null): int
+    {
+        $coin = $this->findCoin($symbol);
+        if (!$coin) return ExitCode::UNSPECIFIED_ERROR;
+
+        $service = new MarketService();
+        $market  = $service->getBestMarket($coin);
+        if (!$market) {
+            $this->stderr("no usable market for {$symbol}\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $this->stdout(sprintf(
+            "symbol=%s market=%s deposit=%s amount=%s dryRun=%s\n",
+            $coin->symbol,
+            $market->name,
+            $market->deposit_address,
+            $amount === null ? 'auto' : sprintf('%.8f', $amount),
+            $this->dryRun ? 'yes' : 'no'
+        ));
+
+        $ok = $service->sellCoin($symbol, $amount, $this->dryRun);
+        $this->stdout($ok ? "ok\n" : "skipped or failed\n");
+        return $ok ? ExitCode::OK : ExitCode::UNSPECIFIED_ERROR;
+    }
+
+    /** Set a validated exchange deposit address for one market. */
+    public function actionDeposit(string $symbol, string $marketName, string $address): int
+    {
+        $coin = $this->findCoin($symbol);
+        if (!$coin) return ExitCode::UNSPECIFIED_ERROR;
+
+        $market = Markets::find()->where([
+            'coinid' => $coin->id,
+            'name' => $marketName,
+            'deleted' => 0,
+        ])->one();
+        if (!$market) {
+            $this->stderr("market '{$marketName}' not found for {$symbol}\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $address = trim($address);
+        $own = (int) Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM coins WHERE LOWER(TRIM(master_wallet)) = LOWER(:addr)',
+            [':addr' => $address]
+        )->queryScalar();
+        if ($own > 0) {
+            $this->stderr("refusing pool master wallet as deposit address: {$address}\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $remote = new \app\components\rpc\WalletRPC($coin);
+        $info   = $remote->validateaddress($address);
+        if (!($info['isvalid'] ?? false)) {
+            $this->stderr("invalid {$symbol} address: {$address}\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $market->deposit_address = $address;
+        $market->save();
+        $this->stdout("{$symbol} {$marketName} deposit={$address}\n");
         return ExitCode::OK;
     }
 

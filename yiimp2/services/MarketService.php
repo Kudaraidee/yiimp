@@ -452,14 +452,29 @@ class MarketService
     }
 
     /**
+     * Sell an explicit amount for one coin. Used by the controlled
+     * `php yii market/sell` command; it does not start any queue worker.
+     */
+    public function sellCoin(string $symbol, ?float $amountOverride = null, bool $dryRun = false): bool
+    {
+        $coin = Coins::find()->where(['symbol' => strtoupper(trim($symbol))])->one();
+        if (!$coin) {
+            Yii::warning("sell: coin {$symbol} not found", __CLASS__);
+            return false;
+        }
+
+        return $this->sellCoinToExchange($coin, $amountOverride, $dryRun);
+    }
+
+    /**
      * Send available balance for a single coin to its best market deposit address.
      * Handles z-address shielding for Zcash-family coins and per-coin amount caps.
      * Ports: sellCoinToExchange()
      */
-    private function sellCoinToExchange(Coins $coin): void
+    private function sellCoinToExchange(Coins $coin, ?float $amountOverride = null, bool $dryRun = false): bool
     {
         if ($coin->dontsell) {
-            return;
+            return false;
         }
 
         $remote        = new \app\components\rpc\WalletRPC($coin);
@@ -472,81 +487,132 @@ class MarketService
 
         $info = $remote->getinfo();
         if (!$info || (!(float) ($info['balance'] ?? 0) && !$zBalance)) {
-            return;
+            return false;
         }
+
+        $txFee = (float) ($info['paytxfee'] ?? 0);
 
         // Send to symbol2 master wallet (alias coin relay)
         if (!empty($coin->symbol2)) {
             $aliasCoin = Coins::find()->where(['symbol' => $coin->symbol2])->one();
             if (!$aliasCoin) {
-                return;
+                return false;
             }
-            $amount = ((float) ($info['balance'] ?? 0) - (float) ($info['paytxfee'] ?? 0)) * 0.9;
+            if ($dryRun) {
+                return true;
+            }
+            $amount = ((float) ($info['balance'] ?? 0) - $txFee) * 0.9;
             $remote->sendtoaddress($aliasCoin->master_wallet, $amount);
-            return;
+            return true;
         }
 
         $market = $this->getBestMarket($coin);
         if (!$market) {
-            return;
+            return false;
         }
 
         // Skip if a previous send is still pending confirmation
         if ($market->lastsent !== null && $market->lastsent > $market->lasttraded) {
-            return;
+            return false;
         }
 
-        $depositAddress = $market->deposit_address;
+        $depositAddress = trim((string) $market->deposit_address);
         $marketName     = $market->name;
 
-        if (empty($depositAddress)) {
-            return;
+        if ($depositAddress === '') {
+            return false;
         }
 
-        $reserved1 = (float) Yii::$app->db->createCommand(
-            "SELECT SUM(balance) FROM accounts WHERE coinid=:cid",
-            [':cid' => $coin->id]
+        // Some seeded market rows still contain the pool's own master wallet as
+        // a placeholder. Sending there only burns the tx fee; it never funds
+        // the exchange account. Refuse it for both automatic and manual sells.
+        $ownWallet = (int) Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM coins WHERE LOWER(TRIM(master_wallet)) = LOWER(:addr)',
+            [':addr' => $depositAddress]
         )->queryScalar();
-        $reserved2 = (float) Yii::$app->db->createCommand(
-            "SELECT SUM(amount*price) FROM earnings
-             WHERE status!=2 AND userid IN (SELECT id FROM accounts WHERE coinid=:cid)",
-            [':cid' => $coin->id]
-        )->queryScalar();
+        if ($ownWallet > 0) {
+            Yii::warning(
+                "sell: deposit address {$depositAddress} is a pool master wallet for {$coin->symbol}; skipped",
+                __CLASS__
+            );
+            return false;
+        }
 
-        $txFee    = (float) ($info['paytxfee'] ?? 0);
-        $reserved = ($reserved1 + $reserved2) * 10;
-        $amount   = (float) ($info['balance'] ?? 0) - $txFee - $reserved;
+        if ($amountOverride !== null) {
+            if ($amountOverride <= 0) {
+                return false;
+            }
+            if (!empty($walletZAddress)) {
+                Yii::warning("sell: explicit amount is not supported for z-address coin {$coin->symbol}", __CLASS__);
+                return false;
+            }
+            $maxAmount = (float) ($info['balance'] ?? 0) - $txFee;
+            if ($amountOverride > $maxAmount) {
+                Yii::warning(
+                    sprintf(
+                        'sell: requested %.8f %s exceeds spendable %.8f',
+                        $amountOverride, $coin->symbol, $maxAmount
+                    ),
+                    __CLASS__
+                );
+                return false;
+            }
+            $amount = round($amountOverride, 8);
+        } else {
+            $reserved1 = (float) Yii::$app->db->createCommand(
+                "SELECT SUM(balance) FROM accounts WHERE coinid=:cid",
+                [':cid' => $coin->id]
+            )->queryScalar();
+            $reserved2 = (float) Yii::$app->db->createCommand(
+                "SELECT SUM(amount*price) FROM earnings
+                 WHERE status!=2 AND userid IN (SELECT id FROM accounts WHERE coinid=:cid)",
+                [':cid' => $coin->id]
+            )->queryScalar();
 
-        // ZCash-family: shield coinbase to z-address first, then send from z-address
-        if (!empty($walletZAddress)) {
-            if ($amount > $coin->sellthreshold) {
-                $result = $remote->z_shieldcoinbase('*', $walletZAddress);
-                if (!$result) {
-                    return;
+            $reserved = ($reserved1 + $reserved2) * 10;
+            $amount   = (float) ($info['balance'] ?? 0) - $txFee - $reserved;
+
+            // ZCash-family: shield coinbase to z-address first, then send from z-address
+            if (!empty($walletZAddress)) {
+                if ($amount > $coin->sellthreshold) {
+                    $result = $remote->z_shieldcoinbase('*', $walletZAddress);
+                    if (!$result) {
+                        return false;
+                    }
                 }
+                $zAmount = (float) $zBalance - $txFee - $reserved;
+                if ($zAmount < $coin->sellthreshold) {
+                    return false;
+                }
+                if (!$dryRun) {
+                    $remote->z_sendmany($walletZAddress, [
+                        ['address' => $depositAddress, 'amount' => round($zAmount - 0.0001, 8)],
+                    ]);
+                }
+                return true;
             }
-            $zAmount = (float) $zBalance - $txFee - $reserved;
-            if ($zAmount < $coin->sellthreshold) {
-                return;
-            }
-            $remote->z_sendmany($walletZAddress, [
-                ['address' => $depositAddress, 'amount' => round($zAmount - 0.0001, 8)],
-            ]);
-            return;
-        }
 
-        if ($amount < (float) $coin->sellthreshold) {
-            return;
-        }
-        if ($amount > (float) $coin->sellthreshold && $amount < (float) $coin->reward / 4) {
-            return;
+            if ($amount < (float) $coin->sellthreshold) {
+                return false;
+            }
+            if ($amount > (float) $coin->sellthreshold && $amount < (float) $coin->reward / 4) {
+                return false;
+            }
         }
 
         // Validate deposit address before sending
         $addrInfo = $remote->validateaddress($depositAddress);
         if (!($addrInfo['isvalid'] ?? false)) {
             Yii::warning("sell: invalid deposit address {$depositAddress} for {$coin->symbol}", __CLASS__);
-            return;
+            return false;
+        }
+
+        if ($dryRun) {
+            Yii::info(
+                sprintf('sell dry-run: %.8f %s → %s (%s)', $amount, $coin->symbol, $depositAddress, $marketName),
+                __CLASS__
+            );
+            return true;
         }
 
         $amount = round($amount, 8);
@@ -563,7 +629,7 @@ class MarketService
             $tx = $remote->sendtoaddress($depositAddress, $amount);
             if (!$tx) {
                 Yii::warning("sell: {$coin->symbol} failed to send {$amount} → {$depositAddress}: {$remote->error}", __CLASS__);
-                return;
+                return false;
             }
         }
 
@@ -579,5 +645,7 @@ class MarketService
         $deposit->status     = 'waiting';
         $deposit->tx         = $tx;
         $deposit->save();
+
+        return true;
     }
 }
