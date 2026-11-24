@@ -54,15 +54,16 @@ $balance      = (float) $user->balance;
 $total_unpaid = $balance + $total_unsold;
 $total_earned = $total_unsold + $balance + $total_paid_raw;
 
-// ── Last 24h payouts ──────────────────────────────────────────────────────────
-$t24h    = time() - 86400;
+// ── Last 15 payouts ───────────────────────────────────────────────────────────
+$payoutLimit = 15;
 $payouts = Payouts::find()
     ->where(['account_id' => $user->id])
-    ->andWhere(['>', 'time', $t24h])
     ->orderBy('time DESC')
+    ->limit($payoutLimit)
     ->all();
 
-$payout24h = array_sum(array_map(fn($p) => (float) $p->amount, $payouts));
+$payoutTotal = array_sum(array_map(fn($p) => (float) $p->amount, $payouts));
+$payout24h   = $payoutTotal; // retained for the adminlte/tailwind layout branches
 
 // ── Extra payouts ─────────────────────────────────────────────────────────────
 $firstId = empty($payouts) ? 999999999 : min(array_map(fn($p) => $p->id, $payouts));
@@ -180,13 +181,13 @@ $fmtUsdt = function ($v) {
 <div id="wallet-payouts-card" class="main-left-box">
 <div class="main-left-title">
     <span class="wl-head-main">
-        <span class="wl-title">Last 24h Payouts</span>
+        <span class="wl-title">Last 15 Payouts</span>
     </span>
     <span class="wl-chips">
         <span class="wl-pill blue"><?= count($payouts) ?> payouts</span>
-        <span class="wl-pill green"><?= Html::encode($conv->bitcoinvaluetoa($payout24h) . ' ' . $sym) ?></span>
-        <?php if ($payout24hUsdt !== null && $payout24h > 0): ?><span class="wl-pill teal">≈ <?= Html::encode($fmtUsdt($payout24hUsdt)) ?> USDT</span><?php endif ?>
-        <span class="wl-pill">24h</span>
+        <span class="wl-pill green"><?= Html::encode($conv->bitcoinvaluetoa($payoutTotal) . ' ' . $sym) ?></span>
+        <?php if ($payout24hUsdt !== null && $payoutTotal > 0): ?><span class="wl-pill teal">≈ <?= Html::encode($fmtUsdt($payout24hUsdt)) ?> USDT</span><?php endif ?>
+        <span class="wl-pill">15</span>
     </span>
 </div>
 <div class="main-left-inner">
@@ -204,7 +205,7 @@ $fmtUsdt = function ($v) {
 <?php endif ?>
 <tr class="wl-total">
     <td><span class="wl-val">Total</span></td>
-    <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($payout24h)) ?></span><span class="wl-cap"><?= Html::encode($sym) ?></span><?php if ($payout24hUsdt !== null && $payout24h > 0): ?><span class="wl-cap">≈ <?= Html::encode($fmtUsdt($payout24hUsdt)) ?> USDT</span><?php endif ?></td>
+    <td><span class="wl-val"><?= Html::encode($conv->bitcoinvaluetoa($payoutTotal)) ?></span><span class="wl-cap"><?= Html::encode($sym) ?></span><?php if ($payout24hUsdt !== null && $payoutTotal > 0): ?><span class="wl-cap">≈ <?= Html::encode($fmtUsdt($payout24hUsdt)) ?> USDT</span><?php endif ?></td>
     <td></td>
 </tr>
 </tbody>
@@ -224,7 +225,7 @@ $fmtUsdt = function ($v) {
 </tbody>
 </table>
 <?php endif ?>
-<div class="wl-foot"><span>Extra payouts are re-sent transactions detected in the same window</span><span>Refresh 60s</span></div>
+<div class="wl-foot"><span>Extra payouts are re-sent transactions detected in this period</span><span>Refresh 60s</span></div>
 </div></div>
 
 
