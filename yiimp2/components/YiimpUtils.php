@@ -282,7 +282,7 @@ class YiimpUtils extends Component
 
 		// coins.price is BTC per coin, so the rate above is BTC/MH/day. Every
 		// caller (views, API and algos.profit comparisons) expects mBTC/MH/day.
-		return $btcmhd * $algo_unit_factor * 1000;
+		return $btcmhd * $algo_unit_factor * YIIMP_PROFITABILITY_MBTC_FACTOR;
 	}
 
 	/** Currency users are paid in. BTC by default, configurable via settings. */
