@@ -30,11 +30,11 @@ INSERT IGNORE INTO `coins`
    `visible`, `auto_exchange`, `installed`, `auto_ready`, `rpchost`, `rpcport`,
    `rpcuser`, `rpcpasswd`, `rpccurl`, `hasgetinfo`, `hassubmitblock`,
    `usesegwit`, `auxpow`, `txfee`, `block_time`, `mature_blocks`,
-   `master_wallet`, `link_explorer`, `network_hash`)
+   `master_wallet`, `link_explorer`, `network_hash`, `image`)
 VALUES
   (14, 'Telestai', 'TLS', 'meraki', 'BTC', 351, 0, 1,
    1, 0, 1, 1, '127.0.0.1', 8766,
    'yiimprpc', '', 1, 0, 1,
    1, 0, 0, 60, 100,
    'AmNJHTBSSznzJDQoV8WAPAEVkFjzCPJ4qxmy6CB49V7FYE5xNzzS',
-   'https://telestai.cryptoscope.io/', 0);
+   'https://telestai.cryptoscope.io/', 0, '/images/coin-TLS.png');
