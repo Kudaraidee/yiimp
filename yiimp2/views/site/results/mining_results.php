@@ -272,7 +272,7 @@ foreach ($list as $coin) {
     $shared_hash_sfx = $pool_shared ? $conv->Itoa2($pool_shared) . 'h/s' : '';
     $solo_hash_sfx   = $pool_solo   ? $conv->Itoa2($pool_solo)   . 'h/s' : '';
 
-    $btcmhd_fmt = $conv->mbitcoinvaluetoa($btcmhd);
+    $btcmhd_fmt = $conv->mbitcoinestimatevaluetoa($btcmhd);
 
     // TTF tooltip
     $ttfTitle = '';

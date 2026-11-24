@@ -255,7 +255,7 @@ foreach ($algos as $item) {
         $nethash     = Yii::$app->YiimpUtils->display_network_hashrate($coin);
         $nethash_sfx = $nethash ? strtoupper($conv->Itoa2($nethash)) . 'H/s' : '—';
 
-        $btcmhd = $conv->mbitcoinvaluetoa(Yii::$app->YiimpUtils->yiimp_profitability($coin));
+        $btcmhd = $conv->mbitcoinestimatevaluetoa(Yii::$app->YiimpUtils->yiimp_profitability($coin));
         $isBest = ($algo === $best_algo);
 
         $initials = strtoupper(substr($coin->symbol, 0, 3));

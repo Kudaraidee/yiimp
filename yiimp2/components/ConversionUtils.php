@@ -130,6 +130,24 @@ class ConversionUtils extends Component
 		return sprintf('%.5f', round($v, 5, PHP_ROUND_HALF_DOWN));
 	}
 
+	/**
+	 * Per-hash profitability estimates can be far below 0.00001 mBTC. Keep
+	 * those tiny values visible instead of rounding every row to 0.00000.
+	 */
+	public function mbitcoinestimatevaluetoa($v)
+	{
+		$v = (float) $v;
+		if ($v <= 0 || $v >= 0.00001) {
+			return $this->mbitcoinvaluetoa($v);
+		}
+		if ($v < 0.000000000001) {
+			return sprintf('%.2e', $v);
+		}
+
+		$s = rtrim(sprintf('%.12f', round($v, 12, PHP_ROUND_HALF_DOWN)), '0');
+		return substr($s, -1) === '.' ? $s . '0' : $s;
+	}
+
 	/** Format a coin amount as a BTC value, wrapping trailing zeros in a dim span. */
 	public function valuetocell(mixed $amount): string
 	{
