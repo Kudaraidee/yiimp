@@ -94,9 +94,9 @@ void db_add_user(YAAMP_DB *db, YAAMP_CLIENT *client)
 			if (g_list_coind.first) {
 				CLI li = g_list_coind.first;
 				YAAMP_COIND *coind = (YAAMP_COIND *)li->data;
-				if (!strlen(client->worker)) strcpy(client->worker, client->username);
-				strcpy(client->username, coind->wallet);
-				if (!strcmp(client->username, "benchmark")) strcat(client->password, ",stats");
+				if (!strlen(client->worker)) STRSET(client->worker, client->username);
+				STRSET(client->username, coind->wallet);
+				if (!strcmp(client->username, "benchmark")) STRADD(client->password, ",stats");
 				if (!strcmp(client->username, "donate")) gift = 100;
 			}
 		}

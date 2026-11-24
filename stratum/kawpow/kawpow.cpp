@@ -78,12 +78,12 @@ void build_kawpow_header(YAAMP_JOB_TEMPLATE* templ, const char* nonce64, const c
     YAAMP_JOB_VALUES submitvalues;
     memset(&submitvalues, 0, sizeof(submitvalues));
 
-    sprintf(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
+    STRFMT(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
     int coinbase_len = strlen(submitvalues.coinbase);
     memcpy(coinbase, submitvalues.coinbase, coinbase_len);
 
-    unsigned char coinbase_bin[1024];
-    memset(coinbase_bin, 0, 1024);
+    unsigned char coinbase_bin[sizeof(submitvalues.coinbase)/2];
+    memset(coinbase_bin, 0, sizeof(coinbase_bin));
     binlify(coinbase_bin, submitvalues.coinbase);
 
     char doublehash[128];
@@ -115,7 +115,7 @@ void build_kawpow_header(YAAMP_JOB_TEMPLATE* templ, const char* nonce64, const c
 
     char blockheader[512];
     memset(blockheader, 0, 512);
-    sprintf(blockheader, "%s%s%s%s%s%08x%s%s%s", templ->version, templ->prevhash_be, submitvalues.merkleroot_be,
+    STRFMT(blockheader, "%s%s%s%s%s%08x%s%s%s", templ->version, templ->prevhash_be, submitvalues.merkleroot_be,
         ntime, templ->nbits, templ->height, n1, n2, mixhash_be);
 
     ser_string_be(blockheader, blockheader_be, 30);
@@ -125,11 +125,11 @@ uint256 build_header_hash(YAAMP_JOB_TEMPLATE* templ)
 {
     YAAMP_JOB_VALUES submitvalues;
     memset(&submitvalues, 0, sizeof(submitvalues));
-    sprintf(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
+    STRFMT(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
     int coinbase_len = strlen(submitvalues.coinbase);
 
-    unsigned char coinbase_bin[1024];
-    memset(coinbase_bin, 0, 1024);
+    unsigned char coinbase_bin[sizeof(submitvalues.coinbase)/2];
+    memset(coinbase_bin, 0, sizeof(coinbase_bin));
     binlify(coinbase_bin, submitvalues.coinbase);
 
     char doublehash[128];
@@ -189,7 +189,7 @@ void kawpow_block(YAAMP_CLIENT* client, YAAMP_JOB* job, YAAMP_JOB_TEMPLATE *temp
     char block_header[256];
     memset(block_header, 0, sizeof(block_header));
 
-    char coin_base[256];
+    char coin_base[sizeof(YAAMP_JOB_VALUES::coinbase)];	// build_kawpow_header() copies the coinbase
     memset(coin_base, 0, sizeof(coin_base));
 
     build_kawpow_header(templ, nonce64, mixhash, block_header, coin_base);

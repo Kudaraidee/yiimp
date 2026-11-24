@@ -18,20 +18,20 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
 
 	if (!strcmp(g_stratum_algo, "lbry")) {
-		sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
+		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
 			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
 			job->id, templ->prevhash_be, templ->claim_be, templ->coinb1, templ->coinb2,
 			templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 		return;
 	} else if (strlen(templ->extradata_hex) == 128) {
 		// LUX smart contract state hashes (like lbry extra field, here the 2 root hashes in one)
-		sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
+		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
 			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
 			job->id, templ->prevhash_be, templ->extradata_be, templ->coinb1, templ->coinb2,
 			templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 		return;
 	} else if (!strcmp(g_stratum_algo,"neoscrypt-xaya")) {
-		sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
+		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
 				"\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
 			job->id, "0000000000000000000000000000000000000000000000000000000000000000", templ->xaya_header,
 			"", "", "20000000", templ->nbits, templ->ntime);
@@ -52,7 +52,7 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 
 		sprintf(equihash_params, "%i_%i", g_equihash_wn, g_equihash_wk);
 
-		strcpy(equihash_personalization,
+		STRSET(equihash_personalization,
 				((strlen(job->coind->personalization)>0)?job->coind->personalization:"ZcashPoW"));
 
 		string_be(templ->version, version_reversed);
@@ -66,12 +66,12 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 
 		char job_message[1024];
 		sprintf(job_message,"{\"id\":null,\"method\":\"client.show_message\",\"params\":[\"equihash %s block %i\"]}\n",
-				(job->coind)?"unknown":job->coind->symbol,
+				(job->coind)?job->coind->symbol:"unknown",
 				templ->height);
 
 		//[2017-12-07 13:53:12] < {"id":null,"method":"client.show_message","params":["equihash KMD block 611840"]}
 
-		sprintf(buffer, "%s{\"id\":null,\"method\":\"mining.notify\",\"params\":["
+		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "%s{\"id\":null,\"method\":\"mining.notify\",\"params\":["
 				"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",true,\"%s\",\"%s\"]}\n", job_message,
 				job->id, version_reversed, prev_hash_reversed, merkleroot_reversed,
 				finalsaplingroot_reversed, time_reversed, bits_reversed,
@@ -80,7 +80,7 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 	}
 
 	// standard stratum
-	sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+	str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
 		job->id, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 }
 
