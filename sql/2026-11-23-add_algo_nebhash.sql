@@ -7,6 +7,10 @@
 -- the JSON-RPC getinfo method only for chain id/height. PoW, targets, chain
 -- shares and block submission are handled by stratum/nebhash/.
 --
+-- The coinbase emits 20 NEB total, but 1 NEB goes to a dev locktype-2 output.
+-- The pool only controls the 19 NEB miner output, so `reward` is the effective
+-- pool reward used for estimates/display, not the raw network emission.
+--
 -- Only the pinned NMD2/Kepler+TESS dataset shipped with node v1.0.4 is
 -- supported. Legacy V1 model frames are rejected; a pool must run node
 -- v1.0.4 with a matching neb-datasets.bin.
@@ -25,7 +29,7 @@ INSERT IGNORE INTO `coins`
    `rpccurl`, `hasgetinfo`, `hassubmitblock`, `usesegwit`, `auxpow`, `txfee`,
    `block_time`, `network_hash`)
 VALUES
-  (13, 'Neb', 'NEB', 'nebhash', 'BTC', 20, 0, 1,
+  (13, 'Neb', 'NEB', 'nebhash', 'BTC', 19, 0, 1,
    1, 0, 1, 1, '127.0.0.1', 8432,
    1, 0, 0, 0, 0, 0,
    60, 0);
