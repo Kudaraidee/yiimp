@@ -271,7 +271,7 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 
 	for(i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
 		block_size += strlen((*i).c_str());
-	block_size += strlen(templ->mweb);
+	if (templ->mweb) block_size += strlen(templ->mweb);
 
 	char *block_hex = (char *)malloc(block_size);
 	if(!block_hex) return;
@@ -397,7 +397,7 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 				snprintf(block_hex, block_size, "%s", hex);
 		}
 
-		if(strlen(templ->mweb) > 0) {
+		if(templ->mweb) {
 			strcat(block_hex, "01");
 			strcat(block_hex, templ->mweb);
 		}

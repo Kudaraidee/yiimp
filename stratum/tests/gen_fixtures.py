@@ -89,12 +89,18 @@ write_case('fixtures', 'btc-segwit', dict(BASE, segwit=1),
 write_case('fixtures', 'btc-empty', BASE, {'getblocktemplate': gbt(ntx=0)})
 write_case('fixtures', 'x11-masternodes', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(2), coinbase_payload='00' * 40)})
-# 40 payees: a 2.8K coinb2, still within the fixed buffers
+# 40 payees: a 2.8K coinb2
 write_case('fixtures', 'x11-payees-40', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(40))})
+# 100 payees: a 6.9K coinb2, close to coinb2[8K]
+write_case('fixtures', 'x11-payees-100', dict(BASE, algo='x11', symbol='TDASH'),
+           {'getblocktemplate': gbt(ntx=2, **payees(100))})
+# litecoin MWEB: the extension block data is kept for block submission
+write_case('fixtures', 'ltc-mweb', dict(BASE, algo='scrypt', symbol='TLTC', segwit=1, mweb=1),
+           {'getblocktemplate': gbt(ntx=2, segwit=True, mweb=''.join(h('mweb', i) for i in range(16)))})
 
 # ---- overflow inputs -------------------------------------------------------
-# 200 payees: script_dests[4096] (stack), coinb2[8K], coinbase[4096]
+# 200 payees: coinb2[8K]
 write_case('overflow', 'payees-200', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(200))})
 # 10 KB coinbase_payload: coinb2[8K]
