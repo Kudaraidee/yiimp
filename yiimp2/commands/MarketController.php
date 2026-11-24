@@ -8,6 +8,7 @@ use yii\console\ExitCode;
 use app\models\Coins;
 use app\models\Markets;
 use app\models\Market_history;
+use app\exchanges\ExchangeFactory;
 use app\services\MarketService;
 
 /**
@@ -16,6 +17,7 @@ use app\services\MarketService;
  * Usage:
  *   php yii market/quotes                             — refresh stablecoin BTC rates
  *   php yii market/sell <SYM> [AMOUNT] --dryRun=1     — controlled one-shot deposit send
+ *   php yii market/trade <EXCHANGE>                  — controlled one-shot trading pass
  *   php yii market/deposit <SYM> <MARKET> <ADDRESS>   — set a validated exchange deposit address
  *   php yii market/list <SYM>                         — list all markets for a coin
  *   php yii market/histo <SYM> <exchange>             — last 100 market history entries
@@ -93,6 +95,28 @@ class MarketController extends Controller
         $ok = $service->sellCoin($symbol, $amount, $this->dryRun);
         $this->stdout($ok ? "ok\n" : "skipped or failed\n");
         return $ok ? ExitCode::OK : ExitCode::UNSPECIFIED_ERROR;
+    }
+
+    /**
+     * One-shot trading pass for a single exchange. Does not start the queue
+     * worker; only coins with dontsell=0 are eligible inside the driver.
+     */
+    public function actionTrade(string $exchange): int
+    {
+        if (!$this->exchangeExists($exchange)) {
+            $this->stderr("exchange '{$exchange}' not found\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $driver = ExchangeFactory::make($exchange);
+        if (!$driver->supportsTrading()) {
+            $this->stderr("exchange '{$exchange}' does not support trading\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $driver->trade();
+        $this->stdout("{$exchange} trade pass complete\n");
+        return ExitCode::OK;
     }
 
     /** Set a validated exchange deposit address for one market. */
