@@ -21,6 +21,8 @@ SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/
 	meowpow/lib/progpow.cpp meowpow/hash.cpp
 
 CFLAGS += -DHAVE_CURL
+include arch.mk
+CFLAGS := $(filter-out -march=native,$(CFLAGS)) -march=$(ARCH)
 SOURCES += rpc_curl.cpp
 #LDCURL = $(shell /usr/bin/pkg-config --static --libs libcurl)
 #LDFLAGS += $(LDCURL)
@@ -86,6 +88,12 @@ clean:
 	rm -f algos/SWIFFTX/*.o
 	rm -f algos/yespower/*.o
 	rm -f algos/yespower/crypto/*.o
+	rm -f algos/blake3/*.o
+	rm -f algos/sha3/*.o
+	rm -f algos/xelisv2-pepew/*.o
+	rm -f kawpow/lib/keccak/*.o
+	rm -f phihash/*.o phihash/lib/*.o
+	rm -f meowpow/*.o meowpow/lib/*.o
 	rm -f kawpow/*.o
 	rm -f kawpow/lib/ethash/*.o
 	rm -f firopow/*.o
