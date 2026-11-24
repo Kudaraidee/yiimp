@@ -135,8 +135,9 @@ if (Yii::$app->LayoutManager->isLegacy()): ?>
 
 <p style="width: 700px; color: #666;">
     NEB difficulty is shown in the miner's unit (1 = 10^10 expected hashes) so the web matches ForgeMiner;
-    hover the value for the raw 256-bit target difficulty. For NEB, <code>d=</code>/<code>sd=</code>
-    pin/seed the vardiff k (1–48), not a decimal difficulty.
+    hover the value for the raw 256-bit target difficulty. For NEB, <code>d=0.1</code> pins that displayed
+    difficulty; <code>sd=0.1</code> seeds it and lets vardiff adjust it. Integer values 1–48 still select
+    the reference pool's <code>k = share_target &lt;&lt; k</code> shift.
 </p>
 
 <p style="width: 700px; color: #666;">

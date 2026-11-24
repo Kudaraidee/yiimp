@@ -52,6 +52,7 @@ foreach ($rows as $r) {
 }
 $scryptPort = $ports['scrypt'] ?? 3433;
 $ethashPort = $ports['ethash'] ?? 3639;
+$nebPort = $ports['nebhash'] ?? 3645;
 
 $liveCount = 0;
 foreach ($rows as $r) {
@@ -269,13 +270,17 @@ CSS;
         <p><code>d=</code> pins difficulty for the whole session. <code>sd=</code> only seeds the initial
            difficulty and still lets vardiff adjust it later. Firopow ignores a custom <code>d=</code> value.</p>
         <p>NEB difficulty is shown in the miner's unit (1 = 10^10 expected hashes), so the web matches
-           ForgeMiner; hover the value for the raw 256-bit target difficulty. For NEB, <code>d=</code>/<code>sd=</code>
-           pin/seed the vardiff k (1–48), not a decimal difficulty.</p>
+           ForgeMiner; hover the value for the raw 256-bit target difficulty. For NEB, <code>d=0.1</code> pins
+           the displayed difficulty and <code>sd=0.1</code> seeds it with vardiff still active. Integer
+           values 1–48 still select the reference pool's <code>k</code> shift.</p>
         <div class="df-code"># Scrypt, fixed diff 64
 -o stratum+tcp://<?= Html::encode($stratumUrl) ?>:<?= (int) $scryptPort ?> -u WALLET.worker -p d=64
 
 # Ethash / Etchash, fixed diff 0.1
--o stratum+tcp://<?= Html::encode($stratumUrl) ?>:<?= (int) $ethashPort ?> -u WALLET.worker -p d=0.1</div>
+-o stratum+tcp://<?= Html::encode($stratumUrl) ?>:<?= (int) $ethashPort ?> -u WALLET.worker -p d=0.1
+
+# NEB, fixed miner-visible diff 0.1
+-o stratum+tcp://<?= Html::encode($stratumUrl) ?>:<?= (int) $nebPort ?> -u WALLET.worker -p d=0.1</div>
     </div>
     <div class="df-foot">Leave <code>d=</code> out to let vardiff manage difficulty automatically.</div>
 </div>

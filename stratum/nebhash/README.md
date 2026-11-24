@@ -41,6 +41,13 @@ This directory adds a `neb-pool/1` stratum listener for NEB v1.0.4 mainnet.
   the node returns an accepted two-byte `Result` frame.
 - V1 model frames are not supported. The loader accepts only `NMD2` /
   `neb2_model` datasets from node v1.0.5.
+- Password tokens `d=` and `sd=` select the session target before the first
+  job. An integer `1..48` keeps the reference pool's `k` shift
+  (`target = share_target << k`). Any other positive number is the miner's
+  display difficulty (`d=0.1` means `10^9` expected hashes); it is clamped so
+  the pool target is never harder than the node's `share_target`. `d=` pins
+  the value, `sd=` only seeds it and leaves vardiff active, and `d=` wins if
+  both are present. Invalid tokens are ignored.
 
 ## Smoke test
 

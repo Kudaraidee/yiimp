@@ -147,6 +147,11 @@ public:
 	uint32_t neb_k;
 	uint32_t neb_k_prev;
 	long long neb_k_changed;
+	// Non-zero when d=/sd= selected a miner-visible difficulty instead of a
+	// legacy integer k shift. The pool target is derived from
+	// neb_diff * 10^10 and clamped to the job's share target.
+	double neb_diff;
+	double neb_diff_prev;
 	long long neb_vardiff_start;
 	int neb_vardiff_shares;
 	long long neb_second_start;

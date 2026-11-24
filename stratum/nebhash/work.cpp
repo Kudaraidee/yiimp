@@ -56,6 +56,9 @@ using std::vector;
 
 // Reference neb-pool/1 limits (spec/pool.md section 9 and neb-pool/src/main.rs).
 #define NEB_K_MAX 48
+// Display unit shared with the web UI: one miner "difficulty" is 10^10
+// expected hashes. d=0.1 therefore targets 10^9 expected hashes per share.
+#define NEB_MINER_DIFF_SCALE 10000000000.0
 #define NEB_VARDiff_WINDOW_MS 60000LL
 #define NEB_RATE_HIGH 12
 #define NEB_RATE_LOW 3
@@ -660,6 +663,32 @@ static bool nebhash_le_lte(const uint8_t a[32], const uint8_t b[32])
 	return true;
 }
 
+// Convert a miner-visible difficulty (d=0.1) to a pool target, never making
+// the pool target harder than the node's share target.
+static void nebhash_target_from_display_diff(double diff,
+	const uint8_t share_target[32], uint8_t out[32])
+{
+	if (!(diff > 0) || !isfinite(diff))
+	{
+		memcpy(out, share_target, 32);
+		return;
+	}
+	nebhash_diff_to_target(diff * NEB_MINER_DIFF_SCALE, out);
+	if (nebhash_le_lte(out, share_target))
+		memcpy(out, share_target, 32);
+}
+
+// Target currently published to a session. Sessions without a d=/sd=
+// override keep the exact share_target << k behaviour.
+static void nebhash_client_target(const YAAMP_CLIENT *client,
+	const uint8_t share_target[32], uint8_t out[32])
+{
+	if (client && client->neb_diff > 0)
+		nebhash_target_from_display_diff(client->neb_diff, share_target, out);
+	else
+		nebhash_shift_target(share_target, client ? client->neb_k : 0, out);
+}
+
 void nebhash_client_set_target_silent(YAAMP_CLIENT *client, const uint8_t le[32])
 {
 	if (!client) return;
@@ -709,11 +738,11 @@ void nebhash_initial_target(uint8_t le[32])
 	nebhash_pool_target(g_nebhash_start_k, le);
 }
 
-static bool nebhash_template_target(YAAMP_JOB_TEMPLATE *templ, uint32_t k, uint8_t le[32])
+static bool nebhash_template_target(YAAMP_JOB_TEMPLATE *templ, const YAAMP_CLIENT *client, uint8_t le[32])
 {
 	uint8_t base[32];
 	if (!templ || !parse_hex_bytes(templ->neb_share_target, 32, base)) return false;
-	nebhash_shift_target(base, k, le);
+	nebhash_client_target(client, base, le);
 	return true;
 }
 
@@ -727,12 +756,19 @@ static void nebhash_submit_target(YAAMP_CLIENT *client, YAAMP_JOB_TEMPLATE *temp
 		memset(le, 0, 32);
 		return;
 	}
-	uint32_t k = client->neb_k;
-	if (client->neb_k_changed &&
-		neb_monotonic_ms() - client->neb_k_changed < NEB_PRIOR_TARGET_GRACE_MS &&
-		client->neb_k_prev > k)
-		k = client->neb_k_prev;
-	nebhash_shift_target(base, k, le);
+	nebhash_client_target(client, base, le);
+	if (!client->neb_k_changed ||
+		neb_monotonic_ms() - client->neb_k_changed >= NEB_PRIOR_TARGET_GRACE_MS)
+		return;
+
+	// The previous, easier target stays valid briefly after a harder change.
+	if (client->neb_diff > 0)
+	{
+		if (client->neb_diff_prev < client->neb_diff)
+			nebhash_target_from_display_diff(client->neb_diff_prev, base, le);
+	}
+	else if (client->neb_k_prev > client->neb_k)
+		nebhash_shift_target(base, client->neb_k_prev, le);
 }
 
 bool nebhash_current_job_ready()
@@ -758,6 +794,8 @@ void nebhash_client_init(YAAMP_CLIENT *client)
 	client->neb_k = g_nebhash_start_k;
 	client->neb_k_prev = g_nebhash_start_k;
 	client->neb_k_changed = neb_monotonic_ms();
+	client->neb_diff = 0;
+	client->neb_diff_prev = 0;
 	client->neb_vardiff_start = neb_monotonic_ms();
 	client->neb_vardiff_shares = 0;
 	client->neb_second_start = neb_monotonic_ms();
@@ -827,15 +865,15 @@ void nebhash_client_note_share_speed(YAAMP_CLIENT *client, double target_diff)
 	client->speed = client->neb_speed_diff / NEB_SPEED_WINDOW;
 }
 
-void nebhash_apply_password_k(YAAMP_CLIENT *client)
+void nebhash_apply_password(YAAMP_CLIENT *client)
 {
 	if (!client) return;
 
-	// Mirror yiimp's password semantics, but on NEB's k instead of a 64-bit
-	// difficulty: d= pins k for the whole session, sd= only seeds it and
-	// leaves the reference vardiff free to adjust it later. d= wins if both
-	// are present. Invalid or out-of-range values are ignored so a stray
-	// password token can never break an otherwise valid login.
+	// Mirror yiimp's password semantics: d= pins the target for the whole
+	// session, sd= only seeds it and leaves vardiff active. d= wins if both
+	// are present. A plain integer 1..48 keeps the reference pool's k shift;
+	// any other positive number is the miner/web display difficulty, where
+	// 0.1 means 10^9 expected hashes per share.
 	const char *value = client_password_param(client->password, "d", 1);
 	bool fixed = true;
 	if (!value)
@@ -847,13 +885,34 @@ void nebhash_apply_password_k(YAAMP_CLIENT *client)
 
 	errno = 0;
 	char *end = NULL;
-	long parsed = strtol(value, &end, 10);
+	long k = strtol(value, &end, 10);
 	while (*end == ' ' || *end == '\t') end++;
-	if (errno || end == value || (*end && *end != ',') || parsed < 1 || parsed > NEB_K_MAX)
+	bool integer_token = !errno && end != value && (!*end || *end == ',');
+	bool use_k = integer_token && k >= 1 && k <= NEB_K_MAX;
+	double diff = 0;
+
+	if (!use_k)
 	{
-		stratumlog("nebhash: ignoring invalid password k '%s' for client %d\n",
-			value, client->userid);
-		return;
+		// A pure integer outside 1..48 was always invalid; do not silently
+		// reinterpret it as a display difficulty (d=49, d=-1, d=0).
+		if (integer_token)
+		{
+			stratumlog("nebhash: ignoring invalid password k '%s' for client %d\n",
+				value, client->userid);
+			return;
+		}
+
+		errno = 0;
+		end = NULL;
+		diff = strtod(value, &end);
+		while (*end == ' ' || *end == '\t') end++;
+		if (errno || end == value || (*end && *end != ',') ||
+			!(diff > 0) || !isfinite(diff))
+		{
+			stratumlog("nebhash: ignoring invalid password difficulty '%s' for client %d\n",
+				value, client->userid);
+			return;
+		}
 	}
 
 	uint8_t share_target[32], target[32];
@@ -863,20 +922,39 @@ void nebhash_apply_password_k(YAAMP_CLIENT *client)
 	if (!has_work) return;
 
 	long long now = neb_monotonic_ms();
-	uint32_t k = (uint32_t) parsed;
-	client->neb_k = k;
-	client->neb_k_prev = k;
 	client->neb_k_changed = now;
 	client->neb_vardiff_start = now;
 	client->neb_vardiff_shares = 0;
 	client->difficulty_fixed = fixed;
 
-	nebhash_shift_target(share_target, k, target);
+	if (use_k)
+	{
+		client->neb_k = (uint32_t) k;
+		client->neb_k_prev = (uint32_t) k;
+		client->neb_diff = 0;
+		client->neb_diff_prev = 0;
+		nebhash_shift_target(share_target, client->neb_k, target);
+		stratumlog("nebhash: password %s=%ld k for client %d (fixed=%d)\n",
+			fixed ? "d" : "sd", k, client->userid, fixed ? 1 : 0);
+	}
+	else
+	{
+		// The pool target may never be harder than the node's share target.
+		double max_diff = nebhash_target_to_diff(share_target) / NEB_MINER_DIFF_SCALE;
+		if (diff > max_diff) diff = max_diff;
+		if (diff < 1e-6) diff = 1e-6;
+
+		client->neb_k = g_nebhash_start_k;
+		client->neb_k_prev = g_nebhash_start_k;
+		client->neb_diff = diff;
+		client->neb_diff_prev = diff;
+		nebhash_target_from_display_diff(diff, share_target, target);
+		stratumlog("nebhash: password %s=%.6g difficulty for client %d (fixed=%d)\n",
+			fixed ? "d" : "sd", diff, client->userid, fixed ? 1 : 0);
+	}
+
 	nebhash_client_set_target_silent(client, target);
 	client->difficulty_actual = nebhash_target_to_diff(target);
-
-	stratumlog("nebhash: password %s=%ld k for client %d (fixed=%d)\n",
-		fixed ? "d" : "sd", parsed, client->userid, fixed ? 1 : 0);
 }
 
 int nebhash_extranonce2_size()
@@ -1102,25 +1180,53 @@ static bool nebhash_vardiff_apply(YAAMP_CLIENT *client, const uint8_t share_targ
 
 	double scaled = (double) counted * (double) NEB_VARDiff_WINDOW_MS / (double) elapsed;
 	uint32_t oldk = client->neb_k;
-	if (scaled > (double) NEB_RATE_HIGH && client->neb_k > 0)
+	double olddiff = client->neb_diff;
+	bool changed = false;
+
+	if (client->neb_diff > 0)
 	{
-		uint32_t steps = (uint32_t) floor(log(scaled / 6.0) / log(2.0));
-		if (steps < 1) steps = 1;
-		if (steps > client->neb_k) steps = client->neb_k;
-		client->neb_k -= steps;
+		// d=/sd= sessions vardiff on the displayed difficulty itself. Doubling
+		// the displayed difficulty halves the target, exactly like k -= 1.
+		double max_diff = nebhash_target_to_diff(share_target) / NEB_MINER_DIFF_SCALE;
+		const double min_diff = 1e-6;
+		if (scaled > (double) NEB_RATE_HIGH && client->neb_diff < max_diff)
+		{
+			uint32_t steps = (uint32_t) floor(log(scaled / 6.0) / log(2.0));
+			if (steps < 1) steps = 1;
+			client->neb_diff *= ldexp(1.0, (int) steps);
+			if (client->neb_diff > max_diff) client->neb_diff = max_diff;
+		}
+		else if (scaled < (double) NEB_RATE_LOW && client->neb_diff > min_diff)
+		{
+			client->neb_diff /= 2.0;
+			if (client->neb_diff < min_diff) client->neb_diff = min_diff;
+		}
+		changed = client->neb_diff != olddiff;
 	}
-	else if (scaled < (double) NEB_RATE_LOW && client->neb_k < NEB_K_MAX)
-		client->neb_k++;
+	else
+	{
+		if (scaled > (double) NEB_RATE_HIGH && client->neb_k > 0)
+		{
+			uint32_t steps = (uint32_t) floor(log(scaled / 6.0) / log(2.0));
+			if (steps < 1) steps = 1;
+			if (steps > client->neb_k) steps = client->neb_k;
+			client->neb_k -= steps;
+		}
+		else if (scaled < (double) NEB_RATE_LOW && client->neb_k < NEB_K_MAX)
+			client->neb_k++;
+		changed = client->neb_k != oldk;
+	}
 
 	client->neb_vardiff_start = now;
 	client->neb_vardiff_shares = 0;
-	if (client->neb_k == oldk) return false;
+	if (!changed) return false;
 
-	client->neb_k_prev = oldk;
+	if (client->neb_diff > 0) client->neb_diff_prev = olddiff;
+	else client->neb_k_prev = oldk;
 	client->neb_k_changed = now;
 
 	uint8_t target[32];
-	nebhash_shift_target(share_target, client->neb_k, target);
+	nebhash_client_target(client, share_target, target);
 	client->difficulty_actual = nebhash_target_to_diff(target);
 	nebhash_client_set_target_bytes(client, target);
 
@@ -1166,11 +1272,16 @@ bool nebhash_vardiff_tick(YAAMP_CLIENT *client)
 	long long now = neb_monotonic_ms();
 	if (!client->neb_vardiff_start) client->neb_vardiff_start = now;
 	uint32_t oldk = client->neb_k;
+	double olddiff = client->neb_diff;
 	if (!nebhash_vardiff_apply(client, share_target, client->neb_vardiff_shares, now))
 		return false;
 
-	stratumlog("nebhash: idle vardiff k %u -> %u for client %d\n",
-		oldk, client->neb_k, client->userid);
+	if (client->neb_diff > 0)
+		stratumlog("nebhash: idle vardiff difficulty %.6g -> %.6g for client %d\n",
+			olddiff, client->neb_diff, client->userid);
+	else
+		stratumlog("nebhash: idle vardiff k %u -> %u for client %d\n",
+			oldk, client->neb_k, client->userid);
 	return true;
 }
 
@@ -1697,7 +1808,7 @@ string nebhash_job_mining_notify(YAAMP_JOB *job, YAAMP_CLIENT *client)
 		// can be checked before the first job, but the reference pool still
 		// publishes it as an explicit set_target on the first pushed job.
 		uint8_t target[32];
-		if (nebhash_template_target(templ, client->neb_k, target) &&
+		if (nebhash_template_target(templ, client, target) &&
 			(need_target || memcmp(client->share_target.begin(), target, 32) != 0))
 			nebhash_client_set_target_bytes(client, target);
 		nebhash_send_model(client, templ);

@@ -21,9 +21,11 @@ double nebhash_initial_difficulty();
 
 // Per-session vardiff state and target publication.
 void nebhash_client_init(YAAMP_CLIENT *client);
-// Password tokens d=<k> (pin k) and sd=<k> (seed k, vardiff still active)
-// override the session's initial NEB k before the first job is published.
-void nebhash_apply_password_k(YAAMP_CLIENT *client);
+// Password tokens d=<value> (pin) and sd=<value> (seed, vardiff still active)
+// override the session's initial NEB target before the first job is published.
+// Integer 1..48 keeps the reference pool's k shift; any other positive number
+// is in the miner's display unit: d=0.1 means 10^9 expected hashes.
+void nebhash_apply_password(YAAMP_CLIENT *client);
 
 // Extranonce2 length advertised by the current node job (extranonce_size - 4).
 int nebhash_extranonce2_size();

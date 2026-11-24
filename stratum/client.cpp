@@ -374,9 +374,9 @@ bool client_authorize(YAAMP_CLIENT *client, json_value *json_params)
 	if(neb_password)
 	{
 		strncpy(client->password, neb_password, 1023);
-		// NEB's password d=/sd= select the session's shift k rather than a
-		// generic yiimp difficulty. Apply it before the first job is pushed.
-		if (is_nebhash) nebhash_apply_password_k(client);
+		// NEB's password d=/sd= select the session's pool target rather than
+		// a generic yiimp difficulty. Apply it before the first job is pushed.
+		if (is_nebhash) nebhash_apply_password(client);
 	}
 
 	if (g_list_client.count >= g_stratum_max_cons) {

@@ -92,8 +92,40 @@ def le_shift_hex(hex_value, k):
     return value.to_bytes(32, "little").hex()
 
 
+def check_password_diff(args, password, diff, label):
+    """d=/sd= decimal values use the miner's 10^10 expected-hashes unit."""
+    c = Client(args.host, args.port, args.timeout)
+    try:
+        sid = c.send("mining.subscribe", ["neb-smoke-test/1", PROTOCOL])
+        reply = c.read_response(sid)
+        assert reply.get("error") is None, reply
+
+        aid = c.send("mining.authorize", [args.wallet + ".diff", password])
+        reply = c.read_response(aid)
+        assert reply.get("error") is None and reply.get("result") is True, reply
+
+        target_msg = c.read_method("mining.set_target")
+        target = target_msg.get("params", [None])[0]
+        assert is_hex(target, 64), target_msg
+        c.read_method("mining.set_model")
+
+        notify_msg = c.read_method("mining.notify")
+        job = notify_msg.get("params", [None])[0]
+        assert isinstance(job, dict) and is_hex(job.get("share_target"), 64), notify_msg
+
+        target_int = int.from_bytes(bytes.fromhex(target), "little")
+        share_int = int.from_bytes(bytes.fromhex(job["share_target"]), "little")
+        # The pool target must not be harder than the node's share target.
+        assert target_int >= share_int, (label, target, job["share_target"])
+        displayed = ((1 << 256) / (target_int + 1)) / 1e10
+        assert abs(displayed - diff) <= diff * 1e-6 + 1e-9, (label, displayed, diff)
+        print("PASS %s -> diff=%g" % (label, diff))
+    finally:
+        c.close()
+
+
 def check_password_k(args, password, k, label):
-    """d=/sd= must select the session's NEB shift k before job publication."""
+    """Integer 1..48 d=/sd= keeps the reference NEB shift k."""
     c = Client(args.host, args.port, args.timeout)
     try:
         sid = c.send("mining.subscribe", ["neb-smoke-test/1", PROTOCOL])
@@ -185,6 +217,9 @@ def main():
         check_password_k(args, "d=14", 14, "d= pins k")
         check_password_k(args, "sd=12", 12, "sd= seeds k")
         check_password_k(args, "sd=12,d=14", 14, "d= wins over sd=")
+        check_password_diff(args, "d=0.1", 0.1, "d= pins miner difficulty")
+        check_password_diff(args, "sd=0.2", 0.2, "sd= seeds miner difficulty")
+        check_password_diff(args, "sd=0.2,d=0.1", 0.1, "d= wins over sd= (difficulty)")
 
         eid = c.send("mining.submit", [args.wallet + ".unknown", "deadbeef", "00", "0", "0"])
         check_error(c.read_response(eid), 24)
