@@ -861,12 +861,22 @@ class YiimpUtils extends Component
 	public function worker_rate($workerid, $algo=null)
 	{
 		if (!$algo) $algo = Yii::$app->session->get('yaamp-algo');
+		return $this->worker_rate_window($workerid, $algo, $this->hashrate_step($algo));
+	}
 
+	/**
+	 * Hashrate over an explicit window, used for the miner-style 1m/1h/24h view.
+	 * For NEB, hashrate_constant() is 1000, so this reduces to
+	 * SUM(share target difficulty) / seconds — the same work the miner reports.
+	 */
+	public function worker_rate_window($workerid, $algo=null, int $interval=600, int $ttl=60)
+	{
+		if (!$algo) $algo = Yii::$app->session->get('yaamp-algo');
+		$interval = max(1, $interval);
 		$target   = $this->hashrate_constant($algo);
-		$interval = $this->hashrate_step($algo);
 		$delay    = time() - $interval;
 
-		$cacheKey = "YIIMP_worker_rate-{$workerid}-{$algo}";
+		$cacheKey = "YIIMP_worker_rate_window-{$workerid}-{$algo}-{$interval}";
 		$rate = Yii::$app->cache->get($cacheKey);
 		if ($rate === false) {
 			$rate = Yii::$app->db->createCommand(
@@ -874,7 +884,7 @@ class YiimpUtils extends Component
 				 FROM shares WHERE valid=1 AND time > :delay AND workerid = :wid",
 				[':target' => $target, ':interval' => $interval, ':delay' => $delay, ':wid' => $workerid]
 			)->queryScalar();
-			Yii::$app->cache->set($cacheKey, $rate, 60);
+			Yii::$app->cache->set($cacheKey, $rate, $ttl);
 		}
 		return (float) $rate;
 	}
