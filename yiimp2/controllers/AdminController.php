@@ -361,10 +361,21 @@ class AdminController extends BaseController
         $this->requireAdmin();
         $symbol = Yii::$app->request->get('symbol', 'all');
 
+        // Include coins with funded accounts, earnings, OR accounts that only
+        // have active workers. Miners with a zero balance (e.g. NEB) must still
+        // be selectable; otherwise the page silently falls back to "all".
+        $minerUserIds = (new \yii\db\Query)->select('userid')->from('workers')->distinct();
+        $accountCoinIds = (new \yii\db\Query)->select('coinid')->from('accounts')
+            ->where(['or',
+                ['>', 'balance', 0.0001],
+                ['in', 'id', $minerUserIds],
+            ])
+            ->distinct();
+
         $activeCoins = Coins::find()
             ->where(['enable' => 1])
             ->andWhere(['or',
-                ['in', 'id', (new \yii\db\Query)->select('coinid')->from('accounts')->where(['>', 'balance', 0.0001])->distinct()],
+                ['in', 'id', $accountCoinIds],
                 ['in', 'id', (new \yii\db\Query)->select('coinid')->from('earnings')->distinct()],
             ])
             ->orderBy('symbol')

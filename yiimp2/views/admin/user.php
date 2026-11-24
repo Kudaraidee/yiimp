@@ -10,11 +10,19 @@ $this->title = 'Users';
 $isTailwind  = Yii::$app->LayoutManager->isTailwind();
 $isLegacy    = Yii::$app->LayoutManager->isLegacy();
 
-$options = '<option value="all"' . ($symbol === 'all' ? ' selected' : '') . '>— all —</option>';
+$options      = '<option value="all"' . ($symbol === 'all' ? ' selected' : '') . '>— all —</option>';
+$knownSymbols = [];
 foreach ($activeCoins as $coin) {
-    $sel      = $coin->symbol === $symbol ? ' selected' : '';
-    $options .= '<option value="' . Html::encode($coin->symbol) . '"' . $sel . '>'
-              . Html::encode($coin->symbol) . '</option>';
+    $knownSymbols[] = $coin->symbol;
+    $sel            = $coin->symbol === $symbol ? ' selected' : '';
+    $options       .= '<option value="' . Html::encode($coin->symbol) . '"' . $sel . '>'
+                    . Html::encode($coin->symbol) . '</option>';
+}
+// Keep a deep-linked ?symbol=... usable even when that coin is not in the
+// active list; otherwise the select silently resets to "all" on page load.
+if ($symbol !== 'all' && !in_array($symbol, $knownSymbols, true)) {
+    $options = '<option value="' . Html::encode($symbol) . '" selected>'
+             . Html::encode($symbol) . '</option>' . $options;
 }
 
 $homeUrl = Yii::$app->homeUrl;
