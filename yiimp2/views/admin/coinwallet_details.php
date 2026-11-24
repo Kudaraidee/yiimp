@@ -883,7 +883,13 @@ foreach ($txs_array as $tx) {
     } else {
         $heightCell = Html::encode((string) $conv->arraySafeVal($tx, 'height', ''));
         $diffValue  = $conv->arraySafeVal($tx, 'difficulty', 0);
-        $diffCell   = $diffValue ? $conv->round_difficulty($diffValue) : '';
+        if ($isNeb && $diffValue) {
+            $diffCell = number_format(
+                Yii::$app->YiimpUtils->display_difficulty('nebhash', $diffValue), 4, '.', ','
+            );
+        } else {
+            $diffCell = $diffValue ? $conv->round_difficulty($diffValue) : '';
+        }
     }
     $confsCell  = Html::encode((string) $conv->arraySafeVal($tx, 'confirmations'));
     $amtCell    = Html::encode((string) $tx['amount']);
