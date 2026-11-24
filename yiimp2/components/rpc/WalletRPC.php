@@ -34,6 +34,9 @@ class WalletRPC
     /** NEB nodes only implement their native getinfo/getpeerinfo RPCs. */
     private bool $isNebhash = false;
 
+    /** NEB dev-fund lock: locktype 2 is a separate non-miner coinbase output. */
+    private const NEB_DEV_LOCK = '270bbd6380c0c7022176e202083d5671ed6bb7bc0c27350bcbd134846ce87dd5';
+
     /**
      * NEB getblock returns raw hex unless verbose=true, and its verbose tx
      * entries are objects rather than txid strings. Cache them so the explorer
@@ -177,6 +180,38 @@ class WalletRPC
     }
 
     /**
+     * Split a NEB coinbase into its raw emission, dev-fund portion and the
+     * output controlled by the pool wallet. `locktype 2` is the protocol-level
+     * dev-fund flag; the known lock hex is kept as a fallback for older nodes.
+     *
+     * @return array{0:float,1:float,2:float,3:float} raw total, devfee,
+     *               pool-controlled amount, effective miner amount (satoshis)
+     */
+    private function nebCoinbaseAmounts(array $outputs): array
+    {
+        $total    = 0.0;
+        $devFee   = 0.0;
+        $poolAmt  = 0.0;
+        $poolLock = $this->coin ? $this->nebAddressLock($this->coin->master_wallet ?? '') : null;
+
+        foreach ($outputs as $out) {
+            $amount = (float) ($out['amount'] ?? 0);
+            $lock   = strtolower((string) ($out['lock'] ?? ''));
+            $type   = (int) ($out['locktype'] ?? -1);
+
+            $total += $amount;
+            if ($type === 2 || $lock === self::NEB_DEV_LOCK) {
+                $devFee += $amount;
+            }
+            if ($poolLock !== null && $lock === $poolLock) {
+                $poolAmt += $amount;
+            }
+        }
+
+        return [$total, $devFee, $poolAmt, $total - $devFee];
+    }
+
+    /**
      * NEB needs the block height to fetch a mined transaction and uses
      * different verbose field names. Return a Bitcoin-like transaction for
      * the generic block/accounting code.
@@ -194,17 +229,27 @@ class WalletRPC
             return false;
         }
 
-        $outputs  = is_array($tx['outputs'] ?? null) ? $tx['outputs'] : [];
-        $poolLock = $this->coin ? $this->nebAddressLock($this->coin->master_wallet ?? '') : null;
-        $amount   = 0.0;
-        foreach ($outputs as $out) {
-            $lock = strtolower((string) ($out['lock'] ?? ''));
-            if ($poolLock !== null && $lock === $poolLock) {
-                $amount += (float) ($out['amount'] ?? 0) / 1e8;
+        $outputs = is_array($tx['outputs'] ?? null) ? $tx['outputs'] : [];
+        [$totalRaw, $devFeeRaw, $poolRaw, $effectiveRaw] = $this->nebCoinbaseAmounts($outputs);
+
+        // Coinbase accounting: use the actual block output and remove the
+        // non-miner dev-fund output. For ordinary transactions keep the old
+        // pool-lock/first-output behaviour used by the explorer views.
+        $isCoinbase = !empty($tx['coinbase']);
+        if ($isCoinbase) {
+            $amount = max(0, $effectiveRaw) / 1e8;
+            if ($poolRaw > 0 && abs($poolRaw - $effectiveRaw) > 1) {
+                Yii::warning(
+                    "NEB coinbase mismatch at height {$height}: pool " . ($poolRaw / 1e8)
+                    . ' vs effective ' . ($effectiveRaw / 1e8),
+                    __CLASS__
+                );
             }
-        }
-        if ($amount <= 0 && isset($outputs[0]['amount'])) {
-            $amount = (float) $outputs[0]['amount'] / 1e8;
+        } else {
+            $amount = $poolRaw > 0 ? $poolRaw / 1e8 : 0.0;
+            if ($amount <= 0 && isset($outputs[0]['amount'])) {
+                $amount = (float) $outputs[0]['amount'] / 1e8;
+            }
         }
 
         $vin = [];
@@ -250,6 +295,9 @@ class WalletRPC
             'time'          => is_array($raw) ? (int) ($raw['time'] ?? 0) : (int) ($entry['time'] ?? 0),
             'category'      => 'generate',
             'amount'        => $amount,
+            'coinbase_amount' => $totalRaw / 1e8,
+            'devfee'        => $devFeeRaw / 1e8,
+            'pool_amount'   => $poolRaw / 1e8,
             'details'       => [[
                 'category' => 'generate',
                 'amount'   => $amount,

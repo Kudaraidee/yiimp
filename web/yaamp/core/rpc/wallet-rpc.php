@@ -21,6 +21,9 @@ class WalletRPC {
 	/** NEB verbose getblock results, keyed by txid, for Bitcoin-like gettransaction mapping. */
 	protected $nebTxCache = array();
 
+	/** NEB dev-fund lock: locktype 2 is a separate non-miner coinbase output. */
+	const NEB_DEV_LOCK = '270bbd6380c0c7022176e202083d5671ed6bb7bc0c27350bcbd134846ce87dd5';
+
 	// Information and debugging
 	public $error;
 	// public $status;
@@ -103,6 +106,33 @@ class WalletRPC {
 	}
 
 	/**
+	 * Split a NEB coinbase into its raw emission, dev-fund portion and the
+	 * output controlled by the pool wallet. `locktype 2` is the protocol-level
+	 * dev-fund flag; the known lock hex is kept as a fallback for older nodes.
+	 */
+	protected function nebCoinbaseAmounts($outputs)
+	{
+		$total   = 0;
+		$devFee  = 0;
+		$poolAmt = 0;
+		$poolLock = $this->coin ? $this->nebAddressLock($this->coin->master_wallet) : null;
+
+		foreach ($outputs as $out) {
+			$amount = (float) (isset($out['amount']) ? $out['amount'] : 0);
+			$lock   = strtolower((string) (isset($out['lock']) ? $out['lock'] : ''));
+			$type   = (int) (isset($out['locktype']) ? $out['locktype'] : -1);
+
+			$total += $amount;
+			if ($type === 2 || $lock === self::NEB_DEV_LOCK)
+				$devFee += $amount;
+			if ($poolLock !== null && $lock === $poolLock)
+				$poolAmt += $amount;
+		}
+
+		return array($total, $devFee, $poolAmt, $total - $devFee);
+	}
+
+	/**
 	 * NEB needs the block height to fetch a mined transaction and its verbose
 	 * output uses different field names. Expose a Bitcoin-like transaction so
 	 * the generic block/accounting code can consume it unchanged.
@@ -117,15 +147,21 @@ class WalletRPC {
 		if (!is_array($tx)) return false;
 
 		$outputs = (isset($tx['outputs']) && is_array($tx['outputs'])) ? $tx['outputs'] : array();
-		$poolLock = $this->coin ? $this->nebAddressLock($this->coin->master_wallet) : null;
-		$amount = 0.0;
-		foreach ($outputs as $out) {
-			$lock = strtolower((string) (isset($out['lock']) ? $out['lock'] : ''));
-			if ($poolLock !== null && $lock === $poolLock)
-				$amount += (float) (isset($out['amount']) ? $out['amount'] : 0) / 1e8;
+		list($totalRaw, $devFeeRaw, $poolRaw, $effectiveRaw) = $this->nebCoinbaseAmounts($outputs);
+
+		// Coinbase accounting: use the actual block output and remove the
+		// non-miner dev-fund output. For ordinary transactions keep the old
+		// pool-lock/first-output behaviour used by the explorer views.
+		$isCoinbase = !empty($tx['coinbase']);
+		if ($isCoinbase) {
+			$amount = max(0, $effectiveRaw) / 1e8;
+			if ($poolRaw > 0 && abs($poolRaw - $effectiveRaw) > 1 && function_exists('debuglog'))
+				debuglog("NEB coinbase mismatch at height {$height}: pool ".($poolRaw/1e8)." vs effective ".($effectiveRaw/1e8));
+		} else {
+			$amount = $poolRaw > 0 ? $poolRaw / 1e8 : 0.0;
+			if ($amount <= 0 && isset($outputs[0]['amount']))
+				$amount = (float) $outputs[0]['amount'] / 1e8;
 		}
-		if ($amount <= 0 && isset($outputs[0]['amount']))
-			$amount = (float) $outputs[0]['amount'] / 1e8;
 
 		$vin = array();
 		if (!empty($tx['coinbase'])) {
@@ -177,6 +213,9 @@ class WalletRPC {
 			'time' => $time,
 			'category' => 'generate',
 			'amount' => $amount,
+			'coinbase_amount' => $totalRaw / 1e8,
+			'devfee' => $devFeeRaw / 1e8,
+			'pool_amount' => $poolRaw / 1e8,
 			'details' => array(array(
 				'category' => 'generate',
 				'amount' => $amount,
