@@ -681,6 +681,7 @@ void *monitor_thread(void *p)
 			exit(1);
 		}
 	}
+	return NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -752,4 +753,5 @@ void *stratum_thread(void *p)
 			pthread_detach(thread);
 		}
 	}
+	return NULL;
 }

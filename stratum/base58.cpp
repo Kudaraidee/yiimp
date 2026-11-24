@@ -77,7 +77,8 @@ static bool _blkmk_b58tobin(void *bin, size_t binsz, const char *b58, size_t b58
 
 	for (; j < outisz; ++j)
 	{
-		*((uint32_t*)binu) = htonl(outi[j]);
+		uint32_t be = htonl(outi[j]);
+		memcpy(binu, &be, sizeof(be));	// binu is not 4-byte aligned
 		binu += sizeof(uint32_t);
 	}
 	return true;

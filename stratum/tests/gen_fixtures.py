@@ -89,6 +89,10 @@ write_case('fixtures', 'btc-segwit', dict(BASE, segwit=1),
 write_case('fixtures', 'btc-empty', BASE, {'getblocktemplate': gbt(ntx=0)})
 write_case('fixtures', 'x11-masternodes', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(2), coinbase_payload='00' * 40)})
+# charity output: charity_percent of the coinbase value
+write_case('fixtures', 'x11-charity', dict(BASE, algo='x11', symbol='TDASH',
+           charity_address='1BoatSLRHtKNngkdXEeobR76b53LETtpyT', charity_percent=2),
+           {'getblocktemplate': gbt(ntx=2, **payees(2))})
 # 40 payees: a 2.8K coinb2
 write_case('fixtures', 'x11-payees-40', dict(BASE, algo='x11', symbol='TDASH'),
            {'getblocktemplate': gbt(ntx=2, **payees(40))})
