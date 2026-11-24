@@ -61,7 +61,10 @@ int m7m_hash(const char* input, char* output, uint32_t len)
 		mpz_init(bns[i]);
 	}
 
-	memcpy(data, input, len /*80*/);
+	// m7m hashes exactly the 80-byte header (76-byte midstate + nonce):
+	// copy no more than that, never past data[] (128 bytes)
+	memset(data, 0, sizeof(data));
+	memcpy(data, input, len < 80 ? len : 80);
 
 	sph_sha256_context       ctx_final_sha256;
 
