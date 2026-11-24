@@ -563,7 +563,7 @@ class ApiController extends Controller
     {
         if (method_exists($util, 'pool_shared_rate')) return (float) $util->pool_shared_rate($algo);
         $target   = $util->hashrate_constant($algo);
-        $interval = $util->hashrate_step();
+        $interval = $util->hashrate_step($algo);
         return (float) Yii::$app->db->createCommand(
             "SELECT SUM(difficulty) * :t / :i / 1000 FROM shares WHERE valid=1 AND time>:d AND algo=:algo AND workerid NOT IN (SELECT id FROM workers WHERE password LIKE '%m=solo%')",
             [':t' => $target, ':i' => $interval, ':d' => time() - $interval, ':algo' => $algo]
@@ -574,7 +574,7 @@ class ApiController extends Controller
     {
         if (method_exists($util, 'pool_solo_rate')) return (float) $util->pool_solo_rate($algo);
         $target   = $util->hashrate_constant($algo);
-        $interval = $util->hashrate_step();
+        $interval = $util->hashrate_step($algo);
         return (float) Yii::$app->db->createCommand(
             "SELECT SUM(difficulty) * :t / :i / 1000 FROM shares WHERE valid=1 AND time>:d AND algo=:algo AND workerid IN (SELECT id FROM workers WHERE password LIKE '%m=solo%')",
             [':t' => $target, ':i' => $interval, ':d' => time() - $interval, ':algo' => $algo]
@@ -585,7 +585,7 @@ class ApiController extends Controller
     {
         if (method_exists($util, 'coin_rate')) return (float) $util->coin_rate($coinId);
         $target   = $util->hashrate_constant($algo);
-        $interval = $util->hashrate_step();
+        $interval = $util->hashrate_step($algo);
         return (float) Yii::$app->db->createCommand(
             "SELECT SUM(difficulty) * :t / :i / 1000 FROM shares WHERE valid=1 AND time>:d AND coinid=:cid",
             [':t' => $target, ':i' => $interval, ':d' => time() - $interval, ':cid' => $coinId]
@@ -596,7 +596,7 @@ class ApiController extends Controller
     {
         if (method_exists($util, 'coin_shared_rate')) return (float) $util->coin_shared_rate($coinId);
         $target   = $util->hashrate_constant($algo);
-        $interval = $util->hashrate_step();
+        $interval = $util->hashrate_step($algo);
         return (float) Yii::$app->db->createCommand(
             "SELECT SUM(difficulty) * :t / :i / 1000 FROM shares WHERE valid=1 AND time>:d AND coinid=:cid AND workerid NOT IN (SELECT id FROM workers WHERE password LIKE '%m=solo%')",
             [':t' => $target, ':i' => $interval, ':d' => time() - $interval, ':cid' => $coinId]
@@ -607,7 +607,7 @@ class ApiController extends Controller
     {
         if (method_exists($util, 'coin_solo_rate')) return (float) $util->coin_solo_rate($coinId);
         $target   = $util->hashrate_constant($algo);
-        $interval = $util->hashrate_step();
+        $interval = $util->hashrate_step($algo);
         return (float) Yii::$app->db->createCommand(
             "SELECT SUM(difficulty) * :t / :i / 1000 FROM shares WHERE valid=1 AND time>:d AND coinid=:cid AND workerid IN (SELECT id FROM workers WHERE password LIKE '%m=solo%')",
             [':t' => $target, ':i' => $interval, ':d' => time() - $interval, ':cid' => $coinId]

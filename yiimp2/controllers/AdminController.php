@@ -193,7 +193,7 @@ class AdminController extends BaseController
 
         $util     = Yii::$app->YiimpUtils;
         $target   = $util->hashrate_constant($algo);
-        $interval = $util->hashrate_step();
+        $interval = $util->hashrate_step($algo);
         $delay    = time() - $interval;
 
         // Single query: worker count + valid/invalid hashrate per version
@@ -256,7 +256,7 @@ class AdminController extends BaseController
         $util     = Yii::$app->YiimpUtils;
         $db       = Yii::$app->db;
         $target   = $util->hashrate_constant($algo);
-        $interval = $util->hashrate_step();
+        $interval = $util->hashrate_step($algo);
         $delay    = time() - $interval;
 
         // ── Workers ───────────────────────────────────────────────────────────
@@ -436,20 +436,36 @@ class AdminController extends BaseController
         $paidMap       = [];
 
         if ($userIds) {
-            $db       = Yii::$app->db;
-            $target   = $util->hashrate_constant();
-            $interval = $util->hashrate_step();
-            $delay    = time() - $interval;
-            $inList   = implode(',', array_map('intval', $userIds));
+            $db = Yii::$app->db;
 
-            // Hashrate per user
-            foreach ($db->createCommand(
-                "SELECT userid, SUM(difficulty) * :target / :interval / 1000 AS rate
-                 FROM shares WHERE valid=1 AND time > :delay AND userid IN ($inList)
-                 GROUP BY userid",
-                [':target' => $target, ':interval' => $interval, ':delay' => $delay]
-            )->queryAll() as $r) {
-                $rateMap[(int) $r['userid']] = (float) $r['rate'];
+            // Hashrate must use each user's own algo. NEB share difficulty is
+            // raw expected hashes, so applying the generic Bitcoin constant /
+            // 300s window here reported a single small worker as tens of PH/s.
+            $userAlgoMap = [];
+            $algoUserIds = [];
+            foreach ($users as $user) {
+                // Use a non-empty sentinel for coins missing from the batch so
+                // hashrate helpers fall back to the generic scale, not the
+                // algo currently stored in the admin session.
+                $algo                   = $coins[$user->coinid]->algo ?? 'unknown';
+                $userAlgoMap[$user->id] = $algo;
+                $algoUserIds[$algo][]   = (int) $user->id;
+            }
+
+            foreach ($algoUserIds as $algo => $uids) {
+                $target   = $util->hashrate_constant($algo);
+                $interval = $util->hashrate_step($algo);
+                $delay    = time() - $interval;
+                $inList   = implode(',', array_map('intval', $uids));
+
+                foreach ($db->createCommand(
+                    "SELECT userid, SUM(difficulty) * :target / :interval / 1000 AS rate
+                     FROM shares WHERE valid=1 AND time > :delay AND userid IN ($inList)
+                     GROUP BY userid",
+                    [':target' => $target, ':interval' => $interval, ':delay' => $delay]
+                )->queryAll() as $r) {
+                    $rateMap[(int) $r['userid']] = (float) $r['rate'];
+                }
             }
 
             // Worker count per user
@@ -482,7 +498,7 @@ class AdminController extends BaseController
 
             // Bad-rate per user (cached in YiimpUtils; no raw DB hit on warm cache)
             foreach ($userIds as $uid) {
-                $badRateMap[$uid] = (float) $util->user_rate_bad($uid);
+                $badRateMap[$uid] = (float) $util->user_rate_bad($uid, $userAlgoMap[$uid] ?? 'unknown');
             }
         }
 

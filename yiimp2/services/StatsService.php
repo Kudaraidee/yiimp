@@ -178,7 +178,7 @@ class StatsService
 
                 // Adjust rent based on rentable capacity vs demand
                 $hashConst = $this->hashrateConstant($algo);
-                $hashStep  = $this->hashrateStep();
+                $hashStep  = $this->hashrateStep($algo);
                 $aa        = $totalRentable * $hashConst / $hashStep / 1000;
                 $bb        = (float) $db->createCommand(
                     "SELECT SUM(speed) FROM jobs WHERE active AND ready AND price>:rent AND algo=:algo",
@@ -434,19 +434,17 @@ class StatsService
 
     private function hashrateConstant(string $algo): float
     {
-        return in_array($algo, ['equihash', 'equihash96', 'equihash125', 'equihash144', 'equihash192'], true)
-            ? 0x0000000004000000
-            : 0x0000040000000000;
+        return (float) Yii::$app->YiimpUtils->hashrate_constant($algo);
     }
 
-    private function hashrateStep(): float
+    private function hashrateStep(string $algo): float
     {
-        return 300.0;
+        return (float) Yii::$app->YiimpUtils->hashrate_step($algo);
     }
 
     private function userRate(int $userId, string $algo): float
     {
-        $interval = $this->hashrateStep();
+        $interval = $this->hashrateStep($algo);
         $target   = $this->hashrateConstant($algo);
         $t        = time() - (int) $interval;
         $diff     = (float) Yii::$app->db->createCommand(
@@ -458,7 +456,7 @@ class StatsService
 
     private function userRateBad(int $userId, string $algo): float
     {
-        $interval = $this->hashrateStep();
+        $interval = $this->hashrateStep($algo);
         $target   = $this->hashrateConstant($algo);
         $t        = time() - (int) $interval;
         $avgDiff  = (float) Yii::$app->db->createCommand(
@@ -478,7 +476,7 @@ class StatsService
             "SELECT algo FROM jobs WHERE id=:jid", [':jid' => $jobId]
         )->queryOne();
         if (!$job) return 0.0;
-        $interval = $this->hashrateStep();
+        $interval = $this->hashrateStep($job['algo']);
         $target   = $this->hashrateConstant($job['algo']);
         $t        = time() - (int) $interval;
         $diff     = (float) Yii::$app->db->createCommand(
@@ -494,7 +492,7 @@ class StatsService
             "SELECT algo FROM jobs WHERE id=:jid", [':jid' => $jobId]
         )->queryOne();
         if (!$job) return 0.0;
-        $interval = $this->hashrateStep();
+        $interval = $this->hashrateStep($job['algo']);
         $target   = $this->hashrateConstant($job['algo']);
         $t        = time() - (int) $interval;
         $avgDiff  = (float) Yii::$app->db->createCommand(

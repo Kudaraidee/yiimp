@@ -706,9 +706,6 @@ class SiteController extends BaseController
 			default                   => 'Mh',
 		};
 
-		$interval = $util->hashrate_step();
-		$delay    = time() - $interval;
-
 		// "All" scope must match the Algorithm bar: only algos backed by
 		// enabled + visible coins. Recent hashrate history alone must not add
 		// dormant algos here.
@@ -743,7 +740,11 @@ class SiteController extends BaseController
 
 		// ── Collect per-algo data (one set of cached queries per algo) ────────
 		foreach ($algos as $itemAlgo) {
-			$target = $util->hashrate_constant($itemAlgo);
+			$target   = $util->hashrate_constant($itemAlgo);
+			// NEB uses a 600s window; using the generic 300s here doubled its
+			// displayed miner-version and total hashrate.
+			$interval = $util->hashrate_step($itemAlgo);
+			$delay    = time() - $interval;
 
 			$wQuery = (new \yii\db\Query())->from('workers')->where(['algo' => $itemAlgo]);
 			$totalWorkers    += (int) (clone $wQuery)->count();
@@ -757,7 +758,7 @@ class SiteController extends BaseController
 				$versionCounts[] = $row;
 			}
 
-			$versionRatesAll[$itemAlgo] = $cache->getOrSet("miners-rates-{$itemAlgo}", function () use ($db, $target, $interval, $delay, $itemAlgo) {
+			$versionRatesAll[$itemAlgo] = $cache->getOrSet("miners-rates-v2-{$itemAlgo}", function () use ($db, $target, $interval, $delay, $itemAlgo) {
 				$rows = $db->createCommand(
 					"SELECT w.version,
 					        SUM(CASE WHEN s.valid=1 THEN s.difficulty ELSE 0 END) * :t / :iv / 1000 AS hashrate,
