@@ -316,7 +316,9 @@ class BlockService
             }
 
             $txid = $coin->rpcencoding === 'GETH' ? $blockExt['hash'] : $blockExt['tx'][0];
-            $tx = $remote->gettransaction($txid);
+            $tx = $coin->algo === 'nebhash'
+                ? $remote->gettransaction($txid, $block->height)
+                : $remote->gettransaction($txid);
             if (!$tx || !isset($tx['details'][0])) {
                 $block->amount = 0;
                 $block->save();
@@ -407,7 +409,9 @@ class BlockService
                 }
             }
 
-            $tx = $remote->gettransaction($block->txhash);
+            $tx = $coin->algo === 'nebhash'
+                ? $remote->gettransaction($block->txhash, $block->height)
+                : $remote->gettransaction($block->txhash);
 
             if (!$tx && $block->category !== 'orphan') {
                 if ($coin->enable) {

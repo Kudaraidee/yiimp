@@ -270,7 +270,10 @@ function BackendBlockFind1($coinid = NULL)
 		}
 
 		$txid = ($coin->rpcencoding == 'GETH') ? $block['hash'] : $block['tx'][0];
-		$tx = $remote->gettransaction($txid);
+		if ($coin->algo === 'nebhash')
+			$tx = $remote->gettransaction($txid, $db_block->height);
+		else
+			$tx = $remote->gettransaction($txid);
 		if(!$tx || !isset($tx['details']) || !isset($tx['details'][0]))
 		{
 			$db_block->amount = 0;
@@ -350,7 +353,10 @@ function BackendBlocksUpdate($coinid = NULL)
 			if(empty($block->txhash)) continue;
 		}
 
-		$tx = $remote->gettransaction($block->txhash);
+		if ($coin->algo === 'nebhash')
+			$tx = $remote->gettransaction($block->txhash, $block->height);
+		else
+			$tx = $remote->gettransaction($block->txhash);
 		if(!$tx && $block->category != 'orphan') {
 			if ($coin->enable) {
 				debuglog("{$coin->name} unable to find {$block->category} block {$block->height} tx {$block->txhash}!");

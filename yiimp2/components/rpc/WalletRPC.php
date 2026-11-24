@@ -140,6 +140,126 @@ class WalletRPC
     }
 
     /**
+     * Decode a NEB bech32m payout address into the 32-byte lock hex used by
+     * the node's coinbase outputs, so only the pool's reward is credited.
+     */
+    private function nebAddressLock(mixed $address): ?string
+    {
+        $address = strtolower(trim((string) $address));
+        if (strlen($address) !== 62 || strncmp($address, 'neb1', 4) !== 0) {
+            return null;
+        }
+
+        $charset = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+        $values  = [];
+        $length  = strlen($address) - 6; // drop the bech32m checksum
+        for ($i = 4; $i < $length; $i++) {
+            $pos = strpos($charset, $address[$i]);
+            if ($pos === false) {
+                return null;
+            }
+            $values[] = $pos;
+        }
+
+        $acc   = 0;
+        $bits  = 0;
+        $bytes = '';
+        foreach ($values as $value) {
+            $acc  = ($acc << 5) | $value;
+            $bits += 5;
+            while ($bits >= 8) {
+                $bits -= 8;
+                $bytes .= chr(($acc >> $bits) & 0xff);
+                $acc &= (1 << $bits) - 1;
+            }
+        }
+        return (strlen($bytes) === 32 && $bits === 4 && $acc === 0) ? bin2hex($bytes) : null;
+    }
+
+    /**
+     * NEB needs the block height to fetch a mined transaction and uses
+     * different verbose field names. Return a Bitcoin-like transaction for
+     * the generic block/accounting code.
+     */
+    private function nebTransaction(string $txid, int $height, ?array $entry = null): array|false
+    {
+        $raw         = $this->rpc->call('gettransaction', [$txid, $height]);
+        $this->error = $this->rpc->getError();
+
+        $tx = is_array($entry) ? ($entry['tx'] ?? null) : null;
+        if (!is_array($tx) && is_array($raw)) {
+            $tx = $raw;
+        }
+        if (!is_array($tx)) {
+            return false;
+        }
+
+        $outputs  = is_array($tx['outputs'] ?? null) ? $tx['outputs'] : [];
+        $poolLock = $this->coin ? $this->nebAddressLock($this->coin->master_wallet ?? '') : null;
+        $amount   = 0.0;
+        foreach ($outputs as $out) {
+            $lock = strtolower((string) ($out['lock'] ?? ''));
+            if ($poolLock !== null && $lock === $poolLock) {
+                $amount += (float) ($out['amount'] ?? 0) / 1e8;
+            }
+        }
+        if ($amount <= 0 && isset($outputs[0]['amount'])) {
+            $amount = (float) $outputs[0]['amount'] / 1e8;
+        }
+
+        $vin = [];
+        if (!empty($tx['coinbase'])) {
+            $vin[] = ['coinbase' => 'NEB coinbase'];
+        } else {
+            foreach ($tx['inputs'] ?? [] as $in) {
+                $inTxid = (string) ($in['txid'] ?? '');
+                $index  = (int) ($in['index'] ?? 0);
+                $vin[]  = [
+                    'txid' => $inTxid,
+                    'vout' => $index,
+                    'addr' => 'input ' . substr($inTxid, 0, 8) . '…:' . $index,
+                ];
+            }
+        }
+
+        $vout = [];
+        foreach ($outputs as $out) {
+            $vout[] = [
+                'value'        => (float) ($out['amount'] ?? 0) / 1e8,
+                'n'            => (int) ($out['index'] ?? 0),
+                'scriptPubKey' => ['hex' => (string) ($out['lock'] ?? '')],
+            ];
+        }
+
+        $hex  = is_array($raw) ? (string) ($raw['hex'] ?? '') : '';
+        $size = is_array($raw)
+            ? (int) ($raw['size'] ?? (strlen($hex) / 2))
+            : (int) ($tx['size'] ?? 0);
+
+        return [
+            'txid'          => $txid,
+            'hex'           => $hex,
+            'size'          => $size,
+            'vin'           => $vin,
+            'vout'          => $vout,
+            'blockhash'     => is_array($raw) ? (string) ($raw['blockhash'] ?? '') : (string) ($entry['hash'] ?? ''),
+            'confirmations' => is_array($raw)
+                ? (int) ($raw['confirmations'] ?? 0)
+                : (int) ($entry['confirmations'] ?? 0),
+            'height'        => $height,
+            'time'          => is_array($raw) ? (int) ($raw['time'] ?? 0) : (int) ($entry['time'] ?? 0),
+            'category'      => 'generate',
+            'amount'        => $amount,
+            'details'       => [[
+                'category' => 'generate',
+                'amount'   => $amount,
+                'txid'     => $txid,
+                'vout'     => 0,
+            ]],
+        ];
+    }
+
+    /**
      * Map an Ethereum block to the Bitcoin-like shape used by the explorer
      * views. Original keys are preserved so backend callers are unaffected.
      */
@@ -807,10 +927,11 @@ class WalletRPC
                             $txid   = (string) $tx['txid'];
                             $txids[] = $txid;
                             $this->nebTxCache[$txid] = [
-                                'height' => (int) ($res['height'] ?? 0),
-                                'hash'   => (string) ($res['hash'] ?? ''),
-                                'time'   => (int) ($res['time'] ?? 0),
-                                'tx'     => $tx,
+                                'height'        => (int) ($res['height'] ?? 0),
+                                'hash'          => (string) ($res['hash'] ?? ''),
+                                'time'          => (int) ($res['time'] ?? 0),
+                                'confirmations' => (int) ($res['confirmations'] ?? 0),
+                                'tx'            => $tx,
                             ];
                         } elseif (is_string($tx)) {
                             $txids[] = $tx;
@@ -825,51 +946,13 @@ class WalletRPC
         if ($this->isNebhash && ($method === 'getrawtransaction' || $method === 'gettransaction')) {
             $txid  = (string) ($params[0] ?? '');
             $entry = $this->nebTxCache[$txid] ?? null;
-            if ($entry) {
-                // NEB needs the block height to look up a mined transaction.
-                $raw         = $this->rpc->call('gettransaction', [$txid, $entry['height']]);
-                $this->error = $this->rpc->getError();
-                $tx          = $entry['tx'];
-
-                $vin = [];
-                if (!empty($tx['coinbase'])) {
-                    $vin[] = ['coinbase' => 'NEB coinbase'];
-                } else {
-                    foreach ($tx['inputs'] ?? [] as $in) {
-                        $inTxid = (string) ($in['txid'] ?? '');
-                        $index  = (int) ($in['index'] ?? 0);
-                        $vin[]  = [
-                            'txid' => $inTxid,
-                            'vout' => $index,
-                            'addr' => 'input ' . substr($inTxid, 0, 8) . '…:' . $index,
-                        ];
-                    }
-                }
-
-                $vout = [];
-                foreach ($tx['outputs'] ?? [] as $out) {
-                    $vout[] = [
-                        'value'        => (float) ($out['amount'] ?? 0) / 1e8,
-                        'n'            => (int) ($out['index'] ?? 0),
-                        'scriptPubKey' => ['hex' => (string) ($out['lock'] ?? '')],
-                    ];
-                }
-
-                $hex  = is_array($raw) ? (string) ($raw['hex'] ?? '') : '';
-                $size = is_array($raw)
-                    ? (int) ($raw['size'] ?? (strlen($hex) / 2))
-                    : (int) ($tx['size'] ?? 0);
-                return [
-                    'txid'          => $txid,
-                    'hex'           => $hex,
-                    'size'          => $size,
-                    'vin'           => $vin,
-                    'vout'          => $vout,
-                    'blockhash'     => $entry['hash'],
-                    'confirmations' => is_array($raw) ? ($raw['confirmations'] ?? 0) : 0,
-                    'height'        => $entry['height'],
-                    'time'          => $entry['time'],
-                ];
+            $height = $entry
+                ? (int) ($entry['height'] ?? 0)
+                : (int) ($params[1] ?? 0);
+            // Callers processing stored blocks pass the height explicitly;
+            // explorer calls rely on the getblock() cache above.
+            if ($height > 0) {
+                return $this->nebTransaction($txid, $height, $entry);
             }
         }
 

@@ -8,6 +8,7 @@ class WalletRPC {
 	protected $rpc;
 	protected $rpc_wallet;
 	protected $hasGetInfo = false;
+	protected $isNebhash = false;
 
 	// cache
 	protected $account;
@@ -16,6 +17,9 @@ class WalletRPC {
 	protected $info;
 	protected $height = 0;
 	protected $ethHead = null;
+
+	/** NEB verbose getblock results, keyed by txid, for Bitcoin-like gettransaction mapping. */
+	protected $nebTxCache = array();
 
 	// Information and debugging
 	public $error;
@@ -44,14 +48,15 @@ class WalletRPC {
 				break;
 			default:
 				$this->type = 'Bitcoin';
+				$this->coin = $coin;
 				$this->rpc = new Bitcoin($coin->rpcuser, $coin->rpcpasswd, $coin->rpchost, $coin->rpcport, $url);
 				// NEB nodes implement a native getinfo RPC but not the
 				// Bitcoin getmininginfo/getwalletinfo/getnetworkinfo calls.
 				// Keep the DB flag at 0 for stratum, which uses its own
 				// NEB-specific template path.
-				if (isset($coin->algo) && $coin->algo === 'nebhash')
-					$this->hasGetInfo = true;
-				else if (isset($coin->symbol) && $coin->symbol === 'NEB')
+				$this->isNebhash = (isset($coin->algo) && $coin->algo === 'nebhash') ||
+					(isset($coin->symbol) && $coin->symbol === 'NEB');
+				if ($this->isNebhash)
 					$this->hasGetInfo = true;
 				else
 					$this->hasGetInfo = $coin->hasgetinfo;
@@ -62,6 +67,123 @@ class WalletRPC {
 			$user = $userOrCoin;
 			$this->rpc = new Bitcoin($user, $pw, $host, $port, $url);
 		}
+	}
+
+	/**
+	 * Decode a NEB bech32m payout address into the 32-byte lock hex used by
+	 * the node's coinbase outputs. Used to credit only the pool's reward.
+	 */
+	protected function nebAddressLock($address)
+	{
+		$address = strtolower(trim((string) $address));
+		if (strlen($address) !== 62 || strncmp($address, 'neb1', 4) !== 0) return null;
+
+		$charset = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+		$values = array();
+		$dataLength = strlen($address) - 6; // drop the bech32m checksum
+		for ($i = 4; $i < $dataLength; $i++) {
+			$pos = strpos($charset, $address[$i]);
+			if ($pos === false) return null;
+			$values[] = $pos;
+		}
+
+		$acc = 0;
+		$bits = 0;
+		$bytes = '';
+		foreach ($values as $value) {
+			$acc = ($acc << 5) | $value;
+			$bits += 5;
+			while ($bits >= 8) {
+				$bits -= 8;
+				$bytes .= chr(($acc >> $bits) & 0xff);
+				$acc &= (1 << $bits) - 1;
+			}
+		}
+		return (strlen($bytes) === 32 && $bits === 4 && $acc === 0) ? bin2hex($bytes) : null;
+	}
+
+	/**
+	 * NEB needs the block height to fetch a mined transaction and its verbose
+	 * output uses different field names. Expose a Bitcoin-like transaction so
+	 * the generic block/accounting code can consume it unchanged.
+	 */
+	protected function nebTransaction($txid, $height, $entry = null)
+	{
+		$raw = $this->rpc->__call('gettransaction', array($txid, (int) $height));
+		$this->error = $this->rpc->error;
+
+		$tx = (is_array($entry) && isset($entry['tx'])) ? $entry['tx'] : null;
+		if (!is_array($tx) && is_array($raw)) $tx = $raw;
+		if (!is_array($tx)) return false;
+
+		$outputs = (isset($tx['outputs']) && is_array($tx['outputs'])) ? $tx['outputs'] : array();
+		$poolLock = $this->coin ? $this->nebAddressLock($this->coin->master_wallet) : null;
+		$amount = 0.0;
+		foreach ($outputs as $out) {
+			$lock = strtolower((string) (isset($out['lock']) ? $out['lock'] : ''));
+			if ($poolLock !== null && $lock === $poolLock)
+				$amount += (float) (isset($out['amount']) ? $out['amount'] : 0) / 1e8;
+		}
+		if ($amount <= 0 && isset($outputs[0]['amount']))
+			$amount = (float) $outputs[0]['amount'] / 1e8;
+
+		$vin = array();
+		if (!empty($tx['coinbase'])) {
+			$vin[] = array('coinbase' => 'NEB coinbase');
+		} else {
+			foreach ((isset($tx['inputs']) && is_array($tx['inputs'])) ? $tx['inputs'] : array() as $in) {
+				$inTxid = (string) (isset($in['txid']) ? $in['txid'] : '');
+				$vout = (int) (isset($in['index']) ? $in['index'] : 0);
+				$vin[] = array(
+					'txid' => $inTxid,
+					'vout' => $vout,
+					'addr' => 'input '.substr($inTxid, 0, 8).'…:'.$vout,
+				);
+			}
+		}
+
+		$voutList = array();
+		foreach ($outputs as $out) {
+			$voutList[] = array(
+				'value' => (float) (isset($out['amount']) ? $out['amount'] : 0) / 1e8,
+				'n' => (int) (isset($out['index']) ? $out['index'] : 0),
+				'scriptPubKey' => array('hex' => (string) (isset($out['lock']) ? $out['lock'] : '')),
+			);
+		}
+
+		$hex = (is_array($raw) && isset($raw['hex'])) ? (string) $raw['hex'] : '';
+		$size = (is_array($raw) && isset($raw['size']))
+			? (int) $raw['size']
+			: (isset($tx['size']) ? (int) $tx['size'] : (int) (strlen($hex) / 2));
+		$confirmations = (is_array($raw) && isset($raw['confirmations']))
+			? (int) $raw['confirmations']
+			: (int) (isset($entry['confirmations']) ? $entry['confirmations'] : 0);
+		$blockhash = (is_array($raw) && isset($raw['blockhash']))
+			? (string) $raw['blockhash']
+			: (string) (isset($entry['hash']) ? $entry['hash'] : '');
+		$time = (is_array($raw) && isset($raw['time']))
+			? (int) $raw['time']
+			: (int) (isset($entry['time']) ? $entry['time'] : 0);
+
+		return array(
+			'txid' => $txid,
+			'hex' => $hex,
+			'size' => $size,
+			'vin' => $vin,
+			'vout' => $voutList,
+			'blockhash' => $blockhash,
+			'confirmations' => $confirmations,
+			'height' => (int) $height,
+			'time' => $time,
+			'category' => 'generate',
+			'amount' => $amount,
+			'details' => array(array(
+				'category' => 'generate',
+				'amount' => $amount,
+				'txid' => $txid,
+				'vout' => 0,
+			)),
+		);
 	}
 
 	/**
@@ -620,7 +742,58 @@ class WalletRPC {
 		}
 
 		// Bitcoin RPC
-        	switch ($method) {
+		if ($this->isNebhash && $method === 'getblock') {
+			// NEB's default getblock result is a raw hex string. Ask for the
+			// verbose object and expose the Bitcoin field names used by yiimp.
+			$params[1] = true;
+			$res = $this->rpc->__call($method, $params);
+			$this->error = $this->rpc->error;
+			if (is_array($res)) {
+				if (!isset($res['merkleroot']) && isset($res['bodyroot']))
+					$res['merkleroot'] = $res['bodyroot'];
+				if (!isset($res['previousblockhash']) && isset($res['parent']))
+					$res['previousblockhash'] = $res['parent'];
+				if (!isset($res['difficulty']) && isset($res['bits'])) {
+					$bits = (int) $res['bits'];
+					$shift = ($bits >> 24) & 0xff;
+					$mantissa = $bits & 0x00ffffff;
+					if ($mantissa > 0 && $shift <= 255)
+						$res['difficulty'] = pow(2.0, 256 - $shift) / $mantissa;
+				}
+				if (isset($res['tx']) && is_array($res['tx'])) {
+					$txids = array();
+					foreach ($res['tx'] as $tx) {
+						if (is_array($tx) && isset($tx['txid'])) {
+							$txid = (string) $tx['txid'];
+							$txids[] = $txid;
+							$this->nebTxCache[$txid] = array(
+								'height' => (int) (isset($res['height']) ? $res['height'] : 0),
+								'hash' => (string) (isset($res['hash']) ? $res['hash'] : ''),
+								'time' => (int) (isset($res['time']) ? $res['time'] : 0),
+								'confirmations' => (int) (isset($res['confirmations']) ? $res['confirmations'] : 0),
+								'tx' => $tx,
+							);
+						} elseif (is_string($tx)) {
+							$txids[] = $tx;
+						}
+					}
+					$res['tx'] = $txids;
+				}
+			}
+			return $res;
+		}
+
+		if ($this->isNebhash && ($method === 'gettransaction' || $method === 'getrawtransaction')) {
+			$txid = (string) (isset($params[0]) ? $params[0] : '');
+			$entry = isset($this->nebTxCache[$txid]) ? $this->nebTxCache[$txid] : null;
+			$height = $entry
+				? (int) $entry['height']
+				: (int) (isset($params[1]) ? $params[1] : 0);
+			if ($height > 0)
+				return $this->nebTransaction($txid, $height, $entry);
+		}
+
+		switch ($method) {
 			case 'getpeerinfo':
 				$res = $this->rpc->__call($method,$params);
 				// NEB reports peer height as `height`; legacy views read
