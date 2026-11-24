@@ -342,7 +342,9 @@ void xelisv2_hash(const uint32_t* input, uint32_t* output, uint32_t len)
 	uint8_t hash[HASHSIZE];
 	// int len=80; // #FixMe
 
-			memcpy(xel_input, input, len);
+			// the algo hashes a fixed INPUT_LEN (112) zero-padded input:
+			// copy no more than that, never past the calloc'd buffer
+			memcpy(xel_input, input, len < INPUT_LEN ? len : INPUT_LEN);
 			// printf("Xel 2 input of %u\n",xel_input);
                         xel_stage_1(xel_input, XEL_INPUT_LEN, scratch_uint8);
                         xel_stage_3(scratch);

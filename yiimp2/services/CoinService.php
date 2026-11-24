@@ -340,7 +340,7 @@ class CoinService
                 CURLOPT_TIMEOUT        => 30,
                 CURLOPT_USERAGENT      => 'yiimp-version-checker/2.0',
             ]);
-            if (defined('GITHUB_ACCESSTOKEN')) {
+            if (defined('GITHUB_ACCESSTOKEN') && GITHUB_ACCESSTOKEN !== '' && !str_contains(GITHUB_ACCESSTOKEN, '<')) {
                 curl_setopt($ch, CURLOPT_USERPWD, GITHUB_ACCESSTOKEN);
             }
             $obj = json_decode(strip_tags(curl_exec($ch)));
@@ -353,6 +353,7 @@ class CoinService
                     [':tag' => $obj->tag_name, ':id' => $coin->id]
                 )->execute();
                 $algoText .= "{$prefix} : New release ({$obj->tag_name})\n";
+                $coin->version_github = $obj->tag_name;
             }
 
             if ($coin->version_installed !== $coin->version_github) {
@@ -745,7 +746,7 @@ class CoinService
      * Snapshot MySQL SHOW PROCESSLIST into the connections table and prune stale rows.
      * Ports: BackendProcessList() — blocks.sh every 20s.
      */
-    public function processJobQueue(): void
+    public function snapshotDbConnections(): void
     {
         $db  = Yii::$app->db;
         $now = time();

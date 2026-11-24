@@ -35,3 +35,4 @@ if (!defined('YIIMP_CLI_ALLOW_DISTCLEAN'))  define('YIIMP_CLI_ALLOW_DISTCLEAN', 
 if (!defined('YIIMP_MAINTENANCE_MODE'))     define('YIIMP_MAINTENANCE_MODE',     false);
 if (!defined('YIIMP_LAYOUT'))               define('YIIMP_LAYOUT',               'legacy');
 if (!defined('YIIMP_TAILWIND_CDN'))         define('YIIMP_TAILWIND_CDN',         true);
+if (!defined('YIIMP_GITHUB_SCAN'))          define('YIIMP_GITHUB_SCAN',          false);

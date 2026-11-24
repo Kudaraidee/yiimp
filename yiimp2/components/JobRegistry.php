@@ -24,6 +24,7 @@ class JobRegistry
             // Coins
             \app\jobs\coins\UpdateCoinStatsJob::class,
             \app\jobs\coins\UpdateRawCoinsJob::class,
+            \app\jobs\coins\GithubVersionsJob::class,
             // Stats
             \app\jobs\stats\UpdatePoolStatsJob::class,
             \app\jobs\stats\UpdateExtendedStatsJob::class,
@@ -43,6 +44,7 @@ class JobRegistry
             \app\jobs\system\NotificationsJob::class,
             \app\jobs\system\BenchUpdateJob::class,
             \app\jobs\system\MaintenanceJob::class,
+            \app\jobs\system\DbConnectionsJob::class,
         ];
     }
 

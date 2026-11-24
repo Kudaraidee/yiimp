@@ -1,0 +1,249 @@
+{
+ "result": {
+  "capabilities": [
+   "proposal"
+  ],
+  "version": 536870912,
+  "rules": [
+   "csv"
+  ],
+  "previousblockhash": "000000000000000000015608c6f72ab72e77a19fe36dd5aac9115ec09d407c0f",
+  "transactions": [
+   {
+    "data": "85d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a4485d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a4485d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a44",
+    "txid": "6fd8682a4129fff8d97dde2691370ae3f0fbb614c4aaa723a8383011d0e90b42",
+    "hash": "6fd8682a4129fff8d97dde2691370ae3f0fbb614c4aaa723a8383011d0e90b42",
+    "fee": 1000,
+    "depends": [],
+    "weight": 384
+   },
+   {
+    "data": "95b20738d986afc930dd7b86bbf20328dd4986f766f0261d595687d2eca3b4d295b20738d986afc930dd7b86bbf20328dd4986f766f0261d595687d2eca3b4d295b20738d986afc930dd7b86bbf20328dd4986f766f0261d595687d2eca3b4d2",
+    "txid": "f88e0bbdb1f34fcaa316687cce1e83b03b916c4b1c921655995422038ef01067",
+    "hash": "f88e0bbdb1f34fcaa316687cce1e83b03b916c4b1c921655995422038ef01067",
+    "fee": 1001,
+    "depends": [],
+    "weight": 384
+   }
+  ],
+  "coinbaseaux": {
+   "flags": ""
+  },
+  "coinbasevalue": 312502001,
+  "target": "00000000000000000002f1280000000000000000000000000000000000000000",
+  "mintime": 1767225000,
+  "mutable": [
+   "time",
+   "transactions",
+   "prevblock"
+  ],
+  "noncerange": "00000000ffffffff",
+  "curtime": 1767225600,
+  "bits": "17030ecd",
+  "height": 900000,
+  "masternode": [
+   {
+    "payee": "Xf9e9bdf2a853be987f6a6dac8900e431f",
+    "script": "76a914308880dbec03b2d50eeff6c837fd72307e18641088ac",
+    "amount": 1000000
+   },
+   {
+    "payee": "Xba7e02d907962ee4652c2b9ac214ab5fe",
+    "script": "76a914dce18304ef1e990b86ff85b26e00e5f6c09322ab88ac",
+    "amount": 1000001
+   },
+   {
+    "payee": "X87ae5d6137bbfcc1fe14cbd9406827ba5",
+    "script": "76a914b9135728c6627f15e5349e52938971d790941d5888ac",
+    "amount": 1000002
+   },
+   {
+    "payee": "Xa743665e827333b90dd6ef0dcee4da531",
+    "script": "76a914eaa79ebe59bfd86b97e6668592b713dcdd2361bb88ac",
+    "amount": 1000003
+   },
+   {
+    "payee": "X1788a64dbbb63ba06d8d5627bbfffcc3d",
+    "script": "76a914845029b0d85ed59de662e25d61ac7831b017527588ac",
+    "amount": 1000004
+   },
+   {
+    "payee": "X2b8e4bc7e5613fcc915ba5b3c337db4fc",
+    "script": "76a91495b4e25155326efa4b3491b0b7e80b0aff50abd088ac",
+    "amount": 1000005
+   },
+   {
+    "payee": "X7d48077c49c7b731f97278915c0df85da",
+    "script": "76a9144ef0f9c13a930d5c5d4f185008881af0862d121588ac",
+    "amount": 1000006
+   },
+   {
+    "payee": "Xc86573c6417ec2f2170246855c20c283c",
+    "script": "76a914547e7ba0fe133a1f5ddf6a92d4cd40a233f4b79788ac",
+    "amount": 1000007
+   },
+   {
+    "payee": "Xee8efb1760384b8efcdcd59d682ab15de",
+    "script": "76a9145e04e3d0d0e6f13d36ef2aaa947e6b685a589b0188ac",
+    "amount": 1000008
+   },
+   {
+    "payee": "X2cabe6fbb20decd0be399caf2f316f10e",
+    "script": "76a914ea755a9a627a318c4e36f00f52cc9f81b86e4b7d88ac",
+    "amount": 1000009
+   },
+   {
+    "payee": "X695c7e7c893bbe060314fff6a2a979fd4",
+    "script": "76a9147d87d61c9dab87bb363030aaeae885322238af0888ac",
+    "amount": 1000010
+   },
+   {
+    "payee": "X0f0e60fb7332667e357f2c9460759020b",
+    "script": "76a9149b3c541224631a36e448060ab49cd8ac168db6e688ac",
+    "amount": 1000011
+   },
+   {
+    "payee": "X5fe52475ef73aeb45af568fec2c1eb889",
+    "script": "76a9148c5e0e0e5e0fce11227c2d0d6fa1454f31cdabd188ac",
+    "amount": 1000012
+   },
+   {
+    "payee": "Xbd2d977ce071326c7ad5ac246b03e8dba",
+    "script": "76a914db0f676c8b327a1c4137d37148889f92cceaaa2b88ac",
+    "amount": 1000013
+   },
+   {
+    "payee": "Xe028d461507db20f0bcb8d7afa5e37ae1",
+    "script": "76a914eeda29facff624e8379970320f03d27e46486e6488ac",
+    "amount": 1000014
+   },
+   {
+    "payee": "X2cf1cb1a0fd23944046f2a8adfe029051",
+    "script": "76a9141f28e14b8b6029eca0ced7d83fb5e8c4a99f99a988ac",
+    "amount": 1000015
+   },
+   {
+    "payee": "Xe8109603e08d6e16c83e78fd065b39d05",
+    "script": "76a91421589a407e218ee6a65db84c8a87e5713efffc9f88ac",
+    "amount": 1000016
+   },
+   {
+    "payee": "Xdcc2dbaa0aa5ad7a208dccd798a77ac76",
+    "script": "76a914376f1236bfe53391c0b294ea69db01d63ed47e8288ac",
+    "amount": 1000017
+   },
+   {
+    "payee": "X7b90a86f1f87cb1a9d0eeea85df7ffc31",
+    "script": "76a914bf0db44d6036bf8971dd919898525918dbda949388ac",
+    "amount": 1000018
+   },
+   {
+    "payee": "Xe437a6e03405c6bb5de03470eccc9506c",
+    "script": "76a914dc520da2b9fa981c24d784c0411ab2f4a8b4f82388ac",
+    "amount": 1000019
+   },
+   {
+    "payee": "X9f49b68aa8e241b7cce8ce88e35bd0eee",
+    "script": "76a91448daf5ec9bb0282d79730eadeaf4fc9ae5ed3ae488ac",
+    "amount": 1000020
+   },
+   {
+    "payee": "X0eb48725a751af83abcadf3321efea514",
+    "script": "76a9140896fd06ba9bd14f31b5211101abd2e68e4bed0188ac",
+    "amount": 1000021
+   },
+   {
+    "payee": "X1853bf440dd349170f3728d7ac79b2d09",
+    "script": "76a9146ef8665b9d656e5f76e8d36fe374ffe27c3aebf188ac",
+    "amount": 1000022
+   },
+   {
+    "payee": "X17d5f94e85e5fabe975a3b516fd8161ae",
+    "script": "76a91465d419684adee88ff7003100aba5e2d09cbb4efe88ac",
+    "amount": 1000023
+   },
+   {
+    "payee": "Xd652cfd740b9025b63e609f3e75b6d19b",
+    "script": "76a9143b9ecc1fad0153b0a3a87ac32087d520723b9bc188ac",
+    "amount": 1000024
+   },
+   {
+    "payee": "X7f654fe42f86f10d7fa7dc4fc97121705",
+    "script": "76a914d27f01cdedc4107494e12c35b22126167ee4e9ab88ac",
+    "amount": 1000025
+   },
+   {
+    "payee": "Xde1e91dc509125de5e47e9f480b5821c4",
+    "script": "76a914838ff2f34d2e19b5c2467e1767707ba0cf7e798788ac",
+    "amount": 1000026
+   },
+   {
+    "payee": "X510c23c2aba408400746c2dfbdc565788",
+    "script": "76a9148351721b72174aa080728ceb8551623c1c9c124b88ac",
+    "amount": 1000027
+   },
+   {
+    "payee": "X7c2b6a04bfb703efbaa198f85345d224d",
+    "script": "76a914502e7d25cd941507b57eb587bbb1765b420cb3c588ac",
+    "amount": 1000028
+   },
+   {
+    "payee": "X8e6dceacaf0e9b6a4e335561db9e4b557",
+    "script": "76a914889c4f725a578083dfb2bab78c91072db5f26c9588ac",
+    "amount": 1000029
+   },
+   {
+    "payee": "Xbf860d388f89eb51406d40c734143cd3b",
+    "script": "76a914304dff229b3eb08cd200958f760c406d02a1e30588ac",
+    "amount": 1000030
+   },
+   {
+    "payee": "X6f9efdbc02b1bcc005659b3fd4dbcb881",
+    "script": "76a914828c55063fc716f3b81a3b21fc4caf6fd419791e88ac",
+    "amount": 1000031
+   },
+   {
+    "payee": "Xe6e257a8692da7a38026061bb95d1db84",
+    "script": "76a914e08555ea4e9b0e63dfee3068d89d92a8493424f088ac",
+    "amount": 1000032
+   },
+   {
+    "payee": "Xe8be6f445dc9aba8e3132eb5da1967464",
+    "script": "76a9143017216cf1d934380c56ff564968d843a7edb2bc88ac",
+    "amount": 1000033
+   },
+   {
+    "payee": "X95109e35fa9a6f5f89435b7f6123fd20a",
+    "script": "76a91495d262e579bbcc4e74d2876fd624af39b275964688ac",
+    "amount": 1000034
+   },
+   {
+    "payee": "Xd9dc55b1412768295ac33e58428a4c306",
+    "script": "76a914a85cd59ce0879574cd0ebfa6ce90fd9364594b0588ac",
+    "amount": 1000035
+   },
+   {
+    "payee": "X29c83a14c8b1eb5692e01846b08830507",
+    "script": "76a9144a075f95165a445d76e1f9ddc4b4633796f561ef88ac",
+    "amount": 1000036
+   },
+   {
+    "payee": "X0405eda97b9f69872a1e7d1f6a48ba58f",
+    "script": "76a91449731b61074b43dbe8865793b56ba44e0b62220988ac",
+    "amount": 1000037
+   },
+   {
+    "payee": "X92d0b82361b89b9792df55fe8b21d62db",
+    "script": "76a9141089c952bf31e694b7400e6f14cead1feb87b31788ac",
+    "amount": 1000038
+   },
+   {
+    "payee": "X2533d88d8baefce1a7ce6bee8bc78b228",
+    "script": "76a914841a3e4d5a8ee0112101fa294a103f0e553e998588ac",
+    "amount": 1000039
+   }
+  ]
+ },
+ "error": null,
+ "id": 1
+}

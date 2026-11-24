@@ -1,0 +1,73 @@
+{
+ "result": {
+  "capabilities": [
+   "proposal"
+  ],
+  "version": 536870912,
+  "rules": [
+   "csv",
+   "!segwit"
+  ],
+  "previousblockhash": "000000000000000000015608c6f72ab72e77a19fe36dd5aac9115ec09d407c0f",
+  "transactions": [
+   {
+    "data": "85d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a4485d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a4485d9ef66cec1447afd2a0b57c78c50ccf91195d4cefe4affe26f47f5364b1a44",
+    "txid": "6fd8682a4129fff8d97dde2691370ae3f0fbb614c4aaa723a8383011d0e90b42",
+    "hash": "83b8b1de62930423d46065ce883ba73c559674a565484d989aeff2840ba207ed",
+    "fee": 1000,
+    "depends": [],
+    "weight": 384
+   },
+   {
+    "data": "95b20738d986afc930dd7b86bbf20328dd4986f766f0261d595687d2eca3b4d295b20738d986afc930dd7b86bbf20328dd4986f766f0261d595687d2eca3b4d295b20738d986afc930dd7b86bbf20328dd4986f766f0261d595687d2eca3b4d2",
+    "txid": "f88e0bbdb1f34fcaa316687cce1e83b03b916c4b1c921655995422038ef01067",
+    "hash": "4701e529ea850a9b8f9c1fd5f13e8660038c2c4fa262794e2aa2f89e425cc85b",
+    "fee": 1001,
+    "depends": [],
+    "weight": 384
+   },
+   {
+    "data": "808fe912125d2b243ccbadcd7f9414efb6a7e7b500a5e9f96d56814cf046e37b808fe912125d2b243ccbadcd7f9414efb6a7e7b500a5e9f96d56814cf046e37b808fe912125d2b243ccbadcd7f9414efb6a7e7b500a5e9f96d56814cf046e37b",
+    "txid": "e5194eb375fc801ff3117a76bd8f8fac870cb143fd50d06484b817ec72b38579",
+    "hash": "cd84352dd2436204a7b0d53e7a65811fb742234c0312f4a222975e5b9b861a59",
+    "fee": 1002,
+    "depends": [],
+    "weight": 384
+   },
+   {
+    "data": "ee8e047896de5864a3f916297234a2f55dbac856150a880cb7910da7cef02a0aee8e047896de5864a3f916297234a2f55dbac856150a880cb7910da7cef02a0aee8e047896de5864a3f916297234a2f55dbac856150a880cb7910da7cef02a0a",
+    "txid": "a130a3b201173a451dbcc9ac3cf113257b802beb6d5c166e5688f8e2777b43e6",
+    "hash": "fa1cc8f4f1f62f70113f46313ecb08bb3ad577768b159ec9ca4ba36ea1d65333",
+    "fee": 1003,
+    "depends": [],
+    "weight": 384
+   },
+   {
+    "data": "63e3d4db678a3456e197401f160628f2859405f675eeb00ea54e8de487e5685663e3d4db678a3456e197401f160628f2859405f675eeb00ea54e8de487e5685663e3d4db678a3456e197401f160628f2859405f675eeb00ea54e8de487e56856",
+    "txid": "2f98d3799146cca8fb6b893a2bdfccd77dfd5071ef7764309f0302fd28a35412",
+    "hash": "9a140a218a1e0d9faedc417d8f01bbfb1349079daa2b58b8c35f664df5a024d0",
+    "fee": 1004,
+    "depends": [],
+    "weight": 384
+   }
+  ],
+  "coinbaseaux": {
+   "flags": ""
+  },
+  "coinbasevalue": 312505010,
+  "target": "00000000000000000002f1280000000000000000000000000000000000000000",
+  "mintime": 1767225000,
+  "mutable": [
+   "time",
+   "transactions",
+   "prevblock"
+  ],
+  "noncerange": "00000000ffffffff",
+  "curtime": 1767225600,
+  "bits": "17030ecd",
+  "height": 900000,
+  "default_witness_commitment": "6a24aa21a9ed643bf6b9238aacfbb1dcb3a7ef4c1b687a72bf4d22f25172089b309cab111766"
+ },
+ "error": null,
+ "id": 1
+}
