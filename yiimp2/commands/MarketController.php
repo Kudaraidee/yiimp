@@ -48,8 +48,11 @@ class MarketController extends Controller
 
     private function exchangeExists(string $exchange): bool
     {
+        // Market rows use names such as "nestex USDT", while CLI commands and
+        // settings keys use the bare exchange name "nestex".
         return (bool) Yii::$app->db->createCommand(
-            "SELECT COUNT(*) FROM markets WHERE name = :e", [':e' => $exchange]
+            "SELECT COUNT(*) FROM markets WHERE name = :e OR name LIKE :p",
+            [':e' => $exchange, ':p' => $exchange . ' %']
         )->queryScalar();
     }
 

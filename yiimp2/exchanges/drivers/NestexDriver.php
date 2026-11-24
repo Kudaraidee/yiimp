@@ -186,7 +186,9 @@ class NestexDriver extends ExchangeDriver
         $ordersBook   = $this->authenticatedRequest('orders', [], 'POST', 'array');
         $flushAll     = rand(0, 8) === 0;
         $cancelAskPct = 1.20;
-        $minTrade     = 0.1;
+        // NestEx quotes are in USDT, so this threshold is in USDT (not BTC).
+        // Operators can lower it for dust sells without touching global trading.
+        $minTrade = $this->configFloat('trade_min_usdt', 0.1);
 
         foreach ($balances['balances'] as $currency => $balance) {
             $sym = strtoupper($currency);

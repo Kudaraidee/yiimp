@@ -118,7 +118,8 @@ class SettingsService extends Component
     {
         return [
             'disabled'           => 'Fully disable the exchange',
-            'trade_min_btc'      => 'Minimum order on the exchange',
+            'trade_min_btc'      => 'Minimum order on the exchange (BTC pairs)',
+            'trade_min_usdt'     => 'Minimum order value on USDT-quoted markets (NestEx)',
             'trade_sell_ask_pct' => 'Initial order ask price related to the lowest ask (%)',
             'trade_cancel_ask_pct' => 'Cancel orders if the lowest ask reaches this % of your order',
             'withdraw_min_btc'   => 'Auto-withdraw when BTC balance exceeds this amount (0=disabled)',
