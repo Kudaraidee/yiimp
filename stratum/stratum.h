@@ -286,4 +286,3 @@ void sha3d_hash_hex(const char *input, char *output, unsigned int len);
 #include "algos/rinhash.h"
 #include "algos/soterg.h"
 
-bool validate_hashfunctions();

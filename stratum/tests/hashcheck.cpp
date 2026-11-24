@@ -3,8 +3,8 @@
 //
 //   hashcheck --generate [--algo NAME]   print vectors to stdout
 //   hashcheck --check FILE [--algo NAME] compare with FILE, exit 1 on mismatch
-//   hashcheck --reference FILE           check known chain blocks (replaces the
-//                                        in-binary validate_hashfunctions())
+//   hashcheck --reference FILE           check known answers (took over from the
+//                                        removed in-binary validate_hashfunctions())
 //
 // The vector file is a golden master of today's behaviour (any change is a
 // regression or needs a conscious re-generate). The reference file holds known
