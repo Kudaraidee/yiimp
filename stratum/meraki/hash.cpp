@@ -94,7 +94,7 @@ uint256 meraki_fullhash(uint256& header_hash, uint64_t& header_nonce,
     return uint256S(meraki_to_hex(result.final_hash));
 }
 
-uint256 meraki_hash(std::string& header_hash, std::string& header_nonce,
+uint256 meraki_hash(const std::string& header_hash, const std::string& header_nonce,
     std::string& mix_real, int& coinid)
 {
     uint256 mix_hash;

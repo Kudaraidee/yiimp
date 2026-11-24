@@ -557,7 +557,7 @@ search_result search_light(const epoch_context& context, int block_number,
     const uint64_t end_nonce = start_nonce + iterations;
     for (uint64_t nonce = start_nonce; nonce < end_nonce; ++nonce)
     {
-        result r = hash(context, block_number, header_hash, nonce);
+        result r = meraki_progpow_hash(context, block_number, header_hash, nonce);
         if (is_less_or_equal(r.final_hash, boundary))
             return {r, nonce};
     }

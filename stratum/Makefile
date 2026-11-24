@@ -74,7 +74,7 @@ ifeq ($(wildcard $(CODEDIR5)/librandomx.a), )
 endif
 
 $(SOURCES): stratum.h util.h
-$(SOURCES_MERAKI): stratum.h meraki/hash.h meraki/helpers.hpp meraki/meraki.h meraki/lib/meraki/meraki.hpp meraki/lib/meraki/progpow.hpp
+$(SOURCES_MERAKI): stratum.h meraki/hash.h meraki/helpers.hpp meraki/meraki.h meraki/lib/meraki/meraki.hpp meraki/lib/meraki/progpow.hpp meraki/lib/attributes.h meraki/lib/support/attributes.h
 $(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/work.h
 $(SOURCES_RANDOMSCASH): stratum.h randomscash/randomscash.h randomx/src/randomx.h
 $(SOURCES_HOMESCRYPT): stratum.h homescrypt/homescrypt.h

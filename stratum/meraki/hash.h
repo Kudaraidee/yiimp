@@ -7,9 +7,8 @@
 
 #include <vector>
 
-// Telestai's Meraki epoch is fixed at 27500 blocks (Miningcore
-// TelestaiConstants.EpochLength and libmeraki MERAKI_EPOCH_LENGTH).
-const int MERAKI_EPOCH_LENGTH = 27500;
+// Telestai's Meraki epoch is fixed at 27500 blocks; MERAKI_EPOCH_LENGTH is
+// provided by meraki/lib/meraki/meraki.h included above.
 
 struct meraki_coin_context {
     int id;
@@ -28,7 +27,7 @@ void meraki_update_epoch(const int coinid, int& height);
 meraki_coin_context* meraki_get_coin_context(const int coinid);
 uint256 meraki_fullhash(uint256& header_hash, uint64_t& header_nonce,
     uint256& mix_hash, int& coinid);
-uint256 meraki_hash(std::string& header_hash, std::string& header_nonce,
+uint256 meraki_hash(const std::string& header_hash, const std::string& header_nonce,
     std::string& mix_real, int& coinid);
 
 #endif // YAAMP_MERAKI_HASH_H
