@@ -15,6 +15,15 @@ $num = function ($value, int $decimals = 6): string {
     return rtrim(rtrim($s, '0'), '.');
 };
 
+$util = Yii::$app->YiimpUtils;
+$diffText = function ($algo, $raw) use ($num, $util): string {
+    if ($algo === 'nebhash') {
+        // Match ForgeMiner's 4-decimal display; the raw target stays in the tooltip.
+        return number_format($util->display_difficulty($algo, $raw), 4, '.', ',');
+    }
+    return $num($raw);
+};
+
 $compact = function ($value) use ($conv): string {
     if ($value === null || $value === '') return '—';
     return (string) $conv->Itoa2($value, 3);
@@ -235,7 +244,7 @@ CSS;
                 <tr>
                     <td><b><?= Html::encode($workerName) ?></b></td>
                     <td><span class="df-pill blue"><?= Html::encode($w['algo']) ?></span></td>
-                    <td><span class="num"><?= Html::encode($num($w['difficulty'])) ?></span></td>
+                    <td><span class="num" title="raw target difficulty: <?= Html::encode($num($w['difficulty'])) ?>"><?= Html::encode($diffText($w['algo'], $w['difficulty'])) ?></span></td>
                     <td><span class="df-pill <?= $overrideCls ?>"><?= Html::encode($override) ?></span></td>
                     <td><?= Html::encode($w['version']) ?></td>
                     <td><span class="meta" style="margin:0"><?= Html::encode($ago($w['time'])) ?></span></td>
@@ -259,6 +268,9 @@ CSS;
         <div class="df-code">-o stratum+tcp://<?= Html::encode($stratumUrl) ?>:<?= (int) $scryptPort ?> -u WALLET -p d=64</div>
         <p><code>d=</code> pins difficulty for the whole session. <code>sd=</code> only seeds the initial
            difficulty and still lets vardiff adjust it later. Firopow ignores a custom <code>d=</code> value.</p>
+        <p>NEB difficulty is shown in the miner's unit (1 = 10^10 expected hashes), so the web matches
+           ForgeMiner; hover the value for the raw 256-bit target difficulty. For NEB, <code>d=</code>/<code>sd=</code>
+           pin/seed the vardiff k (1–48), not a decimal difficulty.</p>
         <div class="df-code"># Scrypt, fixed diff 64
 -o stratum+tcp://<?= Html::encode($stratumUrl) ?>:<?= (int) $scryptPort ?> -u WALLET.worker -p d=64
 

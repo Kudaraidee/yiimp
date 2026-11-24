@@ -394,6 +394,25 @@ class YiimpUtils extends Component
 	////////////////////////////////////////////////////////////////////////
 	// hash rate related functions
 
+	// ForgeMiner/2.x prints the NEB pool target as expected hashes per share
+	// divided by 10^10. Yiimp stores the raw 2^256/target value, so use the
+	// same scale when showing NEB difficulty on the web.
+	const NEBHASH_MINER_DIFF_SCALE = 10000000000.0;
+
+	/**
+	 * Display difficulty in the same unit the miner reports.
+	 *
+	 * For every other algo the stored value is already the number shown by the
+	 * miner (d=0.1 -> 0.1). NEB stores a 256-bit target difficulty in the
+	 * hundreds of millions; ForgeMiner prints the same value scaled by 10^10.
+	 */
+	public function display_difficulty($algo=null, $raw=0)
+	{
+		if ($algo === 'nebhash')
+			return (float) $raw / self::NEBHASH_MINER_DIFF_SCALE;
+		return (float) $raw;
+	}
+
 	public function hashrate_constant($algo=null)
 	{
 		switch ($algo) {

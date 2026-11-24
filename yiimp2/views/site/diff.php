@@ -134,6 +134,12 @@ if (Yii::$app->LayoutManager->isLegacy()): ?>
 </p>
 
 <p style="width: 700px; color: #666;">
+    NEB difficulty is shown in the miner's unit (1 = 10^10 expected hashes) so the web matches ForgeMiner;
+    hover the value for the raw 256-bit target difficulty. For NEB, <code>d=</code>/<code>sd=</code>
+    pin/seed the vardiff k (1–48), not a decimal difficulty.
+</p>
+
+<p style="width: 700px; color: #666;">
     Auto-refresh: every 60s
     <span id="diff-refresh-state">(waiting)</span>
 </p>

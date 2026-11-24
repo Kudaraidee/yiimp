@@ -14,6 +14,14 @@ $num = function ($value, int $decimals = 6): string {
     return rtrim(rtrim($s, '0'), '.');
 };
 
+$util = Yii::$app->YiimpUtils;
+$diffText = function ($algo, $raw) use ($num, $util): string {
+    if ($algo === 'nebhash') {
+        return number_format($util->display_difficulty($algo, $raw), 4, '.', ',');
+    }
+    return $num($raw);
+};
+
 $compact = function ($value) use ($conv): string {
     if ($value === null || $value === '') return '—';
     return (string) $conv->Itoa2($value, 3);
@@ -130,7 +138,7 @@ $customNote = function (string $algo): string {
         <tr>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($workerName) ?></td>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($w['algo']) ?></td>
-            <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($num($w['difficulty'])) ?></td>
+            <td style="border: 1px solid #ccc; padding: 4px 6px;" title="raw target difficulty: <?= Html::encode($num($w['difficulty'])) ?>"><?= Html::encode($diffText($w['algo'], $w['difficulty'])) ?></td>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($override) ?></td>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($w['version']) ?></td>
             <td style="border: 1px solid #ccc; padding: 4px 6px;"><?= Html::encode($ago($w['time'])) ?></td>

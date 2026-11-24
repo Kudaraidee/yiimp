@@ -305,6 +305,13 @@ if(count($uniqueWorkers))
 
 		$user_rate1 = $stat['hashrate'] ? $conv->Itoa2($stat['hashrate']).'h/s' : '—';
 
+		// NEB stores a 256-bit target difficulty; show the same scaled value the
+		// miner prints (d=0.1 -> 0.1 elsewhere). Raw value stays in the tooltip.
+		$diffRaw = htmlspecialchars((string) $worker->difficulty, ENT_QUOTES, 'UTF-8');
+		$diffText = $worker->algo === 'nebhash'
+			? number_format($utils->display_difficulty($worker->algo, $worker->difficulty), 4, '.', ',')
+			: $diffRaw;
+
 		$version = trim((string) $worker->version);
 		$version = $version !== '' ? substr($version, 0, 24) : '';
 		$password = trim((string) $worker->password);
@@ -339,7 +346,7 @@ if(count($uniqueWorkers))
 		if (!is_null(Yii::$app->user->identity))
 			echo "<td>" . htmlspecialchars((string) $worker->ip, ENT_QUOTES, 'UTF-8') . "</td>";
 		echo '<td><span class="wl-pill blue">' . htmlspecialchars((string) $worker->algo, ENT_QUOTES, 'UTF-8') . '</span></td>';
-		echo '<td>' . htmlspecialchars((string) $worker->difficulty, ENT_QUOTES, 'UTF-8') . '</td>';
+		echo '<td title="raw target difficulty: ' . $diffRaw . '">' . $diffText . '</td>';
 		echo '<td><span class="wl-val">' . htmlspecialchars($user_rate1, ENT_QUOTES, 'UTF-8') . '</span></td>';
 		echo '<td><span class="wl-val">' . htmlspecialchars((string) $shares_per_minute, ENT_QUOTES, 'UTF-8') . '/min</span></td>';
 		echo '<td>' . htmlspecialchars($workerCoinSymbol, ENT_QUOTES, 'UTF-8') . '</td>';
