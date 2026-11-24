@@ -38,6 +38,10 @@ class MarketService
         $settings->marketSetDefault('yobit', 'DCR', 'disabled', true);
         $settings->prefetchAll();
 
+        // Quote coins must be priced in BTC before USDT/USDC pairs can be
+        // converted into the BTC value stored in coins.price.
+        $this->refreshQuoteRates();
+
         // Update prices per active exchange
         $exchanges = Balances::find()->all();
         foreach ($exchanges as $exchange) {
@@ -133,6 +137,100 @@ class MarketService
         Yii::debug("==== Start Sync Market Price {$exchange} ====", __CLASS__);
         ExchangeFactory::make($exchange)->updateMarkets();
         Yii::debug('==== End Sync Market Price ====', __CLASS__);
+    }
+
+    /**
+     * Refresh stablecoin BTC rates and mirror them into the seeded quote rows.
+     * Ports updateQuoteCoinPrices() + yiimp_sync_quote_coin_prices() from
+     * web/yaamp/core/backend/markets.php. Without this, USDT-quoted markets
+     * would be converted with a stale usdt_btc rate.
+     */
+    public function refreshQuoteRates(): void
+    {
+        $quotes = [
+            'USDT' => 'tether',
+            'USDC' => 'usd-coin',
+            'BUSD' => 'binance-usd',
+            'DAI'  => 'dai',
+        ];
+
+        $ids  = implode(',', array_values($quotes));
+        $json = $this->fetchJson(
+            'https://api.coingecko.com/api/v3/simple/price?ids=' . $ids . '&vs_currencies=btc'
+        );
+        if (is_array($json)) {
+            foreach ($quotes as $symbol => $cgId) {
+                $rate = (float) ($json[$cgId]['btc'] ?? 0);
+                if ($rate > 0) {
+                    Yii::$app->settings->set(strtolower($symbol) . '_btc', $rate);
+                }
+            }
+        }
+
+        // Cross-check the main stablecoins against Binance BTC/<quote> pairs.
+        $pairs = ['USDT' => 'BTCUSDT', 'USDC' => 'BTCUSDC'];
+        $url   = 'https://api.binance.com/api/v3/ticker/price?symbols='
+            . rawurlencode(json_encode(array_values($pairs)));
+        $json  = $this->fetchJson($url);
+        if (is_array($json)) {
+            $bySymbol = [];
+            foreach ($json as $ticker) {
+                $symbol = (string) ($ticker['symbol'] ?? '');
+                $price  = (float) ($ticker['price'] ?? 0);
+                if ($symbol !== '' && $price > 0) {
+                    $bySymbol[$symbol] = $price;
+                }
+            }
+            foreach ($pairs as $symbol => $pair) {
+                if (isset($bySymbol[$pair]) && $bySymbol[$pair] > 0) {
+                    Yii::$app->settings->set(strtolower($symbol) . '_btc', 1 / $bySymbol[$pair]);
+                }
+            }
+        }
+
+        // Other code paths still read coins.price instead of the settings rate.
+        $symbols = array_unique(array_merge(
+            array_keys($quotes),
+            [Yii::$app->YiimpUtils->payoutQuoteSymbol()]
+        ));
+        foreach ($symbols as $symbol) {
+            $rate = (float) Yii::$app->settings->get(strtolower($symbol) . '_btc', 0);
+            if ($rate <= 0) {
+                continue;
+            }
+            Yii::$app->db->createCommand()->update(
+                'coins',
+                ['price' => $rate],
+                ['symbol' => strtoupper($symbol)]
+            )->execute();
+        }
+    }
+
+    private function fetchJson(string $url): ?array
+    {
+        if (!function_exists('curl_init')) {
+            Yii::warning('refreshQuoteRates: curl is unavailable', __CLASS__);
+            return null;
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_USERAGENT      => 'yiimp-market-service',
+        ]);
+        $body = curl_exec($ch);
+        $err  = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $body === '') {
+            Yii::warning('refreshQuoteRates: ' . ($err !== '' ? $err : 'empty response'), __CLASS__);
+            return null;
+        }
+
+        $data = json_decode($body, true);
+        return is_array($data) ? $data : null;
     }
 
     /**

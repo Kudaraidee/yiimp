@@ -8,11 +8,13 @@ use yii\console\ExitCode;
 use app\models\Coins;
 use app\models\Markets;
 use app\models\Market_history;
+use app\services\MarketService;
 
 /**
  * Market data inspection and settings management.
  *
  * Usage:
+ *   php yii market/quotes                             — refresh stablecoin BTC rates
  *   php yii market/list <SYM>                         — list all markets for a coin
  *   php yii market/histo <SYM> <exchange>             — last 100 market history entries
  *   php yii market/prune <SYM>                        — prune old market history
@@ -35,6 +37,20 @@ class MarketController extends Controller
         return (bool) Yii::$app->db->createCommand(
             "SELECT COUNT(*) FROM markets WHERE name = :e", [':e' => $exchange]
         )->queryScalar();
+    }
+
+    /** Refresh USDT/USDC/BUSD/DAI BTC rates and their seeded coin rows. */
+    public function actionQuotes(): int
+    {
+        (new MarketService())->refreshQuoteRates();
+
+        $util    = Yii::$app->YiimpUtils;
+        $symbols = array_unique(['USDT', 'USDC', 'BUSD', 'DAI', $util->payoutQuoteSymbol()]);
+        foreach ($symbols as $symbol) {
+            $rate = (float) Yii::$app->settings->get(strtolower($symbol) . '_btc', 0);
+            $this->stdout(sprintf("%-6s %s BTC\n", $symbol, $rate > 0 ? $rate : 'no rate'));
+        }
+        return ExitCode::OK;
     }
 
     /** List all markets for a coin with price and status. */

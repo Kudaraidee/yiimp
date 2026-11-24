@@ -54,6 +54,8 @@ defined('YIIMP_PAYMENTS_FREQ') or define('YIIMP_PAYMENTS_FREQ', 3 * 60 * 60); //
 defined('YIIMP_PAYMENTS_MINI') or define('YIIMP_PAYMENTS_MINI', 0.001);        // minimum payout amount (BTC)
 
 // ── Features ──────────────────────────────────────────────────────────────────
+// For USDT accounting (payout_quote=USDT), set this to true and apply
+// sql/2026-11-24-autoexchange-usdt-phase1.sql. Trading/payout jobs stay off.
 defined('YIIMP_ALLOW_EXCHANGE')  or define('YIIMP_ALLOW_EXCHANGE',  false);    // enable multi-coin auto-exchange
 defined('YIIMP_RENTAL')          or define('YIIMP_RENTAL',          false);    // pool rents OUT hash power to external renters
 defined('YIIMP_LIMIT_ESTIMATE')  or define('YIIMP_LIMIT_ESTIMATE',  false);    // cap profitability estimate at 1.5× the 24h average
