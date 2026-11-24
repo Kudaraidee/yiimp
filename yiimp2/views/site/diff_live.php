@@ -39,7 +39,7 @@ $ago = function ($ts) use ($now): string {
 $customNote = function (string $algo): string {
     return match ($algo) {
         'firopow'           => 'ignored (pool fixed)',
-        'ethash', 'etchash' => 'used as-is',
+        'ethash', 'etchash', 'meraki' => 'used as-is',
         default             => 'clamped',
     };
 };

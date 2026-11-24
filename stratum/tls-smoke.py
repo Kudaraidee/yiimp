@@ -14,7 +14,7 @@ import time
 
 DEFAULT_PAIRS = [
     (3433, 4433), (3639, 4639), (3640, 4640), (3641, 4641),
-    (3643, 4643), (3644, 4644),
+    (3643, 4643), (3644, 4644), (3646, 4646),
 ]
 MSG = b'{"id":1,"method":"mining.subscribe","params":["tls-smoke/1.0"]}\n'
 
@@ -75,7 +75,7 @@ def main():
     ap.add_argument('--server-name', help='TLS SNI / certificate name (default: --host)')
     ap.add_argument('--no-verify', action='store_true', help='do not verify the server certificate')
     ap.add_argument('--pair', action='append', type=parse_pair,
-                    help='MAIN_PORT:TLS_PORT (repeatable; defaults to all four algos)')
+                    help='MAIN_PORT:TLS_PORT (repeatable; defaults to all configured algos)')
     args = ap.parse_args()
 
     pairs = args.pair or DEFAULT_PAIRS
