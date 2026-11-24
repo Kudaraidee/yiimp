@@ -224,7 +224,8 @@
     color: #26385a; font-family: inherit; font-size: 11px; line-height: 1.4; outline: 0;
 }
 .admn-page .admn-input:focus { border-color: #a9c4ea; box-shadow: 0 0 0 2px rgba(44,90,160,.08); }
-.admn-page .admn-console-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.admn-page .admn-console-card > .admn-card-body { padding: 14px; }
+.admn-page .admn-console-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .admn-page .admn-console-form .admn-input { flex: 1 1 320px; }
 .admn-page .admn-console-error {
     margin-bottom: 10px; padding: 8px 10px;

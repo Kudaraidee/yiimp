@@ -133,7 +133,7 @@ $walletLinks = str_replace([' || ', '<br/>', '<br />'], '',
     </div>
 </div>
 <?php else: ?>
-<div class="admn-card">
+<div class="admn-card admn-console-card">
     <div class="admn-card-head">
         <span class="admn-head-main"><span class="admn-title">RPC Console</span>
         <span class="admn-sub">raw wallet commands · <?= Html::encode($coin->symbol) ?></span></span>
