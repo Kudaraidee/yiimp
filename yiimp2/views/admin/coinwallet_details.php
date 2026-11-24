@@ -37,10 +37,12 @@ if (!empty($info)) {
     $stake = $conv->arraySafeVal($info, 'stake', '');
     if ($stake !== '') $PoS = true;
 }
-// NEB's native getinfo has no `balance` key: the pool DB is authoritative.
-// A truthy info array still means the daemon answered, so show blocks/peers.
+// A daemon can answer getmininginfo/getnetworkinfo even when no wallet is
+// loaded (Bitcoin Core 30 no longer creates a default wallet). That still
+// means RPC is online; use the pool DB balance in that case. NEB's native
+// getinfo likewise has no `balance` key.
 $isNeb        = $coin->algo === 'nebhash' || $coin->symbol === 'NEB';
-$rpcAvailable = !empty($info) && (isset($info['balance']) || $isNeb);
+$rpcAvailable = !empty($info) && (isset($info['balance']) || isset($info['blocks']) || $isNeb);
 
 // DCR stake info
 $dcrStake = $dcrTickets = $dcrTicketPrice = null;
@@ -553,7 +555,7 @@ $tdL = $isLegacy ? '' : ($isTailwind ? 'px-3 py-2 text-gray-700 dark:text-gray-2
 
 if ($isLegacy) {
     $dbBalance = (float) ($coin->balance ?? 0);
-    $walletAmt = $rpcAvailable ? (float) ($info['balance'] ?? ($isNeb ? $dbBalance : 0)) : $dbBalance;
+    $walletAmt = ($rpcAvailable && isset($info['balance'])) ? (float) $info['balance'] : $dbBalance;
     $walletFmt = $conv->altcoinvaluetoa($walletAmt);
     $walletBtc = $conv->bitcoinvaluetoa($walletAmt * $coin->price);
 
@@ -626,7 +628,7 @@ if (!$rpcAvailable) {
     echo "<td class='{$tdR}'>" . Html::encode((string) $index) . "</td>";
 } else {
     $errors  = $info['errors'] ?? '';
-    $balance = $info['balance'] ?? ($isNeb ? $coin->balance : '');
+    $balance = $info['balance'] ?? $coin->balance;
     $btc     = $conv->bitcoinvaluetoa($balance * $coin->price);
     $conns   = isset($info['connections'])
         ? Html::a(Html::encode((string) $info['connections']), '/admin/coinpeers?id=' . $coin->id)
