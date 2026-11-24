@@ -42,6 +42,9 @@ class YiimpUtils extends Component
 			'yespowerARWN'		=> 0.001,
 			'mike'		=> 0.001,
 			'power2b'	=> 0.001,
+			// NEB difficulty is expected hashes per block, so the per-MH rate
+			// needs the extra mBTC normalization to be visible/comparable.
+			'nebhash'	=> 1000,
 		);
 
 		if(!isset($a[$algo])) {
@@ -278,7 +281,7 @@ class YiimpUtils extends Component
 			}
 		}
 
-		$algo_unit_factor = $this->algo_mBTC_factor($coin->algo);
+		$algo_unit_factor = $this->get_algo_norm($coin->algo);
 		return $btcmhd * $algo_unit_factor;
 	}
 

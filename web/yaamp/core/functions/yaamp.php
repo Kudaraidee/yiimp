@@ -98,6 +98,9 @@ function yaamp_get_algo_norm($algo)
 		'velvet'	=> 1.0,
 		'whirlpool'	=> 1.0,
 		'power2b'	=> 0.001,
+		// NEB difficulty is expected hashes per block, so the per-MH rate
+		// needs the extra mBTC normalization to be visible/comparable.
+		'nebhash'	=> 1000,
 		'yescrypt'	=> 1.0,
 		'yescryptR8'	=> 1.0,
 		'yescryptR16'	=> 0.001,
