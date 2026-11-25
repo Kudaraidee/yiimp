@@ -86,6 +86,10 @@ class PayoutController extends Controller
             : time() - (int) ($freq / 2);
         $db = Yii::$app->db;
 
+        $quoteSymbol = Yii::$app->YiimpUtils->payoutQuoteSymbol();
+        $quoteCoin   = Coins::find()->where(['symbol' => $quoteSymbol])->one();
+        $quoteCoinId = $quoteCoin ? (int) $quoteCoin->id : 0;
+
         if ($this->dryRun) {
             $this->stdout("dry run; no changes\n");
             $this->stdout('payout gate: ' . ($gate ? 'on' : 'off') . "\n");
@@ -108,7 +112,8 @@ class PayoutController extends Controller
             }
             $wallet = $db->createCommand(
                 'SELECT COUNT(*) AS c, COALESCE(SUM(balance), 0) AS total
-                 FROM accounts WHERE coinid = 0 AND is_locked = 0 AND balance > 0'
+                 FROM accounts WHERE coinid = :qid AND is_locked = 0 AND balance > 0',
+                [':qid' => $quoteCoinId]
             )->queryOne();
             $this->stdout(sprintf("quote wallets: count=%s total=%s USDT\n", $wallet['c'], $wallet['total']));
             return ExitCode::OK;

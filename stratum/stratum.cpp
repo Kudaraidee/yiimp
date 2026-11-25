@@ -80,6 +80,7 @@ bool g_debuglog_remote;
 
 bool g_autoexchange = true;
 char g_quote_symbol[32] = "USDT";
+int g_quote_coinid = 9;
 
 uint64_t g_max_shares = 0;
 uint64_t g_shares_counter = 0;
@@ -391,6 +392,7 @@ int main(int argc, char **argv)
 
 	strncpy(g_quote_symbol, iniparser_getstring(ini, "STRATUM:quote_symbol", "USDT"), sizeof(g_quote_symbol) - 1);
 	g_quote_symbol[sizeof(g_quote_symbol) - 1] = '\0';
+	g_quote_coinid = iniparser_getint(ini, "STRATUM:quote_coinid", 9);
 
 	// optional coin filters (to mine only one on a special port or a test instance)
 	char *coin_filter = iniparser_getstring(ini, "WALLETS:include", NULL);

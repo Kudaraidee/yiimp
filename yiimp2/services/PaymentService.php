@@ -105,7 +105,7 @@ class PaymentService
         }
 
         $rows = Accounts::find()
-            ->where(['coinid' => 0, 'is_locked' => 0])
+            ->where(['coinid' => $quoteCoinId, 'is_locked' => 0])
             ->andWhere(['>', 'balance', 0])
             ->orderBy(['balance' => SORT_DESC])
             ->all();

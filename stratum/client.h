@@ -68,8 +68,8 @@ public:
 	int userid;
 	int workerid;
 	int coinid;
-	// Explicit c=<quote symbol> login: keep coinid=0 and skip coin-specific
-	// address validation so the miner is credited in the quote wallet.
+	// Explicit c=<quote symbol> login: bind to the quote coin id (USDT=9) and
+	// skip coin-specific address validation so earnings go to the quote wallet.
 	bool pay_quote;
 	bool logtraffic;
 

@@ -263,17 +263,15 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 ///////////////////////////////////////////////////////////////////////////////////////////
 bool client_validate_user_address(YAAMP_CLIENT *client)
 {
-	// c=<quote symbol> explicitly asks for quote-wallet payouts. Keep the
-	// account on coinid=0 and skip coin-specific wallet validation, otherwise
-	// a dedicated coin port would silently re-bind the account to the mined
-	// coin instead of the configured quote currency. Do not use
-	// db_init_user_coinid() here: it stores NULL for an unset coin, while the
-	// payment/accounting code uses 0 as the quote-wallet sentinel.
+	// c=<quote symbol> explicitly asks for quote-wallet payouts. Bind the
+	// account to the configured quote coin (USDT id=9 by default) and skip
+	// coin-specific wallet validation, otherwise a dedicated coin port would
+	// silently re-bind the account to the mined coin instead of the quote.
 	if (client->pay_quote) {
-		client->coinid = 0;
+		client->coinid = g_quote_coinid;
 		if (client->userid > 0) {
 			CommonLock(&g_db_mutex);
-			db_query(g_db, "UPDATE accounts SET coinid=0 WHERE id=%d", client->userid);
+			db_query(g_db, "UPDATE accounts SET coinid=%d WHERE id=%d", g_quote_coinid, client->userid);
 			CommonUnlock(&g_db_mutex);
 		}
 		return true;

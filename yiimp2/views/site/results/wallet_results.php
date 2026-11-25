@@ -19,9 +19,9 @@ $user = $util->getuserbyaddress(Yii::$app->getRequest()->getQueryParam('address'
 if (!$user) return;
 
 // ── Reference coin ────────────────────────────────────────────────────────────
-// A 0/NULL coinid means "pay in the configured quote" (USDT here). Only a
-// missing explicit coin is an invalid wallet; quote wallets must not fall
-// back to BTC or every balance would be mislabelled.
+// Quote wallets are identified by their coin symbol (USDT id=9 here); legacy
+// rows used the coinid=0 sentinel. Only a missing explicit coin is invalid —
+// quote wallets must not fall back to BTC or balances get mislabelled.
 $quoteSymbol = $util->payoutQuoteSymbol();
 $userCoinId  = (int) $user->coinid;
 $refcoin = $userCoinId > 0 ? Coins::findOne($userCoinId) : null;

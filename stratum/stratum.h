@@ -191,6 +191,7 @@ extern YAAMP_ALGO *g_current_algo;
 
 extern bool g_autoexchange;
 extern char g_quote_symbol[32];
+extern int g_quote_coinid;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
