@@ -302,6 +302,7 @@ class ApiController extends Controller
         }
 
         $conv        = Yii::$app->ConversionUtils;
+        $util        = Yii::$app->YiimpUtils;
         $totalUnsold = $this->convertEarnings($user, 'status!=2');
         $t24         = time() - 86400;
         $paid24h     = (float) Yii::$app->db->createCommand(
@@ -316,7 +317,7 @@ class ApiController extends Controller
         $coin = Coins::findOne((int) $user->coinid);
 
         return $this->asJson([
-            'currency' => $coin ? $coin->symbol : 'BTC',
+            'currency' => $coin ? $coin->symbol : $util->payoutQuoteSymbol(),
             'unsold'   => $totalUnsold,
             'balance'  => $balance,
             'unpaid'   => $totalUnpaid,
@@ -369,7 +370,7 @@ class ApiController extends Controller
         }
 
         $result = [
-            'currency' => $coin ? $coin->symbol : 'BTC',
+            'currency' => $coin ? $coin->symbol : $util->payoutQuoteSymbol(),
             'unsold'   => $totalUnsold,
             'balance'  => $balance,
             'unpaid'   => $totalUnpaid,
