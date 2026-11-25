@@ -77,7 +77,9 @@ $jsAddress  = json_encode($address);
 $jsHomeUrl  = json_encode($homeUrl);
 
 // ── Dashboard shell data ───────────────────────────────────────────────────────
-$payoutSymbol = 'BTC';
+// Quote wallets (coinid=NULL) are credited in the configured payout quote
+// (USDT on this pool), not BTC. Explicit per-coin wallets keep their symbol.
+$payoutSymbol = Yii::$app->YiimpUtils->payoutQuoteSymbol();
 if ($user && isset($coin) && $coin) $payoutSymbol = (string) $coin->symbol;
 $walletInitials = strtoupper(substr($payoutSymbol, 0, 3));
 $shortAddress   = $username !== ''

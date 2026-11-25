@@ -19,15 +19,21 @@ $user = $util->getuserbyaddress(Yii::$app->getRequest()->getQueryParam('address'
 if (!$user) return;
 
 // ── Reference coin ────────────────────────────────────────────────────────────
+// A NULL coinid means "pay in the configured quote" (USDT here). Only a
+// missing explicit coin is an invalid wallet; quote wallets must not fall
+// back to BTC or every balance would be mislabelled.
+$quoteSymbol = $util->payoutQuoteSymbol();
 $refcoin = Coins::findOne((int) $user->coinid);
 if (!$refcoin) {
     $invalidMsg = $user->coinid !== null
         ? 'This wallet address is not valid. You will not receive payments using this address.'
         : null;
-    $refcoin = Coins::find()->where(['symbol' => 'BTC'])->one();
+    $refcoin = Coins::find()->where(['symbol' => $quoteSymbol])->one();
+    if (!$refcoin) $refcoin = Coins::find()->where(['symbol' => 'BTC'])->one();
 } else {
     $invalidMsg = null;
 }
+$isQuoteWallet = strtoupper((string) ($refcoin->symbol ?? '')) === $quoteSymbol;
 
 if (!YIIMP_ALLOW_EXCHANGE && $user->coinid == 6 && $defaultAlgo !== 'sha256') {
     $errMsg = 'This pool does not convert/trade currencies. You will not receive payments using this BTC address.';
@@ -97,15 +103,18 @@ $summaryRows = [
 
 $sym = $refcoin ? Html::encode($refcoin->symbol) : 'BTC';
 
-// ── USDT display value (display only — no USDT payouts) ──────────────────────
+// ── Secondary USDT reference ─────────────────────────────────────────────────
+// Quote wallets are already denominated in USDT, so do not print a second
+// "≈ x USDT" conversion beside the primary value.
 $usdtBtc       = (float) $util->quoteBtcPrice('USDT', 0);
 $usdtUsd       = ($usdtBtc > 0 && $mining && (float) $mining->usdbtc > 0)
     ? $usdtBtc * (float) $mining->usdbtc
     : null;
-$toUsdt        = function ($amount) use ($util, $refcoin) {
+$toUsdt        = function ($amount) use ($util, $refcoin, $isQuoteWallet) {
+    if ($isQuoteWallet) return null;
     return $util->usdtValue($amount, $refcoin);
 };
-$payout24hUsdt = $toUsdt($payout24h);
+$payout24hUsdt = $isQuoteWallet ? null : $toUsdt($payout24h);
 
 // Small balances would otherwise render as 0.00 USDT; keep up to 6
 // decimals for sub-cent values and trim trailing zeros.
