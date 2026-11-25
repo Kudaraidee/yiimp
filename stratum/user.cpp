@@ -134,8 +134,11 @@ void db_add_user(YAAMP_DB *db, YAAMP_CLIENT *client)
 
 	mysql_free_result(result);
 
-	db_check_user_input((char*)symbol.substr(0,15).c_str());
-	db_check_coin_symbol(db, (char*)symbol.substr(0,15).c_str());
+	char symbol_buf[16] = { 0 };
+	strncpy(symbol_buf, symbol.c_str(), sizeof(symbol_buf) - 1);
+	db_check_user_input(symbol_buf);
+	db_check_coin_symbol(db, symbol_buf);
+	symbol = symbol_buf;
 
 	if (gift < 0) gift = 0;
 	client->donation = gift;
@@ -146,7 +149,7 @@ void db_add_user(YAAMP_DB *db, YAAMP_CLIENT *client)
 	else if(client->userid == 0 && strlen(client->username) >= MIN_ADDRESS_LEN)
 	{
 		db_query(db, "INSERT INTO accounts (username, coinsymbol, balance, donation, hostaddr) values ('%s', '%s', 0, %d, '%s')",
-			client->username, symbol.substr(0,15).c_str(), gift, client->sock->ip);
+			client->username, symbol.c_str(), gift, client->sock->ip);
 		client->userid = (int)mysql_insert_id(&db->mysql);
 	}
 
@@ -154,10 +157,10 @@ void db_add_user(YAAMP_DB *db, YAAMP_CLIENT *client)
 		db_query(db, "UPDATE accounts SET coinsymbol='%s', swap_time=%u, donation=%d, hostaddr='%s' WHERE id=%d AND balance = 0"
 			" AND (SELECT COUNT(id) FROM payouts WHERE account_id=%d AND tx IS NULL) = 0" // failed balance
 			" AND (SELECT pending FROM balanceuser WHERE userid=%d ORDER by time DESC LIMIT 1) = 0" // pending balance
-			, symbol.substr(0,15).c_str(), (uint) time(NULL), gift, client->sock->ip, client->userid, client->userid, client->userid);
+			, symbol.c_str(), (uint) time(NULL), gift, client->sock->ip, client->userid, client->userid, client->userid);
 		if (mysql_affected_rows(&db->mysql) > 0 && (symbol.size() > 0)) {
 			debuglog("%s: %s coinsymbol set to %s ip %s uid (%d)\n",
-				g_current_algo->name, client->username, symbol.substr(0,15).c_str(), client->sock->ip, client->userid);
+				g_current_algo->name, client->username, symbol.c_str(), client->sock->ip, client->userid);
 		}
 	}
 }
