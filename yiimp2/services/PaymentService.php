@@ -123,7 +123,10 @@ class PaymentService
             }
 
             $balance = (float) $user->balance;
-            $amount  = round($balance - $fee, 6);
+            // SafeTrade's withdraw API takes `amount` as the total debit and
+            // subtracts its network fee internally. Do not pre-deduct $fee here
+            // or the worker pays the fee twice.
+            $amount = round($balance, 6);
             if ($amount <= 0) {
                 continue;
             }
