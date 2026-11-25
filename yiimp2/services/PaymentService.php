@@ -61,8 +61,9 @@ class PaymentService
     }
 
     /**
-     * Pay quote-wallet accounts (coinid=0) directly in USDT via SafeTrade.
-     * Gated by the safetrade-usdt_payout_enabled setting and never start a worker.
+     * Aggregate quote-wallet accounts (coinid=0) into one SafeTrade USDT
+     * withdrawal to a single BEP20 beneficiary for external distribution.
+     * Gated by safetrade-usdt_payout_enabled and never starts a worker.
      */
     public function payUsdtQuotePayouts(): void
     {
@@ -79,16 +80,11 @@ class PaymentService
             return;
         }
 
-        $minBalance = max(0.000001, (float) $settings->exchangeGet('safetrade', 'withdraw_min_usdt', 3));
-        $fee        = max(0.0, (float) $settings->exchangeGet('safetrade', 'withdraw_fee_usdt', 1));
-
-        $users = Accounts::find()
-            ->where(['coinid' => 0, 'is_locked' => 0])
-            ->andWhere(['>', 'balance', $minBalance])
-            ->orderBy(['balance' => SORT_DESC])
-            ->all();
-
-        if (empty($users)) {
+        $minWithdraw = max(0.000001, (float) $settings->exchangeGet('safetrade', 'withdraw_min_usdt', 3));
+        $fee         = max(0.0, (float) $settings->exchangeGet('safetrade', 'withdraw_fee_usdt', 1));
+        $address     = trim((string) $settings->exchangeGet('safetrade', 'withdraw_usdt_address', ''));
+        if (!preg_match('/^0x[0-9a-fA-F]{40}$/', $address)) {
+            Yii::warning('USDT payout skipped: safetrade-withdraw_usdt_address is not a BEP20 address', __CLASS__);
             return;
         }
 
@@ -100,64 +96,83 @@ class PaymentService
         }
         $quoteCoinId = (int) $quoteCoin->id;
 
-        $driver = ExchangeFactory::make('safetrade');
+        $pending = Payouts::find()
+            ->where(['idcoin' => $quoteCoinId, 'completed' => 0])
+            ->andWhere(['or', ['errmsg' => null], ['errmsg' => '']])
+            ->exists();
+        if ($pending) {
+            return;
+        }
 
-        foreach ($users as $row) {
-            $user = Accounts::findOne((int) $row->id);
-            if (!$user) {
+        $rows = Accounts::find()
+            ->where(['coinid' => 0, 'is_locked' => 0])
+            ->andWhere(['>', 'balance', 0])
+            ->orderBy(['balance' => SORT_DESC])
+            ->all();
+
+        $wallets = [];
+        $total   = 0.0;
+        foreach ($rows as $row) {
+            $balance = round((float) $row->balance, 8);
+            if ($balance <= 0) {
                 continue;
             }
+            $wallets[] = ['id' => (int) $row->id, 'balance' => $balance];
+            $total    += $balance;
+        }
 
-            $address = trim((string) $user->username);
-            if (!preg_match('/^0x[0-9a-fA-F]{40}$/', $address)) {
-                Yii::warning("USDT payout skipped: account {$user->id} has no BEP20 wallet ({$address})", __CLASS__);
-                continue;
-            }
+        $total = round($total, 6);
+        if ($total <= $minWithdraw) {
+            return;
+        }
 
-            $pending = Payouts::find()
-                ->where(['account_id' => (int) $user->id, 'idcoin' => $quoteCoinId, 'completed' => 0])
-                ->andWhere(['or', ['errmsg' => null], ['errmsg' => '']])
-                ->exists();
-            if ($pending) {
-                continue;
-            }
+        if (!Yii::$app->cache->add('usdt_payout_lock', time(), 300)) {
+            return;
+        }
 
-            $balance = (float) $user->balance;
-            // SafeTrade's withdraw API takes `amount` as the total debit and
-            // subtracts its network fee internally. Do not pre-deduct $fee here
-            // or the worker pays the fee twice.
-            $amount = round($balance, 6);
-            if ($amount <= 0) {
-                continue;
-            }
-
-            $payout             = new Payouts();
-            $payout->account_id = (int) $user->id;
-            $payout->idcoin     = $quoteCoinId;
-            $payout->time       = time();
-            $payout->amount     = $this->bitcoinValueToString($balance);
-            $payout->fee        = $this->bitcoinValueToString($fee);
-            $payout->completed  = 0;
-
-            if (!$payout->save()) {
-                continue;
-            }
-
-            $uuid = $driver->withdrawUsdt($address, $amount);
+        try {
+            // SafeTrade takes `amount` as the total debit and deducts its
+            // network fee internally. Send the full aggregated quote balance;
+            // the central wallet receives $total - $fee for manual distribution.
+            $driver = ExchangeFactory::make('safetrade');
+            $uuid   = $driver->withdrawUsdt($address, $total);
             if ($uuid === false) {
-                $payout->errmsg = 'SafeTrade USDT withdrawal failed';
-                $payout->save();
-                continue;
+                return;
             }
 
-            $payout->tx        = $uuid;
-            $payout->completed = 1;
-            $payout->save();
+            foreach ($wallets as $wallet) {
+                $user = Accounts::findOne($wallet['id']);
+                if (!$user) {
+                    continue;
+                }
 
-            $user->balance = $this->bitcoinValueToString(0.0);
-            $user->save();
+                $balance = $wallet['balance'];
+                $share   = $total > 0 ? $fee * $balance / $total : 0.0;
 
-            Yii::info("USDT payout {$balance} to {$address}, withdrawal {$uuid}", __CLASS__);
+                $payout             = new Payouts();
+                $payout->account_id = $wallet['id'];
+                $payout->idcoin     = $quoteCoinId;
+                $payout->time       = time();
+                $payout->amount     = $this->bitcoinValueToString($balance);
+                $payout->fee        = $this->bitcoinValueToString($share);
+                $payout->tx         = $uuid;
+                $payout->memoid     = 'safetrade-central';
+                $payout->completed  = 1;
+
+                if (!$payout->save()) {
+                    Yii::warning("USDT payout ledger failed for account {$wallet['id']}", __CLASS__);
+                }
+
+                $user->balance = $this->bitcoinValueToString(0.0);
+                $user->save();
+            }
+
+            Yii::info(
+                "USDT central payout {$total} (net " . round($total - $fee, 6) . ") to {$address}, withdrawal {$uuid}",
+                __CLASS__
+            );
+        } finally {
+            Yii::$app->cache->delete('usdt_payout_lock');
         }
     }
 

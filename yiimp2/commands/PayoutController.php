@@ -10,6 +10,7 @@ use app\models\Payouts;
 use app\models\Accounts;
 use app\components\rpc\WalletRPC;
 use app\services\PaymentService;
+use app\exchanges\ExchangeFactory;
 
 /**
  * Payout verification and repair.
@@ -20,13 +21,144 @@ use app\services\PaymentService;
  *   php yii payout/confirmations <symbol>   — list last 72h payouts with confirmation counts
  *   php yii payout/redotx <txid>            — redo payment from a bad fork (YIIMP_CLI_ALLOW_TXS required)
  *   php yii payout/usdt                     — one-shot SafeTrade USDT quote payout pass
+ *   php yii payout/clear [SYM]              — clear matured earnings into miner quote wallets
+ *   php yii payout/usdt-cycle               — clear → sell → aggregate payout (one-shot)
  */
 class PayoutController extends Controller
 {
+    public bool $dryRun = false;
+    public string $symbols = 'NEB';
+
+    public function options($actionID): array
+    {
+        if ($actionID === 'usdt-cycle') {
+            return array_merge(parent::options($actionID), ['dryRun', 'symbols']);
+        }
+        return parent::options($actionID);
+    }
+
     /** One-shot USDT payout pass. Does not start queue workers. */
     public function actionUsdt(): int
     {
         (new PaymentService())->payUsdtQuotePayouts();
+        $this->stdout("USDT quote payout pass complete\n");
+        return ExitCode::OK;
+    }
+
+    /** One-shot clear of matured earnings into miner quote wallets. */
+    public function actionClear(string $symbol = ''): int
+    {
+        $coinId = null;
+        if ($symbol !== '') {
+            $coin = Coins::find()->where(['symbol' => strtoupper(trim($symbol))])->one();
+            if (!$coin) {
+                $this->stderr("coin {$symbol} not found!\n");
+                return ExitCode::UNSPECIFIED_ERROR;
+            }
+            $coinId = (int) $coin->id;
+        }
+
+        (new PaymentService())->clearEarnings($coinId);
+        $this->stdout("earnings clear pass complete\n");
+        return ExitCode::OK;
+    }
+
+    /**
+     * Controlled one-shot USDT cycle: clear earnings, sell configured coins on
+     * SafeTrade, then aggregate quote wallets into one central withdrawal.
+     */
+    public function actionUsdtCycle(): int
+    {
+        $settings = Yii::$app->settings;
+        $raw      = trim($this->symbols) !== ''
+            ? $this->symbols
+            : (string) $settings->exchangeGet('safetrade', 'autosell_symbols', 'NEB');
+        $symbols  = array_values(array_filter(array_unique(array_map(
+            'strtoupper',
+            array_map('trim', explode(',', $raw))
+        ))));
+        $address  = trim((string) $settings->exchangeGet('safetrade', 'withdraw_usdt_address', ''));
+        $gate     = (bool) $settings->exchangeGet('safetrade', 'usdt_payout_enabled', false);
+
+        $freq  = defined('YIIMP_PAYMENTS_FREQ') ? (int) YIIMP_PAYMENTS_FREQ : 14400;
+        $delay = (defined('YIIMP_ALLOW_EXCHANGE') && YIIMP_ALLOW_EXCHANGE)
+            ? time() - $freq
+            : time() - (int) ($freq / 2);
+        $db = Yii::$app->db;
+
+        if ($this->dryRun) {
+            $this->stdout("dry run; no changes\n");
+            $this->stdout('payout gate: ' . ($gate ? 'on' : 'off') . "\n");
+            $this->stdout('central wallet: ' . ($address !== '' ? $address : '(unset)') . "\n");
+            $this->stdout('autosell: ' . ($symbols ? implode(',', $symbols) : '(none)') . "\n");
+            $this->stdout("matured earnings:\n");
+            $earnings = $db->createCommand(
+                'SELECT C.symbol, COUNT(*) AS c, SUM(E.amount) AS amt
+                 FROM earnings E JOIN coins C ON C.id = E.coinid
+                 WHERE E.status = 1 AND E.mature_time < :d
+                 GROUP BY E.coinid',
+                [':d' => $delay]
+            )->queryAll();
+            if ($earnings) {
+                foreach ($earnings as $row) {
+                    $this->stdout(sprintf("  %s count=%s amount=%s\n", $row['symbol'], $row['c'], $row['amt']));
+                }
+            } else {
+                $this->stdout("  (none)\n");
+            }
+            $wallet = $db->createCommand(
+                'SELECT COUNT(*) AS c, COALESCE(SUM(balance), 0) AS total
+                 FROM accounts WHERE coinid = 0 AND is_locked = 0 AND balance > 0'
+            )->queryOne();
+            $this->stdout(sprintf("quote wallets: count=%s total=%s USDT\n", $wallet['c'], $wallet['total']));
+            return ExitCode::OK;
+        }
+
+        if (!$gate) {
+            $this->stderr("safetrade usdt payout gate is off; enable it first\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+        if (!preg_match('/^0x[0-9a-fA-F]{40}$/', $address)) {
+            $this->stderr("safetrade withdraw_usdt_address is not a BEP20 address\n");
+            return ExitCode::UNSPECIFIED_ERROR;
+        }
+
+        $service = new PaymentService();
+        $service->clearEarnings();
+        $this->stdout("earnings cleared\n");
+
+        $original = [];
+        foreach ($symbols as $symbol) {
+            $coin = Coins::find()->where(['symbol' => $symbol])->one();
+            if (!$coin) {
+                $this->stderr("coin {$symbol} not found, skipped\n");
+                continue;
+            }
+            if ((int) $coin->dontsell !== 0) {
+                $original[(int) $coin->id] = (int) $coin->dontsell;
+                $coin->dontsell             = 0;
+                $coin->save(false);
+            }
+        }
+
+        try {
+            if ($original) {
+                ExchangeFactory::make('safetrade')->trade();
+                $this->stdout("safetrade trade pass complete\n");
+            } else {
+                $this->stdout("no autosell coin flags changed\n");
+            }
+        } finally {
+            foreach ($original as $coinId => $dontsell) {
+                $coin = Coins::findOne($coinId);
+                if ($coin) {
+                    $coin->dontsell = $dontsell;
+                    $coin->save(false);
+                }
+            }
+        }
+
+        $service->payUsdtQuotePayouts();
         $this->stdout("USDT quote payout pass complete\n");
         return ExitCode::OK;
     }
