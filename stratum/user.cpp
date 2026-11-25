@@ -17,6 +17,12 @@ void db_check_coin_symbol(YAAMP_DB *db, char* symbol)
 	if (!symbol) return;
 	size_t len = strlen(symbol);
 	if (len >= 2 && len <= 12) {
+		// An explicit quote payout is not a mineable coin, but it is a valid
+		// c= token even on dedicated autoexchange=0 ports.
+		if (!strcasecmp(symbol, g_quote_symbol)) {
+			strcpy(symbol, g_quote_symbol);
+			return;
+		}
 		if (!g_autoexchange)
 			db_query(db, "SELECT symbol FROM coins WHERE installed AND algo='%s' AND symbol='%s'", g_stratum_algo, symbol);
 		else
@@ -61,9 +67,11 @@ void db_add_user(YAAMP_DB *db, YAAMP_CLIENT *client)
 			// set payout symbol
 			if (command.at(0) == "c") {
 				symbol = command.at(1);
+				if (!strcasecmp(symbol.c_str(), g_quote_symbol)) client->pay_quote = true;
 			}
 			else if (command.at(0) == "s") {
 				symbol = command.at(1);
+				if (!strcasecmp(symbol.c_str(), g_quote_symbol)) client->pay_quote = true;
 			}
 			else if (command.at(0) == "m") {
 				if (command.at(1) == "solo") client->solo = true;

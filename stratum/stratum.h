@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -189,6 +190,7 @@ extern YAAMP_ALGO g_algos[];
 extern YAAMP_ALGO *g_current_algo;
 
 extern bool g_autoexchange;
+extern char g_quote_symbol[32];
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

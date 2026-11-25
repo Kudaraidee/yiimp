@@ -263,6 +263,18 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 ///////////////////////////////////////////////////////////////////////////////////////////
 bool client_validate_user_address(YAAMP_CLIENT *client)
 {
+	// c=<quote symbol> explicitly asks for quote-wallet payouts. Keep the
+	// account on coinid=0 and skip coin-specific wallet validation, otherwise
+	// a dedicated coin port would silently re-bind the account to the mined
+	// coin instead of the configured quote currency.
+	if (client->pay_quote) {
+		client->coinid = 0;
+		CommonLock(&g_db_mutex);
+		db_init_user_coinid(g_db, client);
+		CommonUnlock(&g_db_mutex);
+		return true;
+	}
+
 	int client_workers = 0;
 	if (client->userid == 0) {
 		client_workers = client_workers_byaddress(client->username);
