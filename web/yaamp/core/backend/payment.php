@@ -43,6 +43,14 @@ function BackendCoinPayments($coin)
 		return;
 	}
 
+	// NEB has no Bitcoin wallet RPC; WalletRPC reads the balance through the
+	// local neb-wallet CLI. Never debit users when that balance is unknown.
+	$is_neb = ($coin->algo == 'nebhash' || $coin->symbol == 'NEB');
+	if ($is_neb && arraySafeVal($info, 'balance', null) === null) {
+		debuglog("payment: cannot read {$coin->symbol} wallet balance ".arraySafeVal($info, 'wallet_error', ''));
+		return;
+	}
+
 	$txfee = floatval($coin->txfee);
 	$min_payout = max(floatval(YAAMP_PAYMENTS_MINI), floatval($coin->payout_min), $txfee);
 
@@ -126,9 +134,10 @@ function BackendCoinPayments($coin)
 	}
 
 	$coef = 1.0;
-	if($info['balance']-$txfee < $total_to_pay && $coin->symbol!='BTC')
+	$wallet_balance = floatval(arraySafeVal($info, 'balance', 0));
+	if($wallet_balance-$txfee < $total_to_pay && $coin->symbol!='BTC')
 	{
-		$msg = "$coin->symbol: insufficient funds for payment {$info['balance']} < $total_to_pay!";
+		$msg = "$coin->symbol: insufficient funds for payment {$wallet_balance} < $total_to_pay!";
 		debuglog($msg);
 		send_email_alert('payouts', "$coin->symbol payout problem detected", $msg);
 
@@ -138,7 +147,7 @@ function BackendCoinPayments($coin)
 			$addresses[$key] = $val * $coef;
 		}
 		// still not possible, skip payment
-		if ($info['balance']-$txfee < $total_to_pay)
+		if ($wallet_balance-$txfee < $total_to_pay)
 			return;
 	}
 
@@ -146,7 +155,7 @@ function BackendCoinPayments($coin)
 	{
 		global $cold_wallet_table;
 
-		$balance = $info['balance'];
+		$balance = $wallet_balance;
 		$stats = getdbosql('db_stats', "1 order by time desc");
 
 		$renter = dboscalar("select sum(balance) from renters");
@@ -169,6 +178,20 @@ function BackendCoinPayments($coin)
 	}
 
 	debuglog("paying $total_to_pay {$coin->symbol}");
+
+	// NEB uses neb-wallet; broadcast first so a CLI failure cannot debit users.
+	$account = $coin->account;
+	$tx = null;
+	if ($is_neb) {
+		if (!$coin->txmessage)
+			$tx = $remote->sendmany($account, $addresses);
+		else
+			$tx = $remote->sendmany($account, $addresses, 1, YAAMP_SITE_NAME);
+		if (!$tx || !is_string($tx)) {
+			debuglog("NEB sendmany failed: {$remote->error} ".json_encode($addresses));
+			return;
+		}
+	}
 
 	$payouts = array();
 	foreach($users as $user)
@@ -198,12 +221,12 @@ function BackendCoinPayments($coin)
 	set_time_limit(120);
 
 	// default account
-	$account = $coin->account;
-
-	if (!$coin->txmessage)
-		$tx = $remote->sendmany($account, $addresses);
-	else
-		$tx = $remote->sendmany($account, $addresses, 1, YAAMP_SITE_NAME);
+	if (!$is_neb) {
+		if (!$coin->txmessage)
+			$tx = $remote->sendmany($account, $addresses);
+		else
+			$tx = $remote->sendmany($account, $addresses, 1, YAAMP_SITE_NAME);
+	}
 
 	$errmsg = NULL;
 	if(!$tx) {

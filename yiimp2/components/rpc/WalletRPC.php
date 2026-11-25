@@ -212,6 +212,168 @@ class WalletRPC
     }
 
     /**
+     * NEB nodes have no Bitcoin-style wallet RPC, so balances and payouts are
+     * handled by the official `neb-wallet` CLI. Paths can be overridden with
+     * YIIMP_* defines; defaults match the local node deployment.
+     */
+    private function nebWalletConfig(): array
+    {
+        return [
+            'bin'      => defined('YIIMP_NEB_WALLET_BIN') ? (string) YIIMP_NEB_WALLET_BIN
+                : '/home/codex/lrs-nodes/neb-node/bin/neb-wallet',
+            'wallet'   => defined('YIIMP_NEB_WALLET_FILE') ? (string) YIIMP_NEB_WALLET_FILE
+                : '/home/codex/lrs-nodes/neb-node/wallet/pool-wallet.txt',
+            'password' => defined('YIIMP_NEB_WALLET_PASSWORD_FILE') ? (string) YIIMP_NEB_WALLET_PASSWORD_FILE
+                : '/home/codex/lrs-nodes/neb-node/wallet/wallet-password.txt',
+            'rpc'      => defined('YIIMP_NEB_RPC_URL') ? (string) YIIMP_NEB_RPC_URL : '',
+        ];
+    }
+
+    /**
+     * Run neb-wallet without a shell interpolation of user data. The password
+     * is passed through the child environment, never on the command line.
+     *
+     * @return array{out:string,err:string}|false
+     */
+    private function nebWalletCli(array $args): array|false
+    {
+        $cfg = $this->nebWalletConfig();
+        foreach (['bin', 'wallet', 'password'] as $key) {
+            if ($cfg[$key] === '' || !is_readable($cfg[$key])) {
+                $this->error = "NEB wallet {$key} is not readable: {$cfg[$key]}";
+                return false;
+            }
+        }
+        if (!is_executable($cfg['bin'])) {
+            $this->error = "NEB wallet binary is not executable: {$cfg['bin']}";
+            return false;
+        }
+
+        $password = trim((string) file_get_contents($cfg['password']));
+        $cmd = escapeshellarg($cfg['bin']) . ' --wallet ' . escapeshellarg($cfg['wallet']);
+        if ($cfg['rpc'] !== '') {
+            $cmd .= ' --rpc ' . escapeshellarg($cfg['rpc']);
+        }
+        foreach ($args as $arg) {
+            $cmd .= ' ' . escapeshellarg((string) $arg);
+        }
+
+        $env = [
+            'PATH' => (string) (getenv('PATH') ?: '/usr/bin:/bin'),
+            'NEB_WALLET_PASSWORD' => $password,
+        ];
+        $pipes = [];
+        $proc = @proc_open($cmd, [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes, null, $env);
+        if (!is_resource($proc)) {
+            $this->error = 'unable to start neb-wallet';
+            return false;
+        }
+
+        fclose($pipes[0]);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+        $out = '';
+        $err = '';
+        $deadline = microtime(true) + 30.0;
+        while (microtime(true) < $deadline) {
+            $out .= (string) stream_get_contents($pipes[1]);
+            $err .= (string) stream_get_contents($pipes[2]);
+            $status = proc_get_status($proc);
+            if (!$status['running']) {
+                break;
+            }
+            usleep(20000);
+        }
+        $status = proc_get_status($proc);
+        if (!empty($status['running'])) {
+            proc_terminate($proc, 9);
+        }
+        $out .= (string) stream_get_contents($pipes[1]);
+        $err .= (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+
+        if (!empty($status['running'])) {
+            $this->error = 'neb-wallet timed out';
+            return false;
+        }
+        if ($code !== 0) {
+            $this->error = trim('neb-wallet: ' . $out . ' ' . $err);
+            return false;
+        }
+        return ['out' => $out, 'err' => $err];
+    }
+
+    /** Return the spendable pool balance in NEB, or false on CLI failure. */
+    private function nebWalletBalance(): float|false
+    {
+        $res = $this->nebWalletCli(['balance']);
+        if ($res === false) {
+            return false;
+        }
+        if (preg_match('/^total\s+([0-9]+(?:\.[0-9]+)?)\s+NEB\b/mi', $res['out'], $m)) {
+            return (float) $m[1];
+        }
+        $this->error = 'unable to parse neb-wallet balance output';
+        return false;
+    }
+
+    /** Send one multi-output NEB payment; return the broadcast txid. */
+    private function nebWalletSend(array $addresses): string|false
+    {
+        if (empty($addresses)) {
+            $this->error = 'NEB payment has no recipients';
+            return false;
+        }
+
+        $args = ['send'];
+        foreach ($addresses as $address => $amount) {
+            $address = (string) $address;
+            $value   = (float) $amount;
+            if ($this->nebAddressLock($address) === null) {
+                $this->error = "invalid NEB payout address: {$address}";
+                return false;
+            }
+            if ($value <= 0) {
+                $this->error = "invalid NEB payout amount for {$address}: {$amount}";
+                return false;
+            }
+            $formatted = rtrim(rtrim(number_format($value, 8, '.', ''), '0'), '.');
+            $args[] = $address;
+            $args[] = $formatted === '' ? '0' : $formatted;
+        }
+
+        $res = $this->nebWalletCli($args);
+        if ($res === false) {
+            return false;
+        }
+        $text = $res['out'] . "\n" . $res['err'];
+        if (preg_match('/\btxid\s+([0-9a-f]{64})\b/i', $text, $m)) {
+            return strtolower($m[1]);
+        }
+        $this->error = 'NEB send returned no txid: ' . trim($text);
+        return false;
+    }
+
+    /** Add wallet balance data to NEB's native getinfo response. */
+    private function nebAddWalletInfo(array &$res): void
+    {
+        $balance = $this->nebWalletBalance();
+        if ($balance === false) {
+            $res['balance'] = null;
+            $res['wallet_error'] = $this->error;
+            return;
+        }
+        $res['balance'] = $balance;
+        $res['unlocked_balance'] = $balance;
+    }
+
+    /**
      * NEB needs the block height to fetch a mined transaction and uses
      * different verbose field names. Return a Bitcoin-like transaction for
      * the generic block/accounting code.
@@ -991,6 +1153,16 @@ class WalletRPC
             return $res;
         }
 
+        if ($this->isNebhash && ($method === 'sendmany' || $method === 'sendtoaddress')) {
+            if ($method === 'sendmany') {
+                // Bitcoin signature: sendmany account {address: amount, ...} minconf comment
+                $addresses = $params[1] ?? $params[0] ?? [];
+            } else {
+                $addresses = [(string) ($params[0] ?? '') => (float) ($params[1] ?? 0)];
+            }
+            return is_array($addresses) ? $this->nebWalletSend($addresses) : false;
+        }
+
         if ($this->isNebhash && ($method === 'getrawtransaction' || $method === 'gettransaction')) {
             $txid  = (string) ($params[0] ?? '');
             $entry = $this->nebTxCache[$txid] ?? null;
@@ -1007,6 +1179,9 @@ class WalletRPC
         if ($method === 'getinfo') {
             if ($this->hasGetInfo) {
                 $res = $this->rpc->call('getinfo', $params);
+                if ($this->isNebhash && is_array($res)) {
+                    $this->nebAddWalletInfo($res);
+                }
             } else {
                 $miningInfo = $this->rpc->call('getmininginfo', []);
                 if (!$miningInfo) {

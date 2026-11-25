@@ -710,6 +710,34 @@ if ($rpcAvailable && !$isNeb) {
             'address'       => $coin->master_wallet,
         ];
     }
+
+    // Payouts are broadcast by neb-wallet, so they never appear in a wallet
+    // RPC transaction list. Show the completed on-chain sends as well.
+    $nebPayouts = \app\models\Payouts::find()
+        ->alias('p')
+        ->select(['p.id', 'p.amount', 'p.tx', 'p.time', 'a.username'])
+        ->innerJoin('accounts a', 'a.id = p.account_id')
+        ->where(['p.idcoin' => $coin->id])
+        ->andWhere(['<>', 'p.tx', ''])
+        ->andWhere(['>=', 'p.time', $list_since])
+        ->orderBy(['p.time' => SORT_ASC, 'p.id' => SORT_ASC])
+        ->limit($maxrows)
+        ->asArray()
+        ->all();
+
+    foreach ($nebPayouts as $payout) {
+        $txs[] = [
+            'time'          => (int) $payout['time'],
+            'category'      => 'send',
+            'amount'        => -abs((float) $payout['amount']),
+            'confirmations' => '',
+            'txid'          => (string) $payout['tx'],
+            'address'       => (string) $payout['username'],
+        ];
+    }
+
+    // Keep ascending order: the renderer reverses the array before display.
+    usort($txs, fn($a, $b) => $a['time'] <=> $b['time']);
 }
 
 $txs_array = [];

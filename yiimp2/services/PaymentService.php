@@ -44,7 +44,13 @@ class PaymentService
             ->all();
 
         foreach ($coins as $coin) {
-            $this->payCoin($coin);
+            // A single coin wallet failure (e.g. NEB CLI unavailable) must not
+            // stop the rest of the scheduled payout run.
+            try {
+                $this->payCoin($coin);
+            } catch (\Throwable $e) {
+                Yii::warning("payment: {$coin->symbol}: " . $e->getMessage(), __CLASS__);
+            }
         }
 
         // Legacy quote payouts were BTC and got swept here. USDT quote balances
@@ -154,10 +160,21 @@ class PaymentService
     {
         $remote = new \app\components\rpc\WalletRPC($coin);
         $info   = $remote->getinfo();
+        $isNeb  = ($coin->algo ?? '') === 'nebhash' || ($coin->symbol ?? '') === 'NEB';
 
         if (!$info) {
             Yii::warning("payment: can't connect to {$coin->symbol} wallet", __CLASS__);
             return;
+        }
+
+        // NEB has no Bitcoin wallet RPC; the balance comes from the local
+        // neb-wallet CLI via WalletRPC::getinfo(). Do not debit users when the
+        // CLI could not be read, otherwise payouts look successful but fail.
+        if ($isNeb && (($info['balance'] ?? null) === null)) {
+            $msg = "{$coin->symbol}: cannot read wallet balance"
+                . (!empty($info['wallet_error']) ? ": {$info['wallet_error']}" : '');
+            Yii::warning($msg, __CLASS__);
+            throw new \RuntimeException($msg);
         }
 
         $txfee      = (float) $coin->txfee;
@@ -199,6 +216,9 @@ class PaymentService
                     if (!$tx) {
                         $error = $remote->error ?? '';
                         Yii::warning("RPC {$error}, {$user->username}, {$amount}", __CLASS__);
+                        if ($isNeb) {
+                            throw new \RuntimeException("NEB payout failed: " . ($error ?: 'neb-wallet returned no txid'));
+                        }
                         if (stripos($error, 'transaction too large') !== false
                             || stripos($error, 'invalid amount') !== false
                             || stripos($error, 'insufficient funds') !== false
@@ -252,7 +272,7 @@ class PaymentService
         // Reduce payout if wallet balance is insufficient
         $coef = 1.0;
         if ((float) ($info['balance'] ?? 0) - $txfee < $totalToPay && $coin->symbol !== 'BTC') {
-            $msg = "{$coin->symbol}: insufficient funds {$info['balance']} < {$totalToPay}";
+            $msg = "{$coin->symbol}: insufficient funds ".($info['balance'] ?? 0)." < {$totalToPay}";
             Yii::warning($msg, __CLASS__);
             $this->sendAlert("{$coin->symbol} payout problem detected", $msg);
             $coef       = 0.5;
@@ -287,6 +307,25 @@ class PaymentService
 
         Yii::info("paying {$totalToPay} {$coin->symbol}", __CLASS__);
 
+        set_time_limit(120);
+
+        $account = $coin->account ?? '';
+        $siteName = defined('YIIMP_SITE_NAME') ? YIIMP_SITE_NAME : 'Yiimp';
+
+        // NEB broadcast happens through neb-wallet. Confirm the txid before
+        // debiting users so a CLI failure cannot silently consume balances.
+        $tx = null;
+        if ($isNeb) {
+            $tx = $coin->txmessage
+                ? $remote->sendmany($account, $addresses, 1, $siteName)
+                : $remote->sendmany($account, $addresses);
+            if (!$tx || !is_string($tx)) {
+                $err = !empty($remote->error) ? $remote->error : 'neb-wallet returned no txid';
+                Yii::warning("NEB sendmany failed: {$err} " . json_encode($addresses), __CLASS__);
+                throw new \RuntimeException("NEB payout failed: {$err}");
+            }
+        }
+
         // Create payout records and debit user balances BEFORE broadcasting
         $payouts = [];
         foreach ($users as $user) {
@@ -311,13 +350,11 @@ class PaymentService
             }
         }
 
-        set_time_limit(120);
-
-        $account = $coin->account ?? '';
-        $siteName = defined('YIIMP_SITE_NAME') ? YIIMP_SITE_NAME : 'Yiimp';
-        $tx       = $coin->txmessage
-            ? $remote->sendmany($account, $addresses, 1, $siteName)
-            : $remote->sendmany($account, $addresses);
+        if (!$isNeb) {
+            $tx = $coin->txmessage
+                ? $remote->sendmany($account, $addresses, 1, $siteName)
+                : $remote->sendmany($account, $addresses);
+        }
 
         $errMsg = null;
         if (!$tx) {
