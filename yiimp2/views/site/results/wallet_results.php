@@ -19,13 +19,15 @@ $user = $util->getuserbyaddress(Yii::$app->getRequest()->getQueryParam('address'
 if (!$user) return;
 
 // ── Reference coin ────────────────────────────────────────────────────────────
-// A NULL coinid means "pay in the configured quote" (USDT here). Only a
+// A 0/NULL coinid means "pay in the configured quote" (USDT here). Only a
 // missing explicit coin is an invalid wallet; quote wallets must not fall
 // back to BTC or every balance would be mislabelled.
 $quoteSymbol = $util->payoutQuoteSymbol();
-$refcoin = Coins::findOne((int) $user->coinid);
+$userCoinId  = (int) $user->coinid;
+$refcoin = $userCoinId > 0 ? Coins::findOne($userCoinId) : null;
 if (!$refcoin) {
-    $invalidMsg = $user->coinid !== null
+    // coinid 0/NULL is the pool's quote-wallet sentinel, not an invalid coin.
+    $invalidMsg = $userCoinId > 0
         ? 'This wallet address is not valid. You will not receive payments using this address.'
         : null;
     $refcoin = Coins::find()->where(['symbol' => $quoteSymbol])->one();
@@ -33,7 +35,8 @@ if (!$refcoin) {
 } else {
     $invalidMsg = null;
 }
-$isQuoteWallet = strtoupper((string) ($refcoin->symbol ?? '')) === $quoteSymbol;
+$isQuoteWallet = $userCoinId <= 0
+    || strtoupper((string) ($refcoin->symbol ?? '')) === $quoteSymbol;
 
 if (!YIIMP_ALLOW_EXCHANGE && $user->coinid == 6 && $defaultAlgo !== 'sha256') {
     $errMsg = 'This pool does not convert/trade currencies. You will not receive payments using this BTC address.';
