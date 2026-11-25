@@ -156,7 +156,7 @@ void db_add_user(YAAMP_DB *db, YAAMP_CLIENT *client)
 	else {
 		db_query(db, "UPDATE accounts SET coinsymbol='%s', swap_time=%u, donation=%d, hostaddr='%s' WHERE id=%d AND balance = 0"
 			" AND (SELECT COUNT(id) FROM payouts WHERE account_id=%d AND tx IS NULL) = 0" // failed balance
-			" AND (SELECT pending FROM balanceuser WHERE userid=%d ORDER by time DESC LIMIT 1) = 0" // pending balance
+			" AND IFNULL((SELECT pending FROM balanceuser WHERE userid=%d ORDER by time DESC LIMIT 1), 0) = 0" // pending balance
 			, symbol.c_str(), (uint) time(NULL), gift, client->sock->ip, client->userid, client->userid, client->userid);
 		if (mysql_affected_rows(&db->mysql) > 0 && (symbol.size() > 0)) {
 			debuglog("%s: %s coinsymbol set to %s ip %s uid (%d)\n",
