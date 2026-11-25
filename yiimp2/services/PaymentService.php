@@ -92,6 +92,14 @@ class PaymentService
             return;
         }
 
+        // payouts.idcoin has a FK to coins.id, so quote payouts must point at
+        // the USDT coin row rather than the legacy sentinel id 0.
+        $quoteCoin = Coins::find()->where(['symbol' => 'USDT'])->one();
+        if (!$quoteCoin) {
+            return;
+        }
+        $quoteCoinId = (int) $quoteCoin->id;
+
         $driver = ExchangeFactory::make('safetrade');
 
         foreach ($users as $row) {
@@ -107,7 +115,7 @@ class PaymentService
             }
 
             $pending = Payouts::find()
-                ->where(['account_id' => (int) $user->id, 'idcoin' => 0, 'completed' => 0])
+                ->where(['account_id' => (int) $user->id, 'idcoin' => $quoteCoinId, 'completed' => 0])
                 ->andWhere(['or', ['errmsg' => null], ['errmsg' => '']])
                 ->exists();
             if ($pending) {
@@ -122,7 +130,7 @@ class PaymentService
 
             $payout             = new Payouts();
             $payout->account_id = (int) $user->id;
-            $payout->idcoin     = 0;
+            $payout->idcoin     = $quoteCoinId;
             $payout->time       = time();
             $payout->amount     = $this->bitcoinValueToString($balance);
             $payout->fee        = $this->bitcoinValueToString($fee);
