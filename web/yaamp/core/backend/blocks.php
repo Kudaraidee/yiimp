@@ -74,7 +74,9 @@ function BackendBlockNew($coin, $db_block)
 				if ($amount <= 0) continue;
 			}
 
-			if (!YAAMP_ALLOW_EXCHANGE || $ucoin->id == $coin->id ||
+			$quoteSymbol   = strtoupper(yaamp_payout_quote_symbol());
+			$isQuoteWallet = $ucoin && strtoupper((string) $ucoin->symbol) === $quoteSymbol;
+			if (!YAAMP_ALLOW_EXCHANGE || $isQuoteWallet || $ucoin->id == $coin->id ||
 				($ucoin->auto_exchange && $coin->auto_exchange)) {
 
 				$earning = new db_earnings;
@@ -136,7 +138,9 @@ function BackendBlockNew($coin, $db_block)
 
 		if(!$user->no_fees) $amount = take_yaamp_fee($amount, $coin->algo, YAAMP_FEES_SOLO);
 
-		if (!YAAMP_ALLOW_EXCHANGE || $ucoin->id == $coin->id ||
+		$quoteSymbol   = strtoupper(yaamp_payout_quote_symbol());
+		$isQuoteWallet = $ucoin && strtoupper((string) $ucoin->symbol) === $quoteSymbol;
+		if (!YAAMP_ALLOW_EXCHANGE || $isQuoteWallet || $ucoin->id == $coin->id ||
 			($ucoin->auto_exchange && $coin->auto_exchange)) {
 
 			$earning = new db_earnings;

@@ -867,6 +867,15 @@ class BlockService
         if (!$userCoin) {
             return true;
         }
+
+        // A quote wallet (coinid=9) is a payout destination, not an
+        // autoexchange coin. Its coin row has auto_exchange=0, so the normal
+        // two-coin rule would silently drop these earnings.
+        $quoteSymbol = strtoupper((string) Yii::$app->YiimpUtils->payoutQuoteSymbol());
+        if (strtoupper((string) $userCoin->symbol) === $quoteSymbol) {
+            return true;
+        }
+
         return !$this->allowExchange()
             || $userCoin->id == $minedCoin->id
             || ($userCoin->auto_exchange && $minedCoin->auto_exchange);
