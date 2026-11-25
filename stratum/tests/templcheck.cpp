@@ -1,5 +1,5 @@
 // templcheck: build a job template from recorded wallet RPC answers and print
-// the result (stratum rework, phase 0 safety net for the buffer work).
+// the result, to catch buffer overflows on oversized RPC values.
 //
 //   templcheck <fixture-dir>
 //

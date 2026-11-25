@@ -184,15 +184,17 @@ static void HoohashMatrixMultiplication(double mat[64][64], const uint8_t *hashB
         vector[2 * i + 1] = hashBytes[i] & 0x0F;
     }
 
+    // Consensus (PePe-core, gcc default -ffp-contract=fast on an FMA target)
+    // fuses exactly these three multiply-adds. Spell them out with fma() and
+    // build this file with -ffp-contract=off, so the result does not depend
+    // on -march.
     for (int i = 0; i < 64; i++) {
         for (int j = 0; j < 64; j++) {
             if (sw <= 0.02) {
-                double input = (mat[i][j] * hashXor * (double)vector[j] + nonceMod);
-                double output_val = SafeComplexTransform(input) * (double)vector[j] * multiplier;
-                product[i] += output_val;
+                double input = fma(mat[i][j] * hashXor, (double)vector[j], nonceMod);
+                product[i] = fma(SafeComplexTransform(input) * (double)vector[j], multiplier, product[i]);
             } else {
-                double output_val = mat[i][j] * divider * (double)vector[j];
-                product[i] += output_val;
+                product[i] = fma(mat[i][j] * divider, (double)vector[j], product[i]);
             }
             sw = TransformFactor(product[i]);
         }
