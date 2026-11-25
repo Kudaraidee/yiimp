@@ -698,7 +698,6 @@ class SafeTradeDriver extends ExchangeDriver
 
             $available = (float) ($account['balance'] ?? 0);
             $locked = (float) ($account['locked'] ?? 0);
-            if ($available <= 0 && $locked <= 0) continue;
 
             $coin = Coins::find()->where(['symbol' => $symbol, 'dontsell' => 0])->one();
             if (!$coin) continue;
@@ -747,6 +746,9 @@ class SafeTradeDriver extends ExchangeDriver
             foreach (Orders::find()->where(['coinid' => $coin->id, 'market' => $marketName])->all() as $dbOrder) {
                 if (!isset($liveIds[(string) $dbOrder->uuid])) $dbOrder->delete();
             }
+
+            // Reconcile stale orders even after a balance has been fully sold.
+            if ($available <= 0 && $locked <= 0) continue;
 
             $market->lasttraded = time();
             $market->save();
