@@ -124,6 +124,11 @@ public:
 
 	YAAMP_CLIENT_ALGO algos_subscribed[YAAMP_MAXALGOS];
 	int job_history[YAAMP_JOB_MAXHISTORY];
+	// Target published with each mining.notify. Progpow miners keep working on
+	// old jobs after a vardiff update, so a share must stay valid against the
+	// target that job was actually sent with.
+	int job_target_ids[YAAMP_JOB_MAXHISTORY];
+	uint256 job_targets[YAAMP_JOB_MAXHISTORY];
 
 	int64_t shares;
 	int stats;
@@ -204,6 +209,8 @@ bool client_initialize_multialgo(YAAMP_CLIENT *client);
 
 void client_add_job_history(YAAMP_CLIENT *client, int jobid);
 bool client_find_job_history(YAAMP_CLIENT *client, int jobid, int startat=1);
+void client_record_job_target(YAAMP_CLIENT *client, int jobid, const uint256& target);
+bool client_find_job_target(YAAMP_CLIENT *client, int jobid, uint256& target);
 
 bool client_find_my_ip(const char *ip);
 

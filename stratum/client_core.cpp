@@ -286,6 +286,43 @@ bool client_find_job_history(YAAMP_CLIENT *client, int jobid, int startat)
 	return false;
 }
 
+void client_record_job_target(YAAMP_CLIENT *client, int jobid, const uint256& target)
+{
+	if(!jobid || target.IsNull()) return;
+
+	for(int i=0; i<YAAMP_JOB_MAXHISTORY; i++)
+	{
+		if(client->job_target_ids[i] == jobid)
+		{
+			client->job_targets[i] = target;
+			return;
+		}
+	}
+
+	for(int i=YAAMP_JOB_MAXHISTORY-1; i>0; i--)
+	{
+		client->job_target_ids[i] = client->job_target_ids[i-1];
+		client->job_targets[i] = client->job_targets[i-1];
+	}
+
+	client->job_target_ids[0] = jobid;
+	client->job_targets[0] = target;
+}
+
+bool client_find_job_target(YAAMP_CLIENT *client, int jobid, uint256& target)
+{
+	for(int i=0; i<YAAMP_JOB_MAXHISTORY; i++)
+	{
+		if(client->job_target_ids[i] == jobid && !client->job_targets[i].IsNull())
+		{
+			target = client->job_targets[i];
+			return true;
+		}
+	}
+
+	return false;
+}
+
 int hostname_to_ip(const char *hostname , char* ip)
 {
     struct hostent *he;

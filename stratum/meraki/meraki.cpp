@@ -122,7 +122,18 @@ bool meraki_submit(YAAMP_CLIENT* client, json_value* json_params)
     stratumlog("client %d on job %d sent diff %0.3f powhash %s\n",
         client->userid, job->id, share_diff, hash.ToString().c_str());
 
-    if (hash > client->share_target) {
+    // Progpow miners can keep finding shares on an older job after vardiff
+    // changes. mining.notify carries the target for that job, so keep accepting
+    // work that met it for a short history window instead of rejecting it with
+    // the newer session target. Use the easier of the two targets.
+    uint256 share_target = client->share_target;
+    uint256 job_target;
+    if (client_find_job_target(client, job->id, job_target) &&
+        UintToArith256(job_target) > UintToArith256(share_target)) {
+        share_target = job_target;
+    }
+
+    if (hash > share_target) {
         client_submit_error(client, job, 26, "Low difficulty share", header, submit_ntime, nonce);
         object_unlock(job);
         return true;

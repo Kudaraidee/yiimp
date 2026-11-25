@@ -219,6 +219,7 @@ void job_send_last(YAAMP_CLIENT *client)
 		job_mining_notify_buffer(job, buffer);
 	}
 
+	client_record_job_target(client, job->id, client->share_target);
 	socket_send_raw(client->sock, buffer, strlen(buffer));
 }
 
@@ -259,6 +260,7 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
 	client->jobid_sent = job->id;
+	client_record_job_target(client, job->id, client->share_target);
 
 	socket_send_raw(client->sock, buffer, strlen(buffer));
 	object_unlock(job);
@@ -289,6 +291,10 @@ void job_broadcast(YAAMP_JOB *job)
 		if(client->jobid_next != job->id) continue;
 		if(client->jobid_sent == job->id) continue;
 
+		// Meraki's notify embeds the share target. Apply vardiff before building
+		// it so the miner and the verifier see the same target on this job.
+		if (is_meraki) client_adjust_difficulty(client);
+
 		// NEB notifications carry a 26 KiB model hash plus a merkle branch.
 		char buffer[512*1024];
 		memset(buffer, 0, sizeof(buffer));
@@ -318,8 +324,9 @@ void job_broadcast(YAAMP_JOB *job)
 	
 		client->jobid_sent = job->id;
 		client_add_job_history(client, job->id);
+		client_record_job_target(client, job->id, client->share_target);
 
-		client_adjust_difficulty(client);
+		if (!is_meraki) client_adjust_difficulty(client);
 
 		setsockopt(client->sock->sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
