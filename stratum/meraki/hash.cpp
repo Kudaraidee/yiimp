@@ -105,7 +105,7 @@ uint256 meraki_fullhash(uint256& header_hash, uint64_t& header_nonce,
     // job. Always use the height of the job the share was submitted for.
     const int epoch_number = meraki_epoch_for_height(height);
     const meraki::epoch_context* epoch_context = context->context.get();
-    meraki::epoch_context_ptr old_epoch{nullptr, &meraki::meraki_destroy_epoch_context};
+    meraki::epoch_context_ptr old_epoch{nullptr, &::meraki_destroy_epoch_context};
     if (!epoch_context || epoch_context->epoch_number != epoch_number) {
         old_epoch = meraki::create_epoch_context(epoch_number);
         epoch_context = old_epoch.get();
