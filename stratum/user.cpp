@@ -207,16 +207,18 @@ void db_update_workers(YAAMP_DB *db)
 		if(client->deleted) continue;
 		if(!client->workerid) continue;
 
-		if(client->speed < YAAMP_CLIENT_MINSPEED)
+		client_speed_update(client);
+
+		int idle = 0;
+		if(client_idle(client, &idle))
 		{
-			clientlog(client, "speed %f", client->speed);
+			clientlog(client, "idle, no valid share for %d s at diff %g", idle, client->difficulty_actual);
 			shutdown(client->sock->sock, SHUT_RDWR);
 			db_clear_worker(db, client);
 			object_delete(client);
 			continue;
 		}
 
-		client->speed *= 0.8;
 		if(client->difficulty_written == client->difficulty_actual) continue;
 
 		db_query(db, "UPDATE workers SET difficulty=%f, subscribe=%d WHERE id=%d",

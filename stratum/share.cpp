@@ -72,9 +72,11 @@ static void share_add_worker(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, c
 
 	if(valid)
 	{
-		worker->difficulty += client->difficulty_actual / g_current_algo->diff_multiplier;
+		// set by the submit from the share's job (see client_share_difficulty)
+		double difficulty = client->share_difficulty > 0 ? client->share_difficulty : client->difficulty_actual;
+		worker->difficulty += difficulty / g_current_algo->diff_multiplier;
 		if (!isaux) {
-			client->speed += client->difficulty_actual / g_current_algo->diff_multiplier * 42;
+			client_speed_add(client, difficulty);
 		}
 		// log best share_diff
 		if (worker->share_diff < share_diff) worker->share_diff = share_diff;
