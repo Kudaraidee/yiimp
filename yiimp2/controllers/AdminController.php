@@ -422,6 +422,15 @@ class AdminController extends BaseController
         $coinIds = array_values(array_unique(array_filter(array_map(fn($u) => $u->coinid, $users))));
         $coins   = $coinIds ? Coins::find()->where(['id' => $coinIds])->indexBy('id')->all() : [];
 
+        // Quote wallets use coinid=0 (no coin row with id 0). Load the real
+        // quote coin so admin rows can link to its wallet page (USDT id=9).
+        if (in_array(0, array_map(fn($u) => (int) $u->coinid, $users), true)) {
+            $quoteCoin = Coins::find()->where(['symbol' => $util->payoutQuoteSymbol()])->one();
+            if ($quoteCoin) {
+                $coins[$quoteCoin->id] = $quoteCoin;
+            }
+        }
+
         // ── Batch aggregate queries ───────────────────────────────────────────
         $rateMap       = [];
         $badRateMap    = [];
