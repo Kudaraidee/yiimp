@@ -61,7 +61,7 @@ class PaymentService
     }
 
     /**
-     * Aggregate quote-wallet accounts (coinid=0) into one SafeTrade USDT
+     * Aggregate quote-wallet accounts (quote coin id, e.g. USDT=9) into one SafeTrade USDT
      * withdrawal to a single BEP20 beneficiary for external distribution.
      * Gated by safetrade-usdt_payout_enabled and never starts a worker.
      */
