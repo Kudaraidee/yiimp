@@ -131,12 +131,31 @@ if ($isTailwind) {
 </tr>
 </thead>
 <tbody>
+<?php
+$quoteSymbol = Yii::$app->YiimpUtils->payoutQuoteSymbol();
+$quoteCoin   = null;
+foreach ($coins as $coinRow) {
+    if (strtoupper((string) $coinRow->symbol) === $quoteSymbol) {
+        $quoteCoin = $coinRow;
+        break;
+    }
+}
+?>
 <?php foreach ($rows as $r):
     $user     = $r['user'];
     $uid      = $r['uid'];
     $userCoin = $coins[$user->coinid] ?? null;
-    $coinImg  = $userCoin ? Html::img(Html::encode($userCoin->image), ['width' => 16, 'alt' => Html::encode($userCoin->symbol)]) : '';
-    $coinLink = $userCoin ? Html::a(Html::encode($userCoin->symbol), ['/admin/coinwallet', 'id' => $userCoin->id]) : '';
+    $isQuote  = !$userCoin && ((int) $user->coinid === 0);
+    $showCoin = $isQuote ? $quoteCoin : $userCoin;
+    $coinName = $isQuote
+        ? (strtoupper(trim((string) $user->coinsymbol)) ?: $quoteSymbol)
+        : ($userCoin ? (string) $userCoin->symbol : trim((string) $user->coinsymbol));
+    $coinImg  = $showCoin && !empty($showCoin->image)
+        ? Html::img(Html::encode($showCoin->image), ['width' => 16, 'alt' => Html::encode($coinName)])
+        : '';
+    $coinLink = $showCoin
+        ? Html::a(Html::encode($coinName), ['/admin/coinwallet', 'id' => $showCoin->id])
+        : Html::encode($coinName);
 ?>
 <tr class="ssrow">
     <td width="24"><?= (int) $uid ?></td>
