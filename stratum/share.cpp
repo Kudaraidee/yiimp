@@ -72,9 +72,11 @@ static void share_add_worker(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, c
 
 	if(valid)
 	{
-		worker->difficulty += client->difficulty_actual / g_current_algo->diff_multiplier;
+		// set by the submit from the share's job (see client_share_difficulty)
+		double difficulty = client->share_difficulty > 0 ? client->share_difficulty : client->difficulty_actual;
+		worker->difficulty += difficulty / g_current_algo->diff_multiplier;
 		if (!isaux) {
-			client->speed += client->difficulty_actual / g_current_algo->diff_multiplier * 42;
+			client_speed_add(client, difficulty);
 		}
 		// log best share_diff
 		if (worker->share_diff < share_diff) worker->share_diff = share_diff;
@@ -116,10 +118,10 @@ void share_add(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, char *extranonc
 	memset(share, 0, sizeof(YAAMP_SHARE));
 
 	share->jobid = job? job->id: 0;
-	strcpy(share->extranonce2, extranonce2);
-	strcpy(share->ntime, ntime);
-	strcpy(share->nonce, nonce);
-	strcpy(share->nonce1, client->extranonce1);
+	STRSET(share->extranonce2, extranonce2);
+	STRSET(share->ntime, ntime);
+	STRSET(share->nonce, nonce);
+	STRSET(share->nonce1, client->extranonce1);
 
 	g_list_share.AddHead(share);
 }
@@ -257,8 +259,8 @@ void block_add(int userid, int workerid, int coinid, int height, double diff, do
 	block->segwit = segwit;
 	block->solo = solo;
 
-	strcpy(block->hash1, h1);
-	strcpy(block->hash2, h2);
+	STRSET(block->hash1, h1);
+	STRSET(block->hash2, h2);
 
 	g_list_block.AddTail(block);
 }
@@ -280,7 +282,7 @@ bool block_confirm(int coinid, const char *blockhash)
 
 		if(coind->multialgos) {
 			char params[192];
-			sprintf(params, "[\"%s\"]", blockhash);
+			STRFMT(params, "[\"%s\"]", blockhash);
 			json_value *json = rpc_call(&coind->rpc, "getblock", params);
 			if(!json) {
 				debuglog("%s: error getblock, no answer\n", __func__);
@@ -302,7 +304,7 @@ bool block_confirm(int coinid, const char *blockhash)
 			break;
 		} else if (strcmp(coind->symbol,"ORB") == 0) {
 			char params[192];
-			sprintf(params, "[\"%s\"]", blockhash);
+			STRFMT(params, "[\"%s\"]", blockhash);
 			json_value *json = rpc_call(&coind->rpc, "getblock", params);
 			if(!json) {
 				debuglog("%s: error getblock, no answer\n", __func__);

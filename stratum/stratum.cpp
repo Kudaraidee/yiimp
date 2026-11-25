@@ -34,6 +34,12 @@ char g_stratum_algo[256];
 double g_stratum_difficulty;
 double g_stratum_min_diff;
 double g_stratum_max_diff;
+double g_stratum_spm_min;
+double g_stratum_spm_max;
+double g_stratum_spm_spam;
+int g_stratum_share_timeout;
+int g_stratum_speed_slot_secs;
+int g_stratum_idle_timeout;
 
 double g_stratum_nicehash_difficulty;
 double g_stratum_nicehash_min_diff;
@@ -344,6 +350,27 @@ int main(int argc, char **argv)
 	g_stratum_difficulty = iniparser_getdouble(ini, "STRATUM:difficulty", 16);
 	g_stratum_min_diff = iniparser_getdouble(ini, "STRATUM:diff_min", g_stratum_difficulty/2);
 	g_stratum_max_diff = iniparser_getdouble(ini, "STRATUM:diff_max", g_stratum_difficulty*8192);
+
+	// vardiff keeps shares per minute inside [spm_min, spm_max], retargets to the middle
+	g_stratum_spm_min = iniparser_getdouble(ini, "STRATUM:spm_min", 2);
+	g_stratum_spm_max = iniparser_getdouble(ini, "STRATUM:spm_max", 4);
+	if(g_stratum_spm_min <= 0 || g_stratum_spm_max <= g_stratum_spm_min)
+	{
+		stratumlog("invalid spm_min %g / spm_max %g, using 2 / 4\n", g_stratum_spm_min, g_stratum_spm_max);
+		g_stratum_spm_min = 2;
+		g_stratum_spm_max = 4;
+	}
+	// above this rate the difficulty is raised on the next share
+	g_stratum_spm_spam = iniparser_getdouble(ini, "STRATUM:spm_spam", g_stratum_spm_max * 5);
+	if(g_stratum_spm_spam <= g_stratum_spm_max) g_stratum_spm_spam = g_stratum_spm_max * 5;
+	// no valid share for this many seconds halves the difficulty
+	g_stratum_share_timeout = iniparser_getint(ini, "STRATUM:share_timeout", (int)(3 * 60 / g_stratum_spm_min));
+	if(g_stratum_share_timeout < 10) g_stratum_share_timeout = 10;
+	// client speed window in seconds, split into YAAMP_SPEED_SLOTS slots
+	int speed_window = iniparser_getint(ini, "STRATUM:speed_window", 600);
+	g_stratum_speed_slot_secs = std::max(1, speed_window / YAAMP_SPEED_SLOTS);
+	// no valid share for this long at the lowest difficulty (or 3x as long in any case): disconnect
+	g_stratum_idle_timeout = std::max(60, iniparser_getint(ini, "STRATUM:idle_timeout", 600));
 	
 	char *new_log_directory = iniparser_getstring(ini, "STRATUM:logdir", NULL);
 	if (new_log_directory) { strcpy(g_log_directory, new_log_directory); }
@@ -535,6 +562,7 @@ void *monitor_thread(void *p)
 			exit(1);
 		}
 	}
+	return NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -592,4 +620,5 @@ void *stratum_thread(void *p)
 
 		pthread_detach(thread);
 	}
+	return NULL;
 }

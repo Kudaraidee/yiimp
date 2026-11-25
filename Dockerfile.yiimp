@@ -57,7 +57,7 @@ RUN mkdir /var/log/yiimp
 #
 # Commit yiimp2/package-lock.json to source control so this stage uses
 # `npm ci` for fully reproducible, lock-file-verified installs.
-FROM node:20-alpine AS tailwind-build
+FROM node:26-alpine AS tailwind-build
 WORKDIR /build
 
 # Install npm deps (layer cached unless package.json changes)

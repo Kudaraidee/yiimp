@@ -9,9 +9,12 @@ class YAAMP_COIND_AUX;
 #define JOB_STATUS_ACTIVE	1
 #define JOB_STATUS_WAITING	2
 
+// full coinbase hex: coinb1 + extranonces + coinb2
+#define YAAMP_COINBASE_HEX	(17*1024)
+
 struct YAAMP_JOB_VALUES
 {
-	char coinbase[4*1024];
+	char coinbase[YAAMP_COINBASE_HEX];
 	char merkleroot_be[1024];
 
 	char header[8192];
@@ -68,17 +71,18 @@ struct YAAMP_JOB_TEMPLATE
 	char coinforsubmitb1[4*1024];
 	char coinforsubmitb2[4*1024];
 	bool isbitcash;
-	char mweb[1024*1024];
+	char *mweb;	// malloc, NULL when the template has none
+	~YAAMP_JOB_TEMPLATE() { free(mweb); }
 
 	char saplingroothash[256];
-	char coinbase[4096];
+	char coinbase[YAAMP_COINBASE_HEX];
 	char merkleroot[4096];
 
 	char header[256];
 
 	char xaya_nbits[32];
 	char xaya_header[1024];
-	char xaya_coinbase[4*1024];
+	char xaya_coinbase[YAAMP_COINBASE_HEX];
 	char xaya_merkleroothash[512];
 
 	bool has_segwit_txs;
@@ -163,6 +167,8 @@ void job_check_status();
 
 void job_send_jobid(YAAMP_CLIENT *client, int jobid);
 void job_send_last(YAAMP_CLIENT *client);
+void job_resend(YAAMP_CLIENT *client, YAAMP_JOB *job, int gen);
+void job_notify_id(char *out, YAAMP_JOB *job, int gen);
 void job_broadcast(YAAMP_JOB *job);
 
 /////////////////////////

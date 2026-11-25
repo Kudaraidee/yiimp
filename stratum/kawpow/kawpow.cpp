@@ -60,12 +60,14 @@ uint256 get_kawpow_seed(int height)
     return uint256S(seed_string);
 }
 
-void kawpow_job_mining_notify_buffer(YAAMP_JOB* job, YAAMP_CLIENT* client, char* buffer)
+void kawpow_job_mining_notify_buffer(YAAMP_JOB* job, YAAMP_CLIENT* client, char* buffer, int gen)
 {
     YAAMP_JOB_TEMPLATE* templ = job->templ;
+    char jobid[32];
+    job_notify_id(jobid, job, gen);
 
-    sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",\"%s\",true,%d,\"%s\"]}\n",
-        job->id,
+    sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%s\",\"%s\",\"%s\",\"%s\",true,%d,\"%s\"]}\n",
+        jobid,
         templ->header_hash.ToString().c_str(),
         templ->header_seed.ToString().c_str(),
         client->share_target.ToString().c_str(),
@@ -78,12 +80,12 @@ void build_kawpow_header(YAAMP_JOB_TEMPLATE* templ, const char* nonce64, const c
     YAAMP_JOB_VALUES submitvalues;
     memset(&submitvalues, 0, sizeof(submitvalues));
 
-    sprintf(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
+    STRFMT(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
     int coinbase_len = strlen(submitvalues.coinbase);
     memcpy(coinbase, submitvalues.coinbase, coinbase_len);
 
-    unsigned char coinbase_bin[1024];
-    memset(coinbase_bin, 0, 1024);
+    unsigned char coinbase_bin[sizeof(submitvalues.coinbase)/2];
+    memset(coinbase_bin, 0, sizeof(coinbase_bin));
     binlify(coinbase_bin, submitvalues.coinbase);
 
     char doublehash[128];
@@ -115,7 +117,7 @@ void build_kawpow_header(YAAMP_JOB_TEMPLATE* templ, const char* nonce64, const c
 
     char blockheader[512];
     memset(blockheader, 0, 512);
-    sprintf(blockheader, "%s%s%s%s%s%08x%s%s%s", templ->version, templ->prevhash_be, submitvalues.merkleroot_be,
+    STRFMT(blockheader, "%s%s%s%s%s%08x%s%s%s", templ->version, templ->prevhash_be, submitvalues.merkleroot_be,
         ntime, templ->nbits, templ->height, n1, n2, mixhash_be);
 
     ser_string_be(blockheader, blockheader_be, 30);
@@ -125,11 +127,11 @@ uint256 build_header_hash(YAAMP_JOB_TEMPLATE* templ)
 {
     YAAMP_JOB_VALUES submitvalues;
     memset(&submitvalues, 0, sizeof(submitvalues));
-    sprintf(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
+    STRFMT(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
     int coinbase_len = strlen(submitvalues.coinbase);
 
-    unsigned char coinbase_bin[1024];
-    memset(coinbase_bin, 0, 1024);
+    unsigned char coinbase_bin[sizeof(submitvalues.coinbase)/2];
+    memset(coinbase_bin, 0, sizeof(coinbase_bin));
     binlify(coinbase_bin, submitvalues.coinbase);
 
     char doublehash[128];
@@ -189,7 +191,7 @@ void kawpow_block(YAAMP_CLIENT* client, YAAMP_JOB* job, YAAMP_JOB_TEMPLATE *temp
     char block_header[256];
     memset(block_header, 0, sizeof(block_header));
 
-    char coin_base[256];
+    char coin_base[sizeof(YAAMP_JOB_VALUES::coinbase)];	// build_kawpow_header() copies the coinbase
     memset(coin_base, 0, sizeof(coin_base));
 
     build_kawpow_header(templ, nonce64, mixhash, block_header, coin_base);
@@ -252,6 +254,7 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     }
 
     int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
+    int jobgen = client_jobid_gen(json_params->u.array.values[1]->u.string.ptr);
 
     // test if miner has supplied params with prefix
     int offset = 0;
@@ -272,6 +275,8 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
         client_submit_error(client, NULL, 21, "Invalid job id", header, mixhash, nonce);
         return true;
     } else if (job->deleted) {
+        // job replaced by a new block: answered as accepted, but not counted
+        client_log_submit(client, "stale job, ignored");
         client_send_result(client, "true");
         object_unlock(job);
         return true;
@@ -318,9 +323,13 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     else if (is_meowpow)
         hash = meowpow_hash(header_str, nonce_str, mixhash_str, coinid);
 
-    uint256 target = client->share_target;
+    // the miner switches difficulty with the next job, judge the share by its job
+    uint256 target;
+    client->share_difficulty = client_share_difficulty(client, job, jobgen);
+    diff_to_target(target, client->share_difficulty);
     uint64_t hash_int = get_hash_difficulty((uint8_t*)&hash);
     double share_diff = target_to_diff(hash_int);
+    client->submit_share_diff = share_diff;
 
     stratumlog("client %d on job %d sent diff %0.3f powhash %s\n", client->userid, job->id, share_diff,hash.ToString().c_str());
 
@@ -351,11 +360,12 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     }
 
     client_send_result(client, "true");
-    client_record_difficulty(client);
     client->submit_bad = 0;
     client->shares++;
 
     share_add(client, job, true, header, job->templ->ntime, nonce, share_diff , 0, job->templ->height);
+    client_log_submit(client, "accepted");
+    client_vardiff_share(client, job, jobgen);
 
     object_unlock(job);
 

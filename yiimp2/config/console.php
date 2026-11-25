@@ -72,6 +72,8 @@ $config = [
             'tableName' => '{{%queue}}',
             'channel'   => 'default',
             'mutex'     => \yii\mutex\MysqlMutex::class,
+            // own command class adds seed/status/migrate to queue/*
+            'commandClass' => \app\commands\QueueController::class,
         ],
         'mutex' => [
             'class' => \yii\mutex\MysqlMutex::class,

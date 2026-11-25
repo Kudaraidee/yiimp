@@ -7,3 +7,10 @@ web
 
 # Local composer vendor (may hold dev packages); the image builds its own in composer-deps.
 yiimp2/vendor
+
+# Local stratum build output: make in the image must not reuse host objects.
+stratum/build
+stratum/tests/build
+stratum/stratum
+**/*.o
+**/*.a

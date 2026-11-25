@@ -3,7 +3,7 @@
 namespace app\commands;
 
 use Yii;
-use yii\console\Controller;
+use yii\queue\db\Command as DbQueueCommand;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 use yii\db\Query;
@@ -16,8 +16,11 @@ use app\components\JobRegistry;
  *   php yii queue/seed     — push all recurring jobs if not already active (idempotent)
  *   php yii queue/status   — show pending counts and next scheduled run per job
  *   php yii queue/migrate  — reminder to run the yii2-queue DB migration
+ *
+ * Registered as the queue component's commandClass, so listen/run/info/
+ * clear/remove from yii2-queue stay available under the same id.
  */
-class QueueController extends Controller
+class QueueController extends DbQueueCommand
 {
     // Job class list is centralised in JobRegistry — see app\components\JobRegistry.
 
