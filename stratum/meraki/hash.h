@@ -26,8 +26,8 @@ double meraki_target_to_diff(uint256& target);
 void meraki_update_epoch(const int coinid, int& height);
 meraki_coin_context* meraki_get_coin_context(const int coinid);
 uint256 meraki_fullhash(uint256& header_hash, uint64_t& header_nonce,
-    uint256& mix_hash, int& coinid);
+    uint256& mix_hash, int& coinid, int height);
 uint256 meraki_hash(const std::string& header_hash, const std::string& header_nonce,
-    std::string& mix_real, int& coinid);
+    std::string& mix_real, int& coinid, int height);
 
 #endif // YAAMP_MERAKI_HASH_H

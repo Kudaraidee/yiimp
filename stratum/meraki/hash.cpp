@@ -92,27 +92,39 @@ meraki_coin_context* meraki_get_coin_context(const int coinid)
 }
 
 uint256 meraki_fullhash(uint256& header_hash, uint64_t& header_nonce,
-    uint256& mix_hash, int& coinid)
+    uint256& mix_hash, int& coinid, int height)
 {
     meraki_coin_context* context = meraki_get_coin_context(coinid);
     if (!context)
         return badhash;
 
     const auto hash = to_meraki_hash256(header_hash.ToString());
+
+    // ProgPoW folds block_number/3 into the mix seed, so verifying a late
+    // share against the node's newest height breaks work mined on an older
+    // job. Always use the height of the job the share was submitted for.
+    const int epoch_number = meraki_epoch_for_height(height);
+    const meraki::epoch_context* epoch_context = context->context.get();
+    meraki::epoch_context_ptr old_epoch{nullptr, &meraki::meraki_destroy_epoch_context};
+    if (!epoch_context || epoch_context->epoch_number != epoch_number) {
+        old_epoch = meraki::create_epoch_context(epoch_number);
+        epoch_context = old_epoch.get();
+    }
+
     const auto result = meraki_progpow::meraki_progpow_hash(
-        *context->context, context->height, hash, header_nonce);
+        *epoch_context, height, hash, header_nonce);
     mix_hash = uint256S(meraki_to_hex(result.mix_hash));
 
     return uint256S(meraki_to_hex(result.final_hash));
 }
 
 uint256 meraki_hash(const std::string& header_hash, const std::string& header_nonce,
-    std::string& mix_real, int& coinid)
+    std::string& mix_real, int& coinid, int height)
 {
     uint256 mix_hash;
     uint256 header = uint256S(header_hash);
     uint64_t nonce = strtoull(header_nonce.c_str(), NULL, 16);
-    uint256 result_hash = meraki_fullhash(header, nonce, mix_hash, coinid);
+    uint256 result_hash = meraki_fullhash(header, nonce, mix_hash, coinid, height);
 
     mix_real = mix_hash.ToString();
     return result_hash;

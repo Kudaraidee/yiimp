@@ -107,7 +107,9 @@ bool meraki_submit(YAAMP_CLIENT* client, json_value* json_params)
     const std::string nonce_str(nonce);
 
     std::string mixhash_calc;
-    uint256 hash = meraki_hash(header_str, nonce_str, mixhash_calc, coinid);
+    // Verify against the height of this job, not the node's newest height:
+    // ProgPoW changes its mix seed every 3 blocks (period_length).
+    uint256 hash = meraki_hash(header_str, nonce_str, mixhash_calc, coinid, templ->height);
 
     if (mixhash_calc != mixhash_str) {
         client_submit_error(client, job, 25, "bad mix-hash", header, submit_ntime, nonce);
