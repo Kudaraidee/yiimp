@@ -44,7 +44,9 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 		return true;
 	}
 
-	if ((!job->coind->auto_exchange) && (!coin_to_mine)) {
+	// a coin without auto exchange is mined by clients paid in it or asking for it (mc=)
+	bool payout_coin = (client->coinid == job->coind->id);
+	if ((!job->coind->auto_exchange) && (!coin_to_mine) && (!payout_coin)) {
 		return true;
 	}
 
@@ -68,7 +70,6 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 		double difficulty_remote = client->difficulty_remote;
 		if(remote->difficulty_actual < client->difficulty_actual)
 		{
-			RETURN_ON_CONDITION(client->difficulty_fixed, true);
 			RETURN_ON_CONDITION(remote->difficulty_actual*4 < client->difficulty_actual, true);
 
 			difficulty_remote = remote->difficulty_actual;
@@ -264,7 +265,7 @@ void job_assign_clients_left(double factor)
 				else
 					factor = 0.;
 			}
-			else if ((!(coind->auto_exchange)) && (!coin_to_mine)) {
+			else if ((!(coind->auto_exchange)) && (!coin_to_mine) && (client->coinid != coind->id)) {
 				factor = 0.;
 			}
 
@@ -436,6 +437,25 @@ void job_update()
 
 //	int ready = 0;
 //	debuglog("job_update\n");
+
+	// share silence: lower the difficulty and resend the client's current job.
+	// Lock order job list -> client list, as in job_assign_clients.
+	g_list_job.Enter();
+	g_list_client.Enter();
+	for(CLI li = g_list_client.first; li; li = li->next)
+	{
+		YAAMP_CLIENT *client = (YAAMP_CLIENT *)li->data;
+		if(client->deleted || !client->workerid) continue;
+
+		YAAMP_JOB *job = (YAAMP_JOB *)object_find(&g_list_job, client->jobid_sent, false);
+		if(job && (job->deleted || !job_can_mine(job))) job = NULL;
+
+		client_vardiff_silence(client, job);
+	}
+	g_list_client.Leave();
+	g_list_job.Leave();
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
 
 	g_list_job.Enter();
 	for(CLI li = g_list_job.first; li; li = li->next)

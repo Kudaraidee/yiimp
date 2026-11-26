@@ -54,6 +54,13 @@ char g_nebhash_dataset[1024] = "/home/codex/lrs-nodes/neb-node/neb-datasets.bin"
 char g_nebhash_chain_id[65] = "da2f5af7bb4c5e2bcc8d558b2f4f01d4c88557a943e6cff9cd035638fe9439ae";
 uint32_t g_nebhash_start_k = 10;
 
+double g_stratum_spm_min;
+double g_stratum_spm_max;
+double g_stratum_spm_spam;
+int g_stratum_share_timeout;
+int g_stratum_speed_slot_secs;
+int g_stratum_idle_timeout;
+
 double g_stratum_nicehash_difficulty;
 double g_stratum_nicehash_min_diff;
 double g_stratum_nicehash_max_diff;
@@ -412,6 +419,27 @@ int main(int argc, char **argv)
 	if (g_stratum_eth_vardiff_window < 30) g_stratum_eth_vardiff_window = 30;
 	g_stratum_eth_vardiff_target = iniparser_getdouble(ini, "STRATUM:eth_vardiff_target", 1.0);
 	if (g_stratum_eth_vardiff_target < 0.1) g_stratum_eth_vardiff_target = 0.1;
+
+	// vardiff keeps shares per minute inside [spm_min, spm_max], retargets to the middle
+	g_stratum_spm_min = iniparser_getdouble(ini, "STRATUM:spm_min", 2);
+	g_stratum_spm_max = iniparser_getdouble(ini, "STRATUM:spm_max", 4);
+	if(g_stratum_spm_min <= 0 || g_stratum_spm_max <= g_stratum_spm_min)
+	{
+		stratumlog("invalid spm_min %g / spm_max %g, using 2 / 4\n", g_stratum_spm_min, g_stratum_spm_max);
+		g_stratum_spm_min = 2;
+		g_stratum_spm_max = 4;
+	}
+	// above this rate the difficulty is raised on the next share
+	g_stratum_spm_spam = iniparser_getdouble(ini, "STRATUM:spm_spam", g_stratum_spm_max * 5);
+	if(g_stratum_spm_spam <= g_stratum_spm_max) g_stratum_spm_spam = g_stratum_spm_max * 5;
+	// no valid share for this many seconds halves the difficulty
+	g_stratum_share_timeout = iniparser_getint(ini, "STRATUM:share_timeout", (int)(3 * 60 / g_stratum_spm_min));
+	if(g_stratum_share_timeout < 10) g_stratum_share_timeout = 10;
+	// client speed window in seconds, split into YAAMP_SPEED_SLOTS slots
+	int speed_window = iniparser_getint(ini, "STRATUM:speed_window", 600);
+	g_stratum_speed_slot_secs = std::max(1, speed_window / YAAMP_SPEED_SLOTS);
+	// no valid share for this long at the lowest difficulty (or 3x as long in any case): disconnect
+	g_stratum_idle_timeout = std::max(60, iniparser_getint(ini, "STRATUM:idle_timeout", 600));
 
 	char *new_log_directory = iniparser_getstring(ini, "STRATUM:logdir", NULL);
 	if (new_log_directory) { strcpy(g_log_directory, new_log_directory); }

@@ -43,7 +43,7 @@ podman build --tag yiimp --target image-prod -f Dockerfile.yiimp
 make build-devel
 ```
 
-The production build includes an isolated `node:20-alpine` stage that compiles Tailwind CSS (`yiimp2/web/css/tailwind.css`) — no Node.js enters the final image.
+The production build includes an isolated `node:26-alpine` stage that compiles Tailwind CSS (`yiimp2/web/css/tailwind.css`) — no Node.js enters the final image.
 
 For Ethash/Etchash setup (SQL, config, node requirements, miner ports) see [stratum/ethash/README.md](stratum/ethash/README.md).
 

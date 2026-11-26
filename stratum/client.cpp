@@ -148,6 +148,12 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 			strcpy(client->extranonce1, client1->extranonce1_reconnect);
 
 			client->speed = client1->speed;
+			memcpy(client->speed_slots, client1->speed_slots, sizeof(client->speed_slots));
+			memcpy(client->speed_share_slots, client1->speed_share_slots, sizeof(client->speed_share_slots));
+			memcpy(client->speed_sq_slots, client1->speed_sq_slots, sizeof(client->speed_sq_slots));
+			client->speed_slot = client1->speed_slot;
+			client->speed_since = client1->speed_since;
+			client->last_share = client1->last_share;
 			client->extranonce1_id = client1->extranonce1_id;
 
 			client->userid = client1->userid;
@@ -170,6 +176,12 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 
 				client->difficulty_actual = client1->difficulty_actual;
 				client->speed = client1->speed;
+			memcpy(client->speed_slots, client1->speed_slots, sizeof(client->speed_slots));
+			memcpy(client->speed_share_slots, client1->speed_share_slots, sizeof(client->speed_share_slots));
+			memcpy(client->speed_sq_slots, client1->speed_sq_slots, sizeof(client->speed_sq_slots));
+			client->speed_slot = client1->speed_slot;
+			client->speed_since = client1->speed_since;
+			client->last_share = client1->last_share;
 
 				memcpy(client->job_history, client1->job_history, sizeof(client->job_history));
 				client1->lock_count = 0;
@@ -774,8 +786,8 @@ void *client_thread(void *p)
 	memset(client, 0, sizeof(YAAMP_CLIENT));
 
 	client->reconnectable = true;
-	client->speed = YAAMP_CLIENT_MINSPEED * 10;
 	client->created = time(NULL);
+	client->speed_since = client->created;
 	client->last_best = time(NULL);
 
 	YAAMP_CLIENT_START *start = (YAAMP_CLIENT_START *)p;
@@ -786,8 +798,6 @@ void *client_thread(void *p)
 	client->sock = socket_initialize(client_sock);
 //	client->source = source_init(client);
 
-	client->shares_per_minute = YAAMP_SHAREPERSEC;
-	client->last_submit_time = current_timestamp();
 
 	// socket_initialize() has already consumed any HAProxy PROXY header, so
 	// the next byte is either a TLS ClientHello or the first JSON character.
@@ -850,8 +860,11 @@ void *client_thread(void *p)
 			break;
 		}
 
-		if (g_debuglog_client) {
-			debuglog("client %s %d %s\n", method, client->id_int, client->id_str? client->id_str: "null");
+		// submits are logged with their result (client_log_submit)
+		if (g_debuglog_client && strcmp(method, "mining.submit")) {
+			char who[1200];
+			client_debug_who(client, who, sizeof(who));
+			debuglog("client %s %s\n", method, who);
 		}
 
 		bool b = false;
@@ -969,9 +982,6 @@ void *client_thread(void *p)
 
 //	source_close(client->source);
 
-	if (g_debuglog_client) {
-		debuglog("client terminate\n");
-	}
 	if(!client) {
 		pthread_exit(NULL);
 	}
@@ -986,8 +996,12 @@ void *client_thread(void *p)
 	// submit; clear all of them, not just the primary login's worker.
 	if (is_nebhash) nebhash_clear_workers(client);
 
+	// only authorized miners are in the list; blocknotify connections end silently
 	if(g_list_client.Find(client))
 	{
+		if (g_debuglog_client)
+			debuglog("client disconnect %s %s.%s\n", client->sock->ip, client->username, client->worker);
+
 		if(client->workerid && !client->reconnecting)
 		{
 			CommonLock(&g_db_mutex);

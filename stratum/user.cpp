@@ -219,14 +219,19 @@ void db_update_workers(YAAMP_DB *db)
 		if(client->deleted) continue;
 		if(!client->workerid) continue;
 
-		// Low-difficulty coins need far longer between shares, so the rough
-		// speed estimate stays below YAAMP_CLIENT_MINSPEED and would kick a
-		// healthy miner (and his reconnect inherits the same low estimate).
-		// NEB shares are even rarer (one every ~10^10 hashes here) and its
-		// speed is not measured by yiimp's generic share formula at all.
-		if(!is_nebhash && !client_low_difficulty_algo() && client->speed < YAAMP_CLIENT_MINSPEED)
+		client_speed_update(client);
+
+		// NEB and low-difficulty algos keep their own speed/vardiff timing:
+		// the generic share-rate/idle watchdog would disconnect healthy slow
+		// miners (and NEB shares are far too rare for the sliding window).
+		int idle = 0;
+		bool idle_disconnect = false;
+		if(!is_nebhash && !client_low_difficulty_algo())
+			idle_disconnect = client_idle(client, &idle);
+
+		if(idle_disconnect)
 		{
-			clientlog(client, "speed %f", client->speed);
+			clientlog(client, "idle, no valid share for %d s at diff %g", idle, client->difficulty_actual);
 			shutdown(client->sock->sock, SHUT_RDWR);
 			db_clear_worker(db, client);
 			object_delete(client);
@@ -245,9 +250,9 @@ void db_update_workers(YAAMP_DB *db)
 			if (client->neb_last_share_time &&
 				(long long) time(NULL) - client->neb_last_share_time > 600)
 				client->speed = 0;
-		} else {
-			client->speed *= 0.8;
 		}
+		// Non-NEB speed decay is handled by client_speed_update()'s sliding window.
+
 		if(client->difficulty_written == client->difficulty_actual) continue;
 
 		db_query(db, "UPDATE workers SET difficulty=%f, subscribe=%d, tls=%d WHERE id=%d",

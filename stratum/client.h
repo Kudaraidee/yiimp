@@ -33,7 +33,15 @@ struct YAAMP_CLIENT_ALGO
 
 #define YAAMP_JOB_MAXHISTORY	16
 
-#define YAAMP_CLIENT_MINSPEED	0.00001
+// client->speed (h/s) and share rate over a sliding window of valid shares
+// slot length = STRATUM:speed_window / YAAMP_SPEED_SLOTS (g_stratum_speed_slot_secs)
+#define YAAMP_SPEED_SLOTS	60
+// share spam is judged on the last minute only
+#define YAAMP_SPAM_WINDOW_SECS	60
+// a resent job gets this many leading zeros in its id at most
+#define YAAMP_RESEND_MAX	16
+// vardiff needs this many effective shares in the window (see speed_neff)
+#define YAAMP_VARDIFF_MIN_SHARES	6
 
 #define MIN_ADDRESS_LEN 3 /* BTC len can be as few as 26 chars, but gen. 33 or 34 */
 #define MAX_ADDRESS_LEN 98 /* BITC */
@@ -87,10 +95,17 @@ public:
 	double difficulty_actual;
 	double difficulty_remote;
 	double difficulty_written;
-	bool difficulty_fixed;
+	bool difficulty_fixed;		// password d= pinned the difficulty for the session
+	double difficulty_prev;		// in effect for jobs up to difficulty_prev_jobid
+	int difficulty_prev_jobid;
+	int difficulty_changed;		// time of the last change
+	int difficulty_new_gen;		// shares on difficulty_prev_jobid with this resend generation or later count new, 0 = none
+	bool difficulty_confirmed;	// a share at the new difficulty came back after a resend
+	int resend_jobid;		// job the resend generations belong to
+	int resend_gen;			// last generation (leading zeros of the job id) sent for resend_jobid
+	double share_difficulty;	// difficulty of the share being processed (set on submit)
+	double submit_share_diff;	// hash difficulty of the share being processed, -1 = not computed
 
-	long long last_submit_time;
-	double shares_per_minute;
 
 	// ETH vardiff counts shares in a fixed window instead of the generic
 	// 10 shares/min EMA, which is far too aggressive for Ethash GPUs.
@@ -116,6 +131,17 @@ public:
 	int submit_bad;
 
 	double speed;
+	double speed_slots[YAAMP_SPEED_SLOTS];	// work in hashes, [0] = current slot
+	int speed_share_slots[YAAMP_SPEED_SLOTS];	// share count per slot
+	double speed_sq_slots[YAAMP_SPEED_SLOTS];	// sum of squared share difficulties per slot
+	int speed_shares;	// shares in the window
+	double speed_neff;	// effective share count: (sum d)^2 / sum d^2, few big shares weigh more than many small
+	int speed_span;		// seconds the window covers
+	double speed_short;	// h/s over the last YAAMP_SPAM_WINDOW_SECS
+	int speed_short_shares;
+	int speed_slot;		// time slot of speed_slots[0]
+	int speed_since;	// start of measurement, kept across reconnect
+	int last_share;		// time of last valid share
 	int extranonce1_id;
 
 	int jobid_next;
@@ -201,6 +227,10 @@ void get_next_extraonce1(char *extraonce1);
 void get_random_key(char *key);
 
 void client_sort();
+void client_debug_who(YAAMP_CLIENT *client, char *out, int size);
+void client_log_submit(YAAMP_CLIENT *client, const char *result);
+void client_speed_add(YAAMP_CLIENT *client, double difficulty);
+void client_speed_update(YAAMP_CLIENT *client);
 void client_block_ip(YAAMP_CLIENT *client, const char *reason);
 void client_block_ipset(YAAMP_CLIENT *client, const char *ipset_name);
 
@@ -218,12 +248,19 @@ bool client_find_my_ip(const char *ip);
 
 int client_send_difficulty(YAAMP_CLIENT *client, double difficulty);
 double client_normalize_difficulty(double difficulty, YAAMP_CLIENT *client);
+void client_record_difficulty(YAAMP_CLIENT *client);
 bool client_uses_precise_difficulty();
 bool client_low_difficulty_algo();
 
 void client_change_difficulty(YAAMP_CLIENT *client, double difficulty);
-void client_record_difficulty(YAAMP_CLIENT *client);
 void client_adjust_difficulty(YAAMP_CLIENT *client);
+void client_vardiff_share(YAAMP_CLIENT *client, YAAMP_JOB *job, int gen);
+void client_vardiff_silence(YAAMP_CLIENT *client, YAAMP_JOB *job);
+void client_vardiff_resend(YAAMP_CLIENT *client, YAAMP_JOB *job);
+bool client_vardiff_at_floor(YAAMP_CLIENT *client);
+bool client_idle(YAAMP_CLIENT *client, int *idle);
+double client_share_difficulty(YAAMP_CLIENT *client, YAAMP_JOB *job, int gen);
+int client_jobid_gen(const char *jobid);
 
 void client_initialize_difficulty(YAAMP_CLIENT *client);
 const char *client_password_param(const char *password, const char *key, size_t keylen);

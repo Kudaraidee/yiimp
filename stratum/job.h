@@ -201,6 +201,8 @@ void job_check_status();
 
 void job_send_jobid(YAAMP_CLIENT *client, int jobid);
 void job_send_last(YAAMP_CLIENT *client);
+void job_resend(YAAMP_CLIENT *client, YAAMP_JOB *job, int gen);
+void job_notify_id(char *out, YAAMP_JOB *job, int gen);
 void job_broadcast(YAAMP_JOB *job);
 
 // Choose a job for an Ethash/Etchash client, honouring mc=SYMBOL pinning.

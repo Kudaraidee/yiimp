@@ -13,27 +13,37 @@ int job_get_jobid()
 	return jobid;
 }
 
-static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
+// job id as sent in mining.notify: hex, with gen leading zeros for a resent job.
+// The miner sees a new job (and applies a pending difficulty at once), the
+// pool still parses the same id and reads gen back from the zeros.
+void job_notify_id(char *out, YAAMP_JOB *job, int gen)
+{
+	sprintf(out, "%.*s%x", std::max(0, std::min(gen, YAAMP_RESEND_MAX)), "0000000000000000", job->id);
+}
+
+static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer, int gen = 0)
 {
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
+	char jobid[32];
+	job_notify_id(jobid, job, gen);
 
 	if (!strcmp(g_stratum_algo, "lbry")) {
 		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
-			job->id, templ->prevhash_be, templ->claim_be, templ->coinb1, templ->coinb2,
+			"\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+			jobid, templ->prevhash_be, templ->claim_be, templ->coinb1, templ->coinb2,
 			templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 		return;
 	} else if (strlen(templ->extradata_hex) == 128) {
 		// LUX smart contract state hashes (like lbry extra field, here the 2 root hashes in one)
 		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-			"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
-			job->id, templ->prevhash_be, templ->extradata_be, templ->coinb1, templ->coinb2,
+			"\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+			jobid, templ->prevhash_be, templ->extradata_be, templ->coinb1, templ->coinb2,
 			templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 		return;
 	} else if (!strcmp(g_stratum_algo,"neoscrypt-xaya")) {
 		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-				"\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
-			job->id, "0000000000000000000000000000000000000000000000000000000000000000", templ->xaya_header,
+				"\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+			jobid, "0000000000000000000000000000000000000000000000000000000000000000", templ->xaya_header,
 			"", "", "20000000", templ->nbits, templ->ntime);
 		return;
 	}
@@ -72,16 +82,16 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer)
 		//[2017-12-07 13:53:12] < {"id":null,"method":"client.show_message","params":["equihash KMD block 611840"]}
 
 		str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "%s{\"id\":null,\"method\":\"mining.notify\",\"params\":["
-				"\"%x\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",true,\"%s\",\"%s\"]}\n", job_message,
-				job->id, version_reversed, prev_hash_reversed, merkleroot_reversed,
+				"\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",true,\"%s\",\"%s\"]}\n", job_message,
+				jobid, version_reversed, prev_hash_reversed, merkleroot_reversed,
 				finalsaplingroot_reversed, time_reversed, bits_reversed,
 				equihash_params, equihash_personalization);
 		return;
 	}
 
 	// standard stratum
-	str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
-		job->id, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime);
+	str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
+		jobid, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime);
 }
 
 // MukiMiner expects a complete serialized 80-byte header and only substitutes
@@ -223,6 +233,43 @@ void job_send_last(YAAMP_CLIENT *client)
 	socket_send_raw(client->sock, buffer, strlen(buffer));
 }
 
+// send the client its current job again under a new id (gen), so a new
+// difficulty applies right away
+void job_resend(YAAMP_CLIENT *client, YAAMP_JOB *job, int gen)
+{
+	// Use the same notify shape as the original job. Only the Stratum v1 and
+	// Progpow builders accept a generation; the other feature protocols keep
+	// their own format (their job-id parser does not use leading zeros).
+	// NEB notifications carry a 26 KiB model hash plus a merkle branch.
+	char buffer[512*1024];
+	if (client->is_ethproxy && (is_ethash || is_etchash))
+	{
+		ethash_ethproxy_work_buffer(job, client, buffer);
+	}
+	else if (is_ethash || is_etchash)
+	{
+		ethash_job_mining_notify_buffer(job, client, buffer);
+	}
+	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
+	{
+		kawpow_job_mining_notify_buffer(job, client, buffer, gen);
+	}
+	else if (is_nebhash)
+	{
+		nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
+	}
+	else if (is_homescrypt && homescrypt_uses_header_notify(client))
+	{
+		homescrypt_job_mining_notify_buffer(job, client, buffer);
+	}
+	else
+	{
+		job_mining_notify_buffer(job, buffer, gen);
+	}
+
+	socket_send_raw(client->sock, buffer, strlen(buffer));
+}
+
 void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 {
 	YAAMP_JOB *job = (YAAMP_JOB *)object_find(&g_list_job, jobid, true);
@@ -322,11 +369,13 @@ void job_broadcast(YAAMP_JOB *job)
 			job_mining_notify_buffer(job, buffer);
 		}
 	
+		// set_difficulty goes out before this job: the miner applies it from this job on
+		// Meraki was already adjusted above, before its target was embedded in the notify.
+		if (!is_meraki) client_adjust_difficulty(client);
+
 		client->jobid_sent = job->id;
 		client_add_job_history(client, job->id);
 		client_record_job_target(client, job->id, client->share_target);
-
-		if (!is_meraki) client_adjust_difficulty(client);
 
 		setsockopt(client->sock->sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 

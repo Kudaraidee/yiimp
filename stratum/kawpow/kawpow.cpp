@@ -62,12 +62,14 @@ uint256 get_kawpow_seed(int height)
     return uint256S(seed_string);
 }
 
-void kawpow_job_mining_notify_buffer(YAAMP_JOB* job, YAAMP_CLIENT* client, char* buffer)
+void kawpow_job_mining_notify_buffer(YAAMP_JOB* job, YAAMP_CLIENT* client, char* buffer, int gen)
 {
     YAAMP_JOB_TEMPLATE* templ = job->templ;
+    char jobid[32];
+    job_notify_id(jobid, job, gen);
 
-    sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%x\",\"%s\",\"%s\",\"%s\",true,%d,\"%s\"]}\n",
-        job->id,
+    sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%s\",\"%s\",\"%s\",\"%s\",true,%d,\"%s\"]}\n",
+        jobid,
         templ->header_hash.ToString().c_str(),
         templ->header_seed.ToString().c_str(),
         client->share_target.ToString().c_str(),
@@ -254,6 +256,7 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     }
 
     int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
+    int jobgen = client_jobid_gen(json_params->u.array.values[1]->u.string.ptr);
 
     // test if miner has supplied params with prefix
     int offset = 0;
@@ -278,6 +281,8 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
         client_submit_error(client, NULL, 21, "Invalid job id", header, submit_ntime, nonce);
         return true;
     } else if (job->deleted) {
+        // job replaced by a new block: answered as accepted, but not counted
+        client_log_submit(client, "stale job, ignored");
         client_send_result(client, "true");
         object_unlock(job);
         return true;
@@ -341,9 +346,13 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     else if (is_evrprogpow)
         hash = evrprogpow_hash(header_str, nonce_str, mixhash_str, coinid);
 
-    uint256 target = client->share_target;
+    // the miner switches difficulty with the next job, judge the share by its job
+    uint256 target;
+    client->share_difficulty = client_share_difficulty(client, job, jobgen);
+    diff_to_target(target, client->share_difficulty);
     uint64_t hash_int = get_hash_difficulty((uint8_t*)&hash);
     double share_diff = target_to_diff(hash_int);
+    client->submit_share_diff = share_diff;
 
     stratumlog("client %d on job %d sent diff %0.3f powhash %s\n", client->userid, job->id, share_diff,hash.ToString().c_str());
 
@@ -399,11 +408,13 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     }
 
     client_send_result(client, "true");
-    client_record_difficulty(client);
     client->submit_bad = 0;
     client->shares++;
 
     share_add(client, job, true, header, job->templ->ntime, nonce, share_diff , 0, job->templ->height);
+    client_log_submit(client, "accepted");
+    client_record_difficulty(client);
+    client_vardiff_share(client, job, jobgen);
 
     object_unlock(job);
 

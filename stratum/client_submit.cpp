@@ -620,6 +620,8 @@ bool dump_submit_debug(const char *title, YAAMP_CLIENT *client, YAAMP_JOB *job, 
 
 void client_submit_error(YAAMP_CLIENT *client, YAAMP_JOB *job, int id, const char *message, char *extranonce2, char *ntime, char *nonce)
 {
+	client_log_submit(client, (job && job->deleted)? "stale job, ignored": message);
+
 //	if(job->templ->created+2 > time(NULL))
 	if(job && job->deleted)
 		client_send_result(client, "true");
@@ -640,6 +642,8 @@ void client_submit_error(YAAMP_CLIENT *client, YAAMP_JOB *job, int id, const cha
 
 bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 {
+	client->submit_share_diff = -1;
+
 	if (is_nebhash)
 		return nebhash_submit(client, json_params);
 
@@ -686,6 +690,7 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return false;
 	}
 	int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
+	int jobgen = client_jobid_gen(json_params->u.array.values[1]->u.string.ptr);
 
 	if (is_equihash) {
 		string_be(str_fits(json_params->u.array.values[2]->u.string.ptr, sizeof(ntime), "ntime"), ntime);
@@ -735,8 +740,10 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return true;
 	}
 
+	// job replaced by a new block: answered as accepted, but not counted
 	if(job->deleted)
 	{
+		client_log_submit(client, "stale job, ignored");
 		client_send_result(client, "true");
 		object_unlock(job);
 
@@ -847,8 +854,10 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 
 	// hash_int divided by 0x10000 to match user_target scaling
 	uint64_t hash_int_scaled = hash_int / 0x10000;
+	client->submit_share_diff = target_to_diff(hash_int);
 
-	uint64_t user_target = share_to_target(client->difficulty_actual) * g_current_algo->diff_multiplier;
+	client->share_difficulty = client_share_difficulty(client, job, jobgen);
+	uint64_t user_target = share_to_target(client->share_difficulty) * g_current_algo->diff_multiplier;
 	uint64_t coin_target = decode_compact(templ->nbits, (is_equihash)? 19 : 25);
 
 if (g_debuglog_hash) {
@@ -911,7 +920,6 @@ if (g_debuglog_hash) {
 		remote_submit(client, job, &submitvalues, extranonce2, ntime, nonce);
 
 	client_send_result(client, "true");
-	client_record_difficulty(client);
 	client->submit_bad = 0;
 	client->shares++;
 	if (client->shares <= 200 && (client->shares % 50) == 0) {
@@ -935,6 +943,9 @@ if (g_debuglog_hash) {
 	}
 
 	share_add(client, job, true, extranonce2, ntime, nonce, share_diff, 0, job->templ->height);
+	client_log_submit(client, "accepted");
+	client_record_difficulty(client);
+	client_vardiff_share(client, job, jobgen);
 
 	object_unlock(job);
 

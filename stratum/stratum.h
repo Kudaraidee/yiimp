@@ -47,7 +47,6 @@ using namespace std;
 
 typedef void (*YAAMP_HASH_FUNCTION)(const char *, char *, uint32_t);
 
-#define YAAMP_SHAREPERSEC		10
 
 #define YAAMP_MINDIFF			0x0000000080000000
 #define YAAMP_MAXDIFF			0x4000000000000000
@@ -121,6 +120,13 @@ extern int g_nebhash_work_port;
 extern char g_nebhash_dataset[1024];
 extern char g_nebhash_chain_id[65];
 extern uint32_t g_nebhash_start_k;
+
+extern double g_stratum_spm_min;
+extern double g_stratum_spm_max;
+extern double g_stratum_spm_spam;
+extern int g_stratum_share_timeout;
+extern int g_stratum_speed_slot_secs;
+extern int g_stratum_idle_timeout;
 
 extern double g_stratum_nicehash_difficulty;
 extern double g_stratum_nicehash_min_diff;
