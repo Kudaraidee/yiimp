@@ -312,6 +312,13 @@ struct NEB_PENDING_BLOCK
 	double network_diff;
 	double share_diff;
 	bool solo;
+	// Keep the submitting session plus the exact share fields so the miner can
+	// be told only after the node has really accepted the block.
+	int client_id;
+	char job_id[16];
+	char extranonce2[65];
+	char ntime[16];
+	char nonce[16];
 };
 static std::deque<NEB_PENDING_BLOCK> g_neb_pending_blocks;
 
@@ -1439,6 +1446,33 @@ static void nebhash_refresh_coind(YAAMP_COIND *coind)
 	if (job) coind->difficulty = nebhash_target_to_diff(job->target);
 }
 
+// The node Result frame arrives after mining.submit was already answered with
+// "true". Only now do we know the share really became a block, so notify just
+// the submitting session. A disconnected session simply misses the notice;
+// block accounting has already happened and remains authoritative.
+static void nebhash_notify_miner_block(const NEB_PENDING_BLOCK &pending)
+{
+	if (!pending.client_id) return;
+
+	YAAMP_CLIENT *client = (YAAMP_CLIENT *) object_find(&g_list_client, pending.client_id, true);
+	if (!client) return;
+
+	if (!client->deleted && client->sock && client->neb_subscribed)
+	{
+		char blockhash[65];
+		bytes_to_hex(pending.id, 32, blockhash);
+		// ccminer f3847da parses params as [job_id, nonce], either strings
+		// or numbers. Both values here are the same hex strings the miner
+		// saw in mining.notify / mining.submit.
+		client_call(client, "mining.block", "[\"%s\",\"%s\"]",
+			pending.job_id, pending.nonce);
+		stratumlog("nebhash: notified client %d of accepted block %s\n",
+			pending.client_id, blockhash);
+	}
+
+	object_unlock(client);
+}
+
 static void nebhash_block_result(bool accepted, uint8_t code)
 {
 	NEB_PENDING_BLOCK pending;
@@ -1462,6 +1496,7 @@ static void nebhash_block_result(bool accepted, uint8_t code)
 		pending.network_diff, pending.share_diff, blockhash, blockhash, 0, pending.solo);
 	block_confirm(pending.coinid, blockhash);
 	job_signal();
+	nebhash_notify_miner_block(pending);
 }
 
 // Model and parent state belong to one work-service connection. The reference
@@ -2223,6 +2258,11 @@ bool nebhash_submit(YAAMP_CLIENT *client, json_value *json_params)
 		pending.network_diff = nebhash_target_to_diff(nbjob->target);
 		pending.share_diff = nebhash_ticket_to_diff(ticket);
 		pending.solo = client->solo;
+		pending.client_id = client->id;
+		snprintf(pending.job_id, sizeof(pending.job_id), "%x", job->id);
+		snprintf(pending.extranonce2, sizeof(pending.extranonce2), "%s", en2hex);
+		snprintf(pending.ntime, sizeof(pending.ntime), "%s", ntimehex);
+		snprintf(pending.nonce, sizeof(pending.nonce), "%s", noncehex);
 
 		// Credit the finder only after the node returns an accepted Result for
 		// this submission. Results are consumed in FIFO order by the reader.
