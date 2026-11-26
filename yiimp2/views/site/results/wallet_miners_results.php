@@ -118,14 +118,8 @@ foreach($workers as $worker)
 	// dropping them, otherwise the per-coin and per-worker detail tables disappear.
 	if ($name === '') $name = 'worker-' . (int) $worker->id;
 	if (!isset($workerStats[$name]))
-		$workerStats[$name] = array(
-			'worker' => $worker, 'hashrate' => 0.0, 'shares' => 0,
-			'rate_1m' => 0.0, 'rate_1h' => 0.0, 'rate_24h' => 0.0,
-		);
+		$workerStats[$name] = array('worker' => $worker, 'hashrate' => 0.0, 'shares' => 0);
 	$workerStats[$name]['hashrate'] += (float) $utils->worker_rate($worker->id, $worker->algo);
-	$workerStats[$name]['rate_1m']  += (float) $utils->worker_rate_window($worker->id, $worker->algo, 60, 10);
-	$workerStats[$name]['rate_1h']  += (float) $utils->worker_rate_window($worker->id, $worker->algo, 3600);
-	$workerStats[$name]['rate_24h'] += (float) $utils->worker_rate_window($worker->id, $worker->algo, 86400);
 	$workerStats[$name]['shares'] += isset($sharesByWorker[(int) $worker->id]) ? $sharesByWorker[(int) $worker->id] : 0;
 }
 $uniqueWorkers = array();
@@ -309,17 +303,7 @@ if(count($uniqueWorkers))
 	{
 		$worker = $stat['worker'];
 
-		// Show the same 1m/1h/24m windows as ForgeMiner. NEB uses a fixed 10^10
-		// expected-hashes-per-share scale, so Mh/s matches the miner panel.
-		$fmtRate = function ($v) use ($conv, $worker): string {
-			if (!$v || $v <= 0) return '—';
-			if ($worker->algo === 'nebhash')
-				return number_format((float) $v / 1000000, 2, '.', '') . 'Mh/s';
-			return $conv->Itoa2($v, 1) . 'h/s';
-		};
-		$user_rate1 = '1m ' . $fmtRate($stat['rate_1m'])
-			. ' · 1h ' . $fmtRate($stat['rate_1h'])
-			. ' · 24h ' . $fmtRate($stat['rate_24h']);
+		$user_rate1 = $stat['hashrate'] ? $conv->Itoa2($stat['hashrate']).'h/s' : '—';
 
 		// NEB stores a 256-bit target difficulty; show the same scaled value the
 		// miner prints (d=0.1 -> 0.1 elsewhere). Raw value stays in the tooltip.
