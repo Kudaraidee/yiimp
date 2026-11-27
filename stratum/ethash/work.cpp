@@ -218,6 +218,28 @@ void ethash_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char 
 		job->id, seed, header);
 }
 
+// XHash miners built on ccminer-tpfuemp use the KawPoW-family wire layout:
+// [job_id, header_hash, seed_hash, target, clean, height, nbits]. The job id
+// is 16 hex digits so the miner can strip an 8-digit prefix; the suffix stays
+// parseable by htoi(). Only ccminer-kudaraidee sessions opt into this shape.
+void ethash_kawpow_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer, int gen)
+{
+	YAAMP_JOB_TEMPLATE *templ = job->templ;
+	char jobid[32];
+	snprintf(jobid, sizeof(jobid), "%08x%08x",
+		gen > 0 && gen < YAAMP_RESEND_MAX ? gen : 0, job->id);
+
+	std::string target = client && !client->share_target.IsNull() ?
+		client->share_target.ToString() :
+		"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+	const char *nbits = templ->nbits[0] ? templ->nbits : "";
+
+	sprintf(buffer,
+		"{\"id\":null,\"method\":\"mining.notify\",\"params\":"
+		"[\"%s\",\"%s\",\"%s\",\"%s\",true,%d,\"%s\"]}\n",
+		jobid, templ->eth_header, templ->eth_seed, target.c_str(), templ->height, nbits);
+}
+
 // ---------------------------------------------------------------------------
 // ethproxy compatibility
 //
@@ -628,8 +650,20 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 
 	uint256 final_hash = ethash_be_to_uint256(final_be);
 	uint8_t share_be[32];
-	ethash_diff_to_target(client->difficulty_actual, share_be);
-	const uint256 share_target = ethash_be_to_uint256(share_be);
+	uint256 share_target;
+
+	// ccminer-kudaraidee mines against the target published with each job.
+	// Keep that target for shares sent after a vardiff change so the verifier
+	// agrees with what the miner actually saw.
+	if (client->is_xhash_kawpow && client_find_job_target(client, jobid, share_target))
+	{
+		// recorded job target
+	}
+	else
+	{
+		ethash_diff_to_target(client->difficulty_actual, share_be);
+		share_target = ethash_be_to_uint256(share_be);
+	}
 
 	char mixhex[80] = { 0 };
 	ethash_bin_to_hex(mix_be, mixhex);
@@ -717,4 +751,52 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 
 	object_unlock(job);
 	return true;
+}
+
+bool ethash_kawpow_submit(YAAMP_CLIENT *client, json_value *json_params)
+{
+	// [worker, job_id, 0x<nonce16>, 0x<header32>, 0x<mix32>]
+	if (!json_params || json_params->type != json_array ||
+		json_params->u.array.length < 5 || !valid_string_params(json_params))
+	{
+		debuglog("%s - %s xhash kawpow: bad submit\n",
+			client->username, client->sock->ip);
+		client->submit_bad++;
+		return false;
+	}
+
+	const char *nonce = ethash_strip_prefix(
+		json_params->u.array.values[2]->u.string.ptr);
+	const char *mix = ethash_strip_prefix(
+		json_params->u.array.values[4]->u.string.ptr);
+	const int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
+
+	if (jobid <= 0 || strlen(nonce) != 16 || !ishexa((char *) nonce, 16) ||
+		strlen(mix) != 64 || !ishexa((char *) mix, 64))
+	{
+		client_send_error(client, 20, "Invalid XHash submit");
+		client->submit_bad++;
+		return true;
+	}
+
+	// The miner strips an 8-digit job-id prefix, so normalize back to the
+	// canonical id before the common verifier records vardiff generation.
+	char canonical_jobid[32] = { 0 };
+	snprintf(canonical_jobid, sizeof(canonical_jobid), "%x", jobid);
+
+	char normalized[512] = { 0 };
+	snprintf(normalized, sizeof(normalized), "[\"xhash\",\"%s\",\"%s\",\"%s\"]",
+		canonical_jobid, nonce, mix);
+
+	json_value *params = json_parse(normalized, strlen(normalized));
+	if (!params)
+	{
+		client_send_error(client, 20, "Invalid XHash submit");
+		client->submit_bad++;
+		return true;
+	}
+
+	bool ok = ethash_submit(client, params);
+	json_value_free(params);
+	return ok;
 }

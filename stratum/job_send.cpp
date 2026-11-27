@@ -198,7 +198,9 @@ static const char *job_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char 
 		return neb_buffer;
 	}
 
-	if (is_eth && client->is_ethproxy)
+	if (is_eth && client->is_xhash_kawpow)
+		ethash_kawpow_job_mining_notify_buffer(job, client, buffer, gen);
+	else if (is_eth && client->is_ethproxy)
 		ethash_ethproxy_work_buffer(job, client, buffer);
 	else if (is_eth)
 		ethash_job_mining_notify_buffer(job, client, buffer);
@@ -248,6 +250,9 @@ void job_resend(YAAMP_CLIENT *client, YAAMP_JOB *job, int gen)
 	char buffer[YAAMP_SMALLBUFSIZE];
 	const char *msg = job_notify_buffer(job, client, buffer, gen);
 
+	// The resent job is advertised with the current target, so remember it for
+	// shares that arrive after a vardiff change.
+	client_record_job_target(client, job->id, client->share_target);
 	socket_send_raw(client->sock, msg, strlen(msg));
 }
 

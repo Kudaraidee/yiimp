@@ -108,6 +108,12 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		if(strstr(client->version, "proxy") || strstr(client->version, "/3."))
       client->reconnectable = false;
 
+		// ccminer-kudaraidee implements XHash through its KawPoW-style
+		// subscribe/notify/submit path, not the EthereumStratum/Rigel shape.
+		if (!strcmp(g_stratum_algo, "xhash") &&
+			strstr(client->version, "ccminer-kudaraidee"))
+			client->is_xhash_kawpow = true;
+
 		if(strstr(client->version, "ccminer")) client->stats = true;
 		if(strstr(client->version, "cpuminer-multi")) client->stats = true;
 		if(strstr(client->version, "cpuminer-opt")) client->stats = true;
@@ -206,6 +212,12 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		char result[YAAMP_SMALLBUFSIZE];
 		nebhash_subscribe_result(client, result, sizeof(result));
 		client_send_result(client, "%s", result);
+	}
+	else if (client->is_xhash_kawpow)
+	{
+		// KawPoW-family subscribe: no session object, just the nonce prefix.
+		// ccminer derives its nonce width from the prefix length itself.
+		client_send_result(client, "[null,\"%s\"]", client->extranonce1);
 	}
 	else if (is_eth)
 	{

@@ -6,6 +6,7 @@
 
 bool ethash_build_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ);
 void ethash_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer);
+void ethash_kawpow_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer, int gen);
 const char *ethash_strip_prefix(const char *src);
 
 // ethproxy compatibility (T-Rex uses eth_submitLogin/eth_getWork/
@@ -16,5 +17,9 @@ bool ethash_ethproxy_get_work(YAAMP_CLIENT *client);
 bool ethash_ethproxy_submit_work(YAAMP_CLIENT *client, json_value *json_params);
 
 bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params);
+
+// ccminer-kudaraidee XHash: normalize its 5-field KawPoW submit into the
+// EthereumStratum [worker, jobid, nonce, mix] form handled above.
+bool ethash_kawpow_submit(YAAMP_CLIENT *client, json_value *json_params);
 
 #endif // YAAMP_ETHASH_WORK_H

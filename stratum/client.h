@@ -88,6 +88,12 @@ public:
 	// version but uses its own object-shaped response, so keep them separate.
 	bool is_nicehash_ethstratum;
 
+	// ccminer-kudaraidee's XHash path reuses the KawPoW wire format:
+	// [null, extranonce1] subscribe, 7-field notify with an explicit target,
+	// and 5-field submit. It is detected from the subscribe user agent so the
+	// EthereumStratum/Rigel clients keep their existing protocol.
+	bool is_xhash_kawpow;
+
 	int userid;
 	int workerid;
 	int coinid;

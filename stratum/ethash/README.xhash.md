@@ -31,6 +31,28 @@ The node boundary is `floor((2^256-1)/difficulty)`. Yiimp's `2^224/diff`
 share target is the same scale Hashwarp uses (`2^256/(diff*2^32)`), so a
 miner reporting `d=0.1` performs about `0.1 * 2^32` expected hashes per share.
 
+## ccminer-kudaraidee compatibility
+
+`ccminer-kudaraidee` (and other ccminer-tpfuemp derivatives) route XHash
+through their KawPoW-family miner code. They do not speak EthereumStratum:
+they subscribe with `[user_agent]`, expect `[null, extranonce1]` back, and
+parse only a 7-field `mining.notify`
+`[job_id, header_hash, seed_hash, target, clean, height, nbits]`.
+
+When the subscribe user agent contains `ccminer-kudaraidee`, the xhash
+listener switches that session to this wire format:
+
+- subscribe result: `[null, "<2-byte nonce prefix>"]`
+- `mining.notify`: 16-hex job id (8-digit prefix + 8-digit id), seal hash,
+  seed hash, big-endian share target, clean flag, height and nbits
+- no numeric `mining.set_difficulty`; the target travels with each job
+- `mining.submit` accepts
+  `[worker, job_id, 0x<nonce16>, 0x<header32>, 0x<mix32>]` and normalizes it
+  to the existing verifier. The target recorded for that job is used for
+  shares arriving after a vardiff change.
+
+All other miners keep the EthereumStratum/Rigel behavior described above.
+
 ## Setup
 
 1. Apply `sql/2026-11-27-add_algo_xhash.sql` (algo id 62, coin id 15, port

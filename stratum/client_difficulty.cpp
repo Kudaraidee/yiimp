@@ -360,6 +360,10 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 		client->share_target = ethash_be_to_uint256(target_be);
 		client->next_target = client->share_target;
 
+		// ccminer-kudaraidee reads the target from each mining.notify, so a
+		// numeric set_difficulty is neither needed nor interpreted here.
+		if (client->is_xhash_kawpow) return 0;
+
 		if (client->is_ethproxy)
 		{
 			// ethproxy miners read the target from eth_getWork / work pushes.
