@@ -4,6 +4,7 @@
 #include "stratum.h"
 #include "params.h"
 #include "context.h"
+#include "engine.h"
 #include "work.h"
 
 #include <kawpow/include/ethash/ethash.hpp>
@@ -85,22 +86,31 @@ bool ethash_build_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ)
 	if (!coind || !templ)
 		return false;
 
-	json_value *json = rpc_call(&coind->rpc, "eth_getWork", "[]", coind);
+	const ETHASH_ENGINE *engine = ethash_engine();
+	json_value *json = rpc_call(&coind->rpc, engine->getwork_method, "[]", coind);
 	if (!json)
 	{
-		debuglog("ethash: %s eth_getWork failed\n", coind->symbol);
+		debuglog("%s: %s %s failed\n", engine->name, coind->symbol, engine->getwork_method);
 		return false;
 	}
 
 	json_value *work = json_get_object(json, "result");
 	if (!work || work->type != json_array || work->u.array.length < 3)
 	{
-		debuglog("ethash: %s eth_getWork returned no work\n", coind->symbol);
+		debuglog("%s: %s %s returned no work\n", engine->name, coind->symbol, engine->getwork_method);
 		json_value_free(json);
 		return false;
 	}
 
-	for (int i = 0; i < 3; i++)
+	const int work_fields = engine->work_includes_height ? 4 : 3;
+	if (work->u.array.length < (size_t) work_fields)
+	{
+		debuglog("%s: %s %s returned short work\n", engine->name, coind->symbol, engine->getwork_method);
+		json_value_free(json);
+		return false;
+	}
+
+	for (int i = 0; i < work_fields; i++)
 	{
 		json_value *v = work->u.array.values[i];
 		if (!v || v->type != json_string || !v->u.string.ptr)
@@ -111,9 +121,12 @@ bool ethash_build_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ)
 	}
 
 	char header_str[80] = { 0 }, seed_str[80] = { 0 }, target_str[80] = { 0 };
+	char height_str[64] = { 0 };
 	snprintf(header_str, sizeof(header_str), "%s", work->u.array.values[0]->u.string.ptr);
 	snprintf(seed_str, sizeof(seed_str), "%s", work->u.array.values[1]->u.string.ptr);
 	snprintf(target_str, sizeof(target_str), "%s", work->u.array.values[2]->u.string.ptr);
+	if (engine->work_includes_height)
+		snprintf(height_str, sizeof(height_str), "%s", work->u.array.values[3]->u.string.ptr);
 	json_value_free(json);
 
 	uint8_t header_be[32], seed_be[32], target_be[32];
@@ -125,34 +138,40 @@ bool ethash_build_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ)
 		!ethash_parse_hex(seed, seed_be) ||
 		!ethash_parse_hex(target, target_be))
 	{
-		debuglog("ethash: %s eth_getWork returned malformed work\n", coind->symbol);
+		debuglog("%s: %s %s returned malformed work\n", engine->name, coind->symbol, engine->getwork_method);
 		return false;
 	}
 
-	// eth_getWork has no height; use the pending block number when available.
+	// xhash_getWork carries the mined block number directly. Classic
+	// eth_getWork has no height, so use the pending block number instead.
 	int height = 0;
-	char number[64] = { 0 };
-	if (ethash_rpc_hex("eth_blockNumber", coind, number, sizeof(number)))
+	if (engine->work_includes_height && height_str[0])
+		height = (int) strtoul(ethash_strip_prefix(height_str), NULL, 16);
+	else
 	{
-		const char *p = ethash_strip_prefix(number);
-		if (*p)
-			height = (int) strtoul(p, NULL, 16) + 1;
+		char number[64] = { 0 };
+		if (ethash_rpc_hex("eth_blockNumber", coind, number, sizeof(number)))
+		{
+			const char *p = ethash_strip_prefix(number);
+			if (*p)
+				height = (int) strtoul(p, NULL, 16) + 1;
+		}
 	}
 
-	// The seed hash is authoritative: it identifies the epoch the node is
-	// actually mining on, including across ECIP-1099 forks.
-	int epoch = ethash::find_epoch_number(ethash_to_hash256(seed));
-	if (epoch < 0)
-		epoch = ethash_epoch_for_height(height);
+	// The seed hash identifies the epoch the node is actually mining on.
+	// Classic Ethash can reverse it; XHash derives the epoch from the work
+	// height and verifies the advertised seed against that epoch below.
+	int epoch = engine->epoch_from_work(height, seed_be);
 
-	if (strcmp(to_hex(ethash::calculate_epoch_seed(epoch)).c_str(), seed) != 0)
+	uint8_t expected_seed[32];
+	engine->seed_for_epoch(epoch, expected_seed);
+	if (memcmp(expected_seed, seed_be, 32) != 0)
 	{
-		// The seed hash is what the miner sees in mining.notify, so it is the
-		// authoritative source for the verification context. Falling back to
-		// the height-derived epoch here would verify against a different DAG
-		// and reject every share on chains with custom epoch timing.
-		stratumlog("ethash: seed/epoch mismatch for %s (seed epoch %d, height %d)\n",
-			coind->symbol, epoch, ethash_epoch_for_height(height));
+		// The seed hash is what the miner sees in mining.notify, so it must
+		// match the verification context: a mismatch would reject every
+		// share against a different DAG.
+		stratumlog("%s: seed/epoch mismatch for %s (epoch %d, height %d)\n",
+			engine->name, coind->symbol, epoch, height);
 	}
 
 	ethash_bin_to_hex(header_be, templ->eth_header);
@@ -385,13 +404,15 @@ bool ethash_ethproxy_submit_work(YAAMP_CLIENT *client, json_value *json_params)
 		return true;
 	}
 
-	const ethash::hash256 header_hash = ethash_to_hash256(templ->eth_header);
+	uint8_t header_be[32];
 	const uint64_t nonce64 = strtoull(nonce, NULL, 16);
-	const ethash::result result = ethash::hash(*context, header_hash, nonce64);
-
 	uint8_t final_be[32], mix_be[32];
-	memcpy(final_be, result.final_hash.bytes, 32);
-	memcpy(mix_be, result.mix_hash.bytes, 32);
+	if (!ethash_parse_hex(templ->eth_header, header_be))
+	{
+		reject_share("invalid job header", 20);
+		return true;
+	}
+	ethash_engine()->hash(context.get(), header_be, nonce64, final_be, mix_be);
 
 	if (memcmp(submitted_mix_be, mix_be, 32) != 0)
 	{
@@ -516,7 +537,7 @@ bool ethash_submit_work(YAAMP_COIND *coind, int height, const char *nonce,
 		ethash_rpc_hex(header, header_hex, sizeof(header_hex)),
 		ethash_rpc_hex(mix, mix_hex, sizeof(mix_hex)));
 
-	json_value *json = rpc_call(&coind->rpc, "eth_submitWork", params, coind);
+	json_value *json = rpc_call(&coind->rpc, ethash_engine()->submitwork_method, params, coind);
 	if (!json)
 		return false;
 
@@ -592,12 +613,15 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return true;
 	}
 
-	const ethash::hash256 header = ethash_to_hash256(templ->eth_header);
-	const ethash::result result = ethash::hash(*context, header, nonce64);
-
+	uint8_t header_be[32];
 	uint8_t final_be[32], mix_be[32];
-	memcpy(final_be, result.final_hash.bytes, 32);
-	memcpy(mix_be, result.mix_hash.bytes, 32);
+	if (!ethash_parse_hex(templ->eth_header, header_be))
+	{
+		object_unlock(job);
+		client_send_error(client, 20, "Invalid job header");
+		return true;
+	}
+	ethash_engine()->hash(context.get(), header_be, nonce64, final_be, mix_be);
 
 	uint256 final_hash = ethash_be_to_uint256(final_be);
 	uint8_t share_be[32];

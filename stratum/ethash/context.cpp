@@ -1,8 +1,9 @@
-// Light (cache-based) Ethash epoch context cache.
+// Light (cache-based) epoch context cache for the Ethereum-style engines.
 // Distributed under the MIT software license.
 
 #include "stratum.h"
 #include "context.h"
+#include "engine.h"
 
 #include <map>
 
@@ -23,15 +24,16 @@ ethash_context_ptr ethash_get_context(int epoch)
 		CommonUnlock(&g_ethash_context_mutex);
 	}
 
-	// Building the light cache can take a while; never do it under the lock.
-	ethash_epoch_context *raw = ethash_create_epoch_context(epoch);
+	const ETHASH_ENGINE *engine = ethash_engine();
+	void *raw = engine->create_context(epoch);
 	if (!raw)
 	{
-		debuglog("ethash: unable to create light cache for epoch %d\n", epoch);
+		debuglog("%s: unable to create light cache for epoch %d\n", engine->name, epoch);
 		return ethash_context_ptr();
 	}
 
-	ethash_context_ptr context(raw, ethash_destroy_epoch_context);
+	// Bind the deleter that belongs to the engine which created this context.
+	ethash_context_ptr context(raw, [engine](void *p) { engine->destroy_context(p); });
 
 	CommonLock(&g_ethash_context_mutex);
 	g_ethash_contexts[epoch] = context;

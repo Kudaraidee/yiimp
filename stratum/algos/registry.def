@@ -146,6 +146,8 @@ ALGO("x22i", x22i_hash, 1, 0, STD, 0)
 ALGO("x25x", x25x_hash, 1, 0, STD, 0)
 ALGO("xevan", xevan_hash, 0x100, 0, STD, 0)
 ALGO("xelisv2-pepew", xelisv2_hash, 0x10000, 0, STD, 0)
+// Parallax XHash: Ethereum-style work/protocol, SHA3-512/256 PoW core.
+ALGO("xhash", sha256_double_hash, 1, 0, ETHASH, 0)
 ALGO("yescrypt", yescrypt_hash, 0x10000, 0, STD, 0)
 ALGO("yescryptR8", yescryptR8_hash, 0x10000, 0, STD, 0)
 ALGO("yescryptR16", yescryptR16_hash, 0x10000, 0, STD, 0)

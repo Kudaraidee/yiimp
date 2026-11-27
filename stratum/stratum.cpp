@@ -1,4 +1,5 @@
 #include "stratum.h"
+#include "ethash/engine.h"
 #include <signal.h>
 #include <sys/resource.h>
 
@@ -311,8 +312,15 @@ int main(int argc, char **argv)
 	char *new_log_directory = iniparser_getstring(ini, "STRATUM:logdir", NULL);
 	if (new_log_directory) { strcpy(g_log_directory, new_log_directory); }
 
-	if (!strcmp(g_stratum_algo, "ethash") || !strcmp(g_stratum_algo, "etchash"))
-		ethash_params_load(ini);
+	// Select the chain-specific backend before any template/submit can run.
+	// Parallax keeps eth_* block queries but uses xhash_* mining RPCs.
+	if (!strcmp(g_stratum_algo, "ethash") || !strcmp(g_stratum_algo, "etchash") ||
+		!strcmp(g_stratum_algo, "xhash"))
+	{
+		ethash_engine_select(g_stratum_algo);
+		if (strcmp(g_stratum_algo, "xhash"))
+			ethash_params_load(ini);
+	}
 
 	if (!strcmp(g_stratum_algo, "nebhash"))
 	{

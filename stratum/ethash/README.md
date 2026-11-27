@@ -3,6 +3,10 @@
 How to install and enable the `ethash` and `etchash` algos on this yiimp fork.
 Thai version: [README.thai.md](README.thai.md).
 
+Parallax (LAX) uses the same work module with the `xhash` engine; see
+[README.xhash.md](README.xhash.md) for the chain-specific RPC, epoch and
+payout details.
+
 ## 1. Requirements
 
 - A PoW node only: core-geth / Besu / Erigon still running Ethash/Etchash.

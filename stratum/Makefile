@@ -1,7 +1,7 @@
 
 CC= gcc -no-pie 
 
-CFLAGS= -g -march=native -I./ -Irandomx/src
+CFLAGS= -g -march=native -I./ -Irandomx/src -Ixhash/libxhash/include
 SQLFLAGS= `mysql_config --cflags --libs`
 
 #CFLAGS=-c -O2 -I /usr/include/mysql
@@ -23,7 +23,10 @@ SOURCES_KAWPOW=kawpow/lib/keccak/keccak.c kawpow/lib/keccak/keccakf800.c kawpow/
 SOURCES_MERAKI_C=meraki/lib/keccak/keccak.c meraki/lib/keccak/keccakf800.c meraki/lib/keccak/keccakf1600.c meraki/lib/meraki/primes.c
 SOURCES_MERAKI_CPP=meraki/lib/meraki/meraki.cpp meraki/lib/meraki/managed.cpp meraki/lib/meraki/progpow.cpp meraki/hash.cpp meraki/meraki.cpp
 SOURCES_MERAKI=$(SOURCES_MERAKI_C) $(SOURCES_MERAKI_CPP)
-SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/work.cpp
+SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/engine.cpp ethash/work.cpp
+SOURCES_XHASH_C=xhash/libxhash/lib/keccak/keccak.c xhash/libxhash/lib/sha3/sha3.c xhash/libxhash/lib/xhash/primes.c
+SOURCES_XHASH_CPP=xhash/libxhash/lib/xhash/xhash.cpp
+SOURCES_XHASH=$(SOURCES_XHASH_C) $(SOURCES_XHASH_CPP)
 SOURCES_RANDOMSCASH=randomscash/randomscash.cpp
 SOURCES_HOMESCRYPT=homescrypt/homescrypt.cpp
 SOURCES_NEBHASH_C=nebhash/blake3_shared.c nebhash/chacha8.c nebhash/nebhash2.c nebhash/shares.c
@@ -37,7 +40,7 @@ SOURCES += rpc_curl.cpp
 #LDCURL = $(shell /usr/bin/pkg-config --static --libs libcurl)
 #LDFLAGS += $(LDCURL)
 
-OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_MERAKI_C:.c=.o) $(SOURCES_MERAKI_CPP:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o) $(SOURCES_RANDOMSCASH:.cpp=.o) $(SOURCES_HOMESCRYPT:.cpp=.o) $(SOURCES_NEBHASH_C:.c=.o) $(SOURCES_NEBHASH_CPP:.cpp=.o)
+OBJECTS=$(SOURCES:.cpp=.o) $(SOURCES_KAWPOW:.cpp=.o) $(SOURCES_MERAKI_C:.c=.o) $(SOURCES_MERAKI_CPP:.cpp=.o) $(SOURCES_ETHASH:.cpp=.o) $(SOURCES_XHASH_C:.c=.o) $(SOURCES_XHASH_CPP:.cpp=.o) $(SOURCES_RANDOMSCASH:.cpp=.o) $(SOURCES_HOMESCRYPT:.cpp=.o) $(SOURCES_NEBHASH_C:.c=.o) $(SOURCES_NEBHASH_CPP:.cpp=.o)
 OUTPUT=stratum
 
 CODEDIR1=algos
@@ -49,8 +52,8 @@ CODEDIR5=randomx
 
 .PHONY: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5
 
-all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_MERAKI) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(SOURCES_NEBHASH) $(OUTPUT)
-buildonly: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_MERAKI) $(SOURCES_ETHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(SOURCES_NEBHASH) $(OUTPUT)
+all: gitsubmodules projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_MERAKI) $(SOURCES_ETHASH) $(SOURCES_XHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(SOURCES_NEBHASH) $(OUTPUT)
+buildonly: projectcode1 projectcode2 projectcode3 projectcode4 projectcode5 $(SOURCES) $(SOURCES_KAWPOW) $(SOURCES_MERAKI) $(SOURCES_ETHASH) $(SOURCES_XHASH) $(SOURCES_RANDOMSCASH) $(SOURCES_HOMESCRYPT) $(SOURCES_NEBHASH) $(OUTPUT)
 
 gitsubmodules:
 	git submodule init && git submodule update
@@ -78,7 +81,8 @@ endif
 $(SOURCES): stratum.h util.h
 stratum.o: algos/registry.def
 $(SOURCES_MERAKI): stratum.h meraki/hash.h meraki/helpers.hpp meraki/meraki.h meraki/lib/meraki/meraki.hpp meraki/lib/meraki/progpow.hpp meraki/lib/attributes.h meraki/lib/support/attributes.h
-$(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/work.h
+$(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/engine.h ethash/work.h
+$(SOURCES_XHASH): stratum.h xhash/libxhash/include/xhash/xhash.h xhash/libxhash/include/xhash/xhash.hpp
 $(SOURCES_RANDOMSCASH): stratum.h randomscash/randomscash.h randomx/src/randomx.h
 $(SOURCES_HOMESCRYPT): stratum.h homescrypt/homescrypt.h
 $(SOURCES_NEBHASH): stratum.h nebhash/work.h nebhash/shares.h nebhash/nebhash2.h nebhash/blake3_shared.h nebhash/chacha8.h
@@ -133,6 +137,9 @@ clean:
 	rm -f randomscash/*.o
 	rm -f homescrypt/*.o
 	rm -f nebhash/*.o
+	rm -f xhash/libxhash/lib/keccak/*.o
+	rm -f xhash/libxhash/lib/sha3/*.o
+	rm -f xhash/libxhash/lib/xhash/*.o
 	rm -rf randomx/build
 	rm -f randomx/librandomx.a
 	rm -f ethash/*.o
