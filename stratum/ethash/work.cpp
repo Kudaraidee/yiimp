@@ -790,23 +790,119 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 	return true;
 }
 
+static void ethash_kawpow_log_bad_submit(YAAMP_CLIENT *client, json_value *json_params)
+{
+	char raw[768] = { 0 };
+	size_t off = 0;
+
+	if (!json_params || json_params->type != json_array)
+		snprintf(raw, sizeof(raw), "no array params");
+	else
+	{
+		int n = snprintf(raw, sizeof(raw), "len=%d",
+			json_params->u.array.length);
+		if (n > 0) off = (size_t)n;
+		const int count = json_params->u.array.length < 6 ?
+			json_params->u.array.length : 6;
+		for (int i = 0; i < count && off < sizeof(raw); i++)
+		{
+			json_value *v = json_params->u.array.values[i];
+			if (json_is_string(v))
+				n = snprintf(raw + off, sizeof(raw) - off, " [%d]=s:%.64s",
+					i, json_string_value(v));
+			else if (json_is_integer(v))
+				n = snprintf(raw + off, sizeof(raw) - off, " [%d]=i:%lld",
+					i, (long long)json_integer_value(v));
+			else
+				n = snprintf(raw + off, sizeof(raw) - off, " [%d]=type%d",
+					i, (int)v->type);
+			if (n <= 0) break;
+			off += (size_t)n;
+		}
+	}
+
+	debuglog("%s - %s xhash kawpow: bad submit %s\n",
+		client->username, client->sock->ip, raw);
+}
+
 bool ethash_kawpow_submit(YAAMP_CLIENT *client, json_value *json_params)
 {
-	// [worker, job_id, 0x<nonce16>, 0x<header32>, 0x<mix32>]
-	if (!json_params || json_params->type != json_array ||
-		json_params->u.array.length < 5 || !valid_string_params(json_params))
+	if (!json_params || json_params->type != json_array)
 	{
-		debuglog("%s - %s xhash kawpow: bad submit\n",
-			client->username, client->sock->ip);
+		ethash_kawpow_log_bad_submit(client, json_params);
 		client->submit_bad++;
 		return false;
 	}
 
-	const char *nonce = ethash_strip_prefix(
-		json_params->u.array.values[2]->u.string.ptr);
-	const char *mix = ethash_strip_prefix(
-		json_params->u.array.values[4]->u.string.ptr);
-	const int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
+	const int len = json_params->u.array.length;
+
+	// Some forks still use the EthereumStratum [worker, job, nonce[, mix]]
+	// submit even after receiving a KawPoW-style notify. Let the common
+	// verifier handle those directly.
+	if (len == 3 || len == 4)
+	{
+		for (int i = 0; i < len; i++)
+		{
+			if (!json_is_string(json_params->u.array.values[i]))
+			{
+				ethash_kawpow_log_bad_submit(client, json_params);
+				client->submit_bad++;
+				return false;
+			}
+		}
+		return ethash_submit(client, json_params);
+	}
+
+	// [worker, job_id, nonce, header, mix, ...]. Extra fields are ignored;
+	// some ccminer forks append a numeric difficulty or ticket id.
+	if (len < 5)
+	{
+		ethash_kawpow_log_bad_submit(client, json_params);
+		client->submit_bad++;
+		return false;
+	}
+
+	char jobidbuf[32] = { 0 };
+	char noncebuf[32] = { 0 };
+	const char *jobid_str = NULL;
+	const char *nonce = NULL;
+	const char *mix = NULL;
+	json_value *vjob = json_params->u.array.values[1];
+	json_value *vnonce = json_params->u.array.values[2];
+	json_value *vmix = json_params->u.array.values[4];
+
+	if (json_is_string(vjob))
+		jobid_str = json_string_value(vjob);
+	else if (json_is_integer(vjob))
+	{
+		snprintf(jobidbuf, sizeof(jobidbuf), "%x",
+			(unsigned int)json_integer_value(vjob));
+		jobid_str = jobidbuf;
+	}
+
+	if (json_is_string(vnonce))
+		nonce = ethash_strip_prefix(json_string_value(vnonce));
+	else if (json_is_integer(vnonce))
+	{
+		snprintf(noncebuf, sizeof(noncebuf), "%016llx",
+			(unsigned long long)json_integer_value(vnonce));
+		nonce = noncebuf;
+	}
+
+	if (json_is_string(vmix))
+		mix = ethash_strip_prefix(json_string_value(vmix));
+
+	if (!jobid_str || !nonce || !mix)
+	{
+		ethash_kawpow_log_bad_submit(client, json_params);
+		client->submit_bad++;
+		return false;
+	}
+
+	// The miner strips an 8-digit job-id prefix, but accept an unstripped id
+	// too. htoi() parses both the 16-digit and 8-digit forms.
+	const char *shortjob = strlen(jobid_str) > 8 ? jobid_str + 8 : jobid_str;
+	const int jobid = htoi(shortjob);
 
 	if (jobid <= 0 || strlen(nonce) != 16 || !ishexa((char *) nonce, 16) ||
 		strlen(mix) != 64 || !ishexa((char *) mix, 64))
@@ -816,8 +912,6 @@ bool ethash_kawpow_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return true;
 	}
 
-	// The miner strips an 8-digit job-id prefix, so normalize back to the
-	// canonical id before the common verifier records vardiff generation.
 	char canonical_jobid[32] = { 0 };
 	snprintf(canonical_jobid, sizeof(canonical_jobid), "%x", jobid);
 
