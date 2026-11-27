@@ -1,96 +1,117 @@
 # Ethash / Etchash stratum setup
 
-ภาษาไทย — วิธีติดตั้งและเปิดใช้งาน algo `ethash` และ `etchash` บน yiimp fork นี้
+How to install and enable the `ethash` and `etchash` algos on this yiimp fork.
+Thai version: [README.thai.md](README.thai.md).
 
-## 1. สิ่งที่ต้องมี
+## 1. Requirements
 
-- Node แบบ PoW เท่านั้น ใช้ได้กับ core-geth / Besu / ERIGON ที่ยังรัน Ethash/Etchash อยู่  
-  **ใช้ geth หลัง Merge ไม่ได้** เพราะไม่มี `eth_getWork`
-- RPC ต้องเปิดเมธอดเหล่านี้:
+- A PoW node only: core-geth / Besu / Erigon still running Ethash/Etchash.
+  **Post-Merge geth does not work**: it has no `eth_getWork`.
+- The RPC must allow these methods:
   - `eth_getWork`
   - `eth_blockNumber`
   - `eth_submitWork`
-- ตั้ง beneficiary/reward address ของ pool ไว้ที่ node เอง ฝั่ง stratum จะเรียก `eth_submitWork` เพื่อส่งบล็อกที่ solved แล้วเท่านั้น
-- ติดตั้ง dependencies สำหรับ build stratum ให้ครบ (`mysqlclient`, `libsodium`, `curl`, `pthread`, `gmp` ฯลฯ)
+- The pool's beneficiary/reward address is set on the node itself; the
+  stratum only calls `eth_submitWork` to submit solved blocks.
+- All stratum build dependencies installed (`mysqlclient`, `libsodium`,
+  `curl`, `pthread`, `gmp`, …).
 
 ## 2. Build
 
 ```bash
 make -C stratum buildonly
-# หรือ
+# or
 make -C stratum
 ```
 
-ตรวจสอบว่าได้ไฟล์ `stratum/stratum` แล้ว
+Check that `stratum/stratum` was built.
 
 ## 3. SQL migration
-
-ใช้ migration ที่เพิ่มเข้ามา:
 
 ```bash
 mysql -u root -p yaamp < sql/2026-11-19-add_algo_ethash_etchash.sql
 ```
 
-ไฟล์นี้เพิ่ม algo 2 ตัว:
+It adds two algos:
 
-| algo | port | s |
+| algo | port | color |
 |---|---:|---|
 | `ethash`  | 3639 | `#e2d0d2` |
 | `etchash` | 3640 | `#e2d0d2` |
 
-ปรับ port ให้ตรงกับ `[TCP] port` ในไฟล์ config ของ stratum เสมอ
+Keep the ports in line with `[TCP] port` in the stratum config.
 
-หลัง insert แล้วให้ flush memcache key เหล่านี้ ไม่เช่นนั้นหน้าเว็บอาจยังเห็น algo เก่า:
+After the insert, flush these memcache keys, otherwise the web may still show
+the old algo list:
 
 ```bash
 printf 'delete yaamp_algo_list\r\ndelete yaamp_visible_algos\r\ndelete yaamp_unvisible_algos\r\ndelete yaamp_algo_ports\r\ndelete yaamp_algo_colors\r\n' | nc 127.0.0.1 11211
 ```
 
-หรือ `flush_all` ถ้าทolerable ได้
+or `flush_all` if that is acceptable.
 
-## 4. เพิ่ม coin ใน DB
+## 4. Add the coin
 
-เพิ่ม coin ผ่าน admin UI ของเว็บ (หรือ INSERT ลงตาราง `coins` เอง) โดยกำหนดอย่างน้อย:
+Add the coin through the admin UI (or insert into `coins` directly) with at
+least:
 
-- `algo` = `ethash` หรือ `etchash`
+- `algo` = `ethash` or `etchash`
 - `rpcencoding` = `GETH`
 - `enable` = 1
 - `auto_ready` = 1
-- `installed` = 1 — ถ้าเป็น 0 `BackendCoinsUpdate()` จะข้าม coin นี้ ทำให้ `difficulty`, `block_height`, `connections` ค้างค่าเดิม
-- RPC host/port/user/pass ชี้ไปยัง node ที่รองรับ Ethash/Etchash
-- `master_wallet` = address ที่ node ใช้เป็น beneficiary
-- `block_time` / `network_ttf` = ค่าเฉลี่ยจริงของเชน (เช่น ~11 วิสำหรับ Larissa)
-- `powlimit_bits` = 0 — ไม่ใช้ compact target แบบ Bitcoin; stratum ใช้ ethash target = 2^224 / difficulty (ตั้งที่ coin หรือปล่อยให้ค่าจากตาราง `algos` ใน migration ด้านบน)
-- `reward` = ผลตอบแทนต่อบล็อกจริง ตรวจจาก node/explorer แล้วอัปเดตเป็นระยะ (เช่น Larissa ลดทุกสัปดาห์)
-- symbol/contract/info อื่น ๆ ตามเหรียญที่ต้องการ เช่น `ETC` สำหรับ etchash
+- `installed` = 1 — with 0, `BackendCoinsUpdate()` skips the coin and
+  `difficulty`, `block_height`, `connections` stay stale
+- RPC host/port/user/pass pointing at a node with Ethash/Etchash
+- `master_wallet` = the address the node uses as beneficiary
+- `block_time` / `network_ttf` = the chain's real average (e.g. ~11 s for
+  Larissa)
+- `powlimit_bits` = 0 — no Bitcoin compact target; the stratum uses the ethash
+  target 2^224 / difficulty (set it on the coin or rely on the `algos` value
+  from the migration)
+- `reward` = the real block reward; check it on the node/explorer and update
+  it regularly (Larissa, for example, lowers it every week)
+- symbol/contract/info as needed, e.g. `ETC` for etchash
 
-ฝั่งเว็บไม่มี hardcoded algo allow-list — dropdown algo อ่านจากตาราง `algos` เลยหลังจาก migration ด้านบน algo ใหม่จะปรากฏเอง
+The web has no hardcoded algo allow-list: the algo dropdown reads the `algos`
+table, so the new algos show up after the migration.
 
-### Block explorer สำหรับเหรียญ GETH
+### GETH block explorer
 
-`WalletRPC` (ทั้ง legacy `web/` และ `yiimp2/`) แปลงผลลัพธ์ `eth_getBlockBy*` / `eth_getTransactionByHash` ให้เป็นโครงสร้างแบบ Bitcoin ที่หน้า explorer ใช้ (`height`, `time`, `tx`, `difficulty`, `confirmations`, `txid`, `vout` …) โดยยังเก็บ field เดิมของ Ethereum ไว้ด้วย → หน้า `/explorer/<SYMBOL>` ของเหรียญ `GETH` เช่น LRS แสดงบล็อกได้โดยไม่ต้องตั้ง `no_explorer=1`
+`WalletRPC` (both legacy `web/` and `yiimp2/`) maps `eth_getBlockBy*` /
+`eth_getTransactionByHash` results into the Bitcoin-shaped structure the
+explorer pages use (`height`, `time`, `tx`, `difficulty`, `confirmations`,
+`txid`, `vout`, …) while keeping the original Ethereum fields, so
+`/explorer/<SYMBOL>` works for GETH coins such as LRS without setting
+`no_explorer=1`.
 
-รองรับการค้นหาทั้ง `?height=`, `?hash=0x...` และ `?q=0x...` (มี prefix `0x` ด้วย) หน้า difficulty graph จะจำกัดระยะเป็น 40 บล็อกสำหรับเหรียญ GETH เพราะ RPC ไม่มี batch call
+Lookups accept `?height=`, `?hash=0x...` and `?q=0x...` (also with the `0x`
+prefix). The difficulty graph is limited to 40 blocks for GETH coins because
+the RPC has no batch calls.
 
-ถ้าตลาดที่ใช้เป็นสกุล quote อื่น (เช่น `LRS/USDT` บน nonkyc) ให้เก็บ `markets.price` เป็นราคาในสกุลนั้นตามข้อมูล exchange ฝั่ง backend จะดึงอัตรา `USDT/BTC` (หรือ `USDC/BTC`) เก็บในตาราง `settings` เป็น `usdt_btc` / `usdc_btc` แล้วแปลงเป็น `coins.price` ให้เอง ทั้งหน้าเว็บและ yiimp2 จะแสดงราคาตลาดเป็น BTC จากอัตราเดียวกันนี้
+If the market is quoted in another currency (e.g. `LRS/USDT` on NonKyc), keep
+`markets.price` in that currency as reported by the exchange; the backend
+fetches `USDT/BTC` (or `USDC/BTC`) into `settings` as `usdt_btc` / `usdc_btc`
+and converts it to `coins.price`. Both the legacy web and yiimp2 show the
+market price in BTC using the same rate.
 
-## 5. ไฟล์ config stratum
+## 5. Stratum config
 
-มีตัวอย่างแล้วที่:
+Samples:
 
 - `stratum/config.sample/ethash.conf`
 - `stratum/config.sample/etchash.conf`
 
-คัดลอกไปยังตำแหน่งจริง เช่น:
+Copy them to their real place, e.g.:
 
 ```bash
 cp stratum/config.sample/ethash.conf  /etc/yiimp/stratum/ethash.conf
 cp stratum/config.sample/etchash.conf /etc/yiimp/stratum/etchash.conf
 ```
 
-แก้ `[TCP]`, `[SQL]`, `[STRATUM]` ให้ตรงกับระบบจริง และให้ `STRATUM:algo` เป็น `ethash` / `etchash` เป๊ะ ๆ
+Adjust `[TCP]`, `[SQL]`, `[STRATUM]`; `STRATUM:algo` must be exactly
+`ethash` / `etchash`.
 
-### `[ETHASH]` (ไม่บังคับ)
+### `[ETHASH]` (optional)
 
 ```ini
 [ETHASH]
@@ -103,17 +124,17 @@ chain_id = 0
 dag_init_size = 1073741824
 ```
 
-| key | ความหมาย | default ethash | default etchash |
+| key | meaning | default ethash | default etchash |
 |---|---|---:|---:|
-| `epoch_length` | จำนวนบล็อกต่อ epoch หลัง fork | 30000 | 60000 |
-| `seed_epoch_length` | ตัวหาร seed แบบเดิม (ECIP-1099 ใช้ 30000 เสมอ) | 30000 | 30000 |
-| `etchash_fork_block` | บล็อกที่เปลี่ยนไปใช้ Etchash | 0 | 11700000 |
-| `etchash_fork_epoch` | epoch ที่ fork_block (0 = คำนวณจาก `fork_block / seed_epoch_length`) | 0 | 0 → ได้ 390 |
-| `epoch_offset` | บวกเพิ่มเข้า epoch ที่คำนวณได้ | 0 | 0 |
-| `chain_id` | ข้อมูลเท่านั้น standard Ethash PoW ไม่ได้ commit chain-id | 0 | 61 |
-| `dag_init_size` | ใช้คำนวณ dataset item count ของ light verification | 1 GiB | 1 GiB |
+| `epoch_length` | blocks per epoch after the fork | 30000 | 60000 |
+| `seed_epoch_length` | old seed divisor (ECIP-1099 always uses 30000) | 30000 | 30000 |
+| `etchash_fork_block` | block where Etchash starts | 0 | 11700000 |
+| `etchash_fork_epoch` | epoch at fork_block (0 = `fork_block / seed_epoch_length`) | 0 | 0 → 390 |
+| `epoch_offset` | added to the computed epoch | 0 | 0 |
+| `chain_id` | informational only; standard Ethash PoW doesn't commit to it | 0 | 61 |
+| `dag_init_size` | dataset item count for light verification | 1 GiB | 1 GiB |
 
-ตัวอย่าง chain อื่น:
+Another chain, for example:
 
 ```ini
 ; Mordor Etchash testnet
@@ -124,16 +145,18 @@ etchash_fork_epoch = 84
 chain_id = 63
 ```
 
-stratum จะถาม `eth_getWork` จาก node แล้วใช้ **seed hash ที่ node ส่งมาเป็นตัวกำหนด epoch จริง** ส่วน `eth_blockNumber` ใช้เพื่อเติม height เฉย ๆ
+The stratum asks the node for `eth_getWork` and **uses the seed hash the node
+sends to determine the actual epoch**; `eth_blockNumber` only fills in the
+height.
 
 ## 6. Supervisord
 
-เพิ่ม block ไว้ให้แล้วใน `config/supervisord.conf`:
+The blocks are already in `config/supervisord.conf`:
 
 - `[program:stratum-ethash]`
 - `[program:stratum-etchash]`
 
-โดยค่าเริ่มต้น `autostart=false` เปิดใช้งานด้วย:
+They default to `autostart=false`. Enable them with:
 
 ```bash
 supervisorctl reread
@@ -142,43 +165,49 @@ supervisorctl start stratum-ethash stratum-etchash
 supervisorctl status
 ```
 
-หรือแก้ `autostart=true` ถ้าต้องการให้-start อัตโนมัติตอน supervisord รัน
+or set `autostart=true` to start them with supervisord.
 
-## 7. เชื่อม miner
+## 7. Connect a miner
 
-ใช้ Ethereum Stratum (`EthereumStratum/1.0.0`) ไม่ใช่ stratum แบบ Bitcoin-style เดิมของ yiimp
+Use Ethereum Stratum (`EthereumStratum/1.0.0`), not yiimp's Bitcoin-style
+stratum.
 
-ตัวอย่าง:
+Examples:
 
 ```bash
 ethminer -U -S pool.example.com:3639 -O WALLET.WORKER:x
-# Etchash แยก port
+# Etchash on its own port
 ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
 ```
 
-ตัวอย่าง Rigel:
+Rigel:
 
 ```bash
 ./rigel -a ethash -o ethstratum+tcp://pool.example.com:3639 -u WALLET -p c=LRS,mc=LRS
 ```
 
-ตัวอย่าง miner ที่ใช้ NiceHash EthereumStratum/1.0.0 (PhoenixMiner, lolMiner, GMiner, NBMiner, ethminer):
+Miners using NiceHash EthereumStratum/1.0.0 (PhoenixMiner, lolMiner, GMiner,
+NBMiner, ethminer):
 
 ```bash
 ./PhoenixMiner -pool ethstratum+tcp://pool.example.com:3639 -wal WALLET -worker WORKER -pass c=LRS,mc=LRS
 ./lolMiner --pool ethstratum+tcp://pool.example.com:3639 --wallet WALLET --worker WORKER --pass c=LRS,mc=LRS
 ```
 
-> pool ตรวจจับจาก parameter ที่ 2 ของ `mining.subscribe` (`EthereumStratum/1.0.0`) แล้วตอบกลับเป็น array ตาม spec ของ NiceHash ส่วน Rigel ที่ส่ง string เดียวกันจะยังได้ object response แบบเดิม (ตรวจจาก user agent `Rigel/`)
+> The pool detects NiceHash by the second `mining.subscribe` parameter
+> (`EthereumStratum/1.0.0`) and answers with the array from the NiceHash
+> spec. Rigel sends the same string but keeps its object-shaped response
+> (detected by the `Rigel` user agent).
 
-ตัวอย่าง T-Rex 0.19/0.26 แบบ ethproxy (scheme ธรรมดา):
+T-Rex 0.19/0.26 over ethproxy (plain scheme):
 
 ```bash
 ./t-rex -a ethash -o stratum+tcp://pool.example.com:3639 \
   -u WALLET.WORKER -p c=LRS,mc=LRS --intensity 16 --kernel 0
 ```
 
-ตัวอย่าง GMiner 3.43 แบบ ethproxy (ไม่ใส่ scheme → `--proto proxy`) และแบบ NiceHash ethstratum:
+GMiner 3.43 over ethproxy (no scheme → `--proto proxy`) and over NiceHash
+ethstratum:
 
 ```bash
 ./miner --proto proxy --server pool.example.com --port 3639 \
@@ -187,88 +216,148 @@ ethminer -U -S pool.example.com:3640 -O WALLET.WORKER:x
   --user WALLET.WORKER --pass c=LRS,mc=LRS --cuda 1
 ```
 
-> GMiner 3.43 ไม่ได้เลือก NiceHash ethstratum จาก scheme ใน `--server` เสมอไป ถ้าต้องการ path `mining.subscribe`/`mining.notify` ให้ระบุ `--proto stratum` ด้วย; ถ้าไม่ระบุ `--proto` มักยังตกลงมาเป็น ethproxy (`eth_submitLogin`/`eth_getWork`)
+> GMiner 3.43 does not always pick NiceHash ethstratum from the scheme in
+> `--server`. For the `mining.subscribe`/`mining.notify` path pass
+> `--proto stratum`; without `--proto` it usually ends up on ethproxy
+> (`eth_submitLogin`/`eth_getWork`).
 
-ตัวอย่าง T-Rex แบบ NiceHash `stratum2` (ใช้ protocol เดียวกับ NiceHash/MiningPoolHub):
+T-Rex with NiceHash `stratum2` (the NiceHash/MiningPoolHub protocol):
 
 ```bash
 ./t-rex -a ethash -o stratum2+tcp://pool.example.com:3639 \
   -u WALLET.WORKER -p c=LRS,mc=LRS --intensity 16 --kernel 0
 ```
 
-> **หมายเหตุสำคัญ:** T-Rex **ไม่ได้พูด EthereumStratum แบบ `mining.subscribe`/`mining.submit`** เมื่อใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` สำหรับ `-a ethash` ทั้งของ v0.19.14 และ v0.26.8 ถึงจะขึ้น `Using protocol: stratum1` ก็ตาม มันยังส่ง `eth_submitLogin` / `eth_getWork` / `eth_submitWork` (ethproxy) เหมือนกัน
+> **Important:** T-Rex **does not speak EthereumStratum
+> (`mining.subscribe`/`mining.submit`)** with `stratum+tcp://`,
+> `ethstratum+tcp://` or `stratum+http://` for `-a ethash`, in both v0.19.14
+> and v0.26.8, even though it logs `Using protocol: stratum1`. It still sends
+> `eth_submitLogin` / `eth_getWork` / `eth_submitWork` (ethproxy).
 >
-> เฉพาะ `stratum2+tcp://` / `stratum2+ssl://` ที่ใช้ NiceHash EthereumStratum/1.0.0 จริง ๆ (`mining.subscribe` / `mining.set_difficulty` / `mining.notify` / `mining.submit` + `mining.extranonce.subscribe`) ซึ่ง pool รองรับแล้วตามหัวข้อ NiceHash ด้านบน
+> Only `stratum2+tcp://` / `stratum2+ssl://` use real NiceHash
+> EthereumStratum/1.0.0 (`mining.subscribe` / `mining.set_difficulty` /
+> `mining.notify` / `mining.submit` + `mining.extranonce.subscribe`), which
+> the pool supports as described above.
 >
-> stratum ของโปรเจกต์นี้รองรับ ethproxy โดยตรงแล้ว:
+> This stratum supports ethproxy directly:
 >
-> - `eth_submitLogin` → ใช้ username/password แบบเดียวกับ `mining.authorize`
-> - `eth_getWork` → ตอบ `[headerHash, seedHash, shareTarget, noncePrefix]` ตามรูปแบบ Claymore ethproxy (มี `jsonrpc:"2.0"` ด้วย) โดย target คือ 58 hex หลักแรกของ `floor(2^224 / difficulty)` ตามสเกล ethash มาตรฐาน (raw difficulty = `difficulty × 2^32`) และ `noncePrefix` คือ session prefix 6 hex ที่ miner ต้องต่อเข้ากับ nonce ตอนส่งงาน Rigel รับ difficulty เป็นตัวเลขแล้วโชว์ `34.36G (8.00)` สำหรับ `d=8`, T-Rex อ่าน target แล้วโชว์ raw difficulty `34.36G` — สองตัวจริง ๆ แล้วขุดที่ difficulty เดียวกัน รองรับ difficulty ทศนิยม เช่น `d=0.1` หรือ `d=8.5` โดย pool คำนวณ target จากค่าจริงไม่ปัดเป็นจำนวนเต็ม ค่า `difficulty` ใน config คือค่าหลังหาร 2^32 เช่น `0.1` → raw 429.5M เหมาะกับการ์ดระดับ 1050 Ti (~1 share/นาที)
-> - `-p d=...` → ตั้ง difficulty เริ่มต้นแล้ว **ล็อกไว้ตลอด session** (vardiff ไม่เปลี่ยน) ใช้ได้ทั้ง Rigel และ T-Rex
-> - `-p sd=...` → ตั้ง difficulty เริ่มต้นแบบเดียวกัน แต่ **ไม่ล็อก** ให้ vardiff ปรับขึ้น/ลงตามอัตรา share ได้เหมือน miner ทั่วไป ถ้าใส่ทั้ง `d=` และ `sd=` ฝั่ง `d=` จะชนะ
+> - `eth_submitLogin` → same username/password as `mining.authorize`
+> - `eth_getWork` → `[headerHash, seedHash, shareTarget, noncePrefix]` in the
+>   Claymore ethproxy format (with `jsonrpc:"2.0"`). The target is the first
+>   58 hex digits of `floor(2^224 / difficulty)` on the standard ethash scale
+>   (raw difficulty = `difficulty × 2^32`); `noncePrefix` is the 6-hex session
+>   prefix the miner prepends to its nonce on submit. Rigel takes the
+>   difficulty as a number and shows `34.36G (8.00)` for `d=8`; T-Rex reads
+>   the target and shows the raw `34.36G` — both mine at the same difficulty.
+>   Fractional difficulties such as `d=0.1` or `d=8.5` work; the target is
+>   computed from the exact value. The config `difficulty` is the value after
+>   dividing by 2^32, e.g. `0.1` → raw 429.5M, suitable for a 1050 Ti-class
+>   card (~1 share/min).
+> - `-p d=...` → sets the starting difficulty; with `allow_static_diff = true`
+>   in the config it is **fixed for the session** (vardiff doesn't adjust it,
+>   except the share-flood protection can still raise it). Without it (the
+>   default) it behaves like `sd=`.
+> - `-p sd=...` → sets the starting difficulty the same way, but **not fixed**:
+>   vardiff adjusts it with the share rate like for any miner. With both `d=`
+>   and `sd=`, `d=` wins.
 >
-> ทั้ง `d=` และ `sd=` ต้องเป็น token ที่คั่นด้วย comma เช่น `c=LRS,mc=LRS,sd=0.1` (ไม่ใช่ substring ของ `sd=`, `xd=` ฯลฯ); `decred=` ที่มีอยู่จะยังปิดการใช้งาน override นี้เหมือนเดิม
-> - `eth_submitHashrate` → ตอบ `true`
-> - `eth_submitWork` → pool ตรวจ mix digest ด้วย `ethash_hash()` เอง บันทึก share และส่งบล็อกให้ node ด้วย `eth_submitWork` ถ้าเจอ block
+> `d=` and `sd=` must be comma-separated tokens, e.g. `c=LRS,mc=LRS,sd=0.1`
+> (not a substring of `sd=`, `xd=` etc.); an existing `decred=` still disables
+> this override.
+> - `eth_submitHashrate` → answers `true`
+> - `eth_submitWork` → the pool checks the mix digest with `ethash_hash()`
+>   itself, records the share and submits found blocks to the node with
+>   `eth_submitWork`.
 >
-> กับ client แบบ ethproxy pool **จะไม่ส่ง** `mining.set_difficulty` / `mining.notify` (T-Rex จะฟ้อง `Unregistered stratum method`) แต่จะส่ง work ใหม่เป็น `{"id":0,"jsonrpc":"2.0","result":[...]}` แทนส่วน `eth_getWork` จะตอบด้วย id ของคำขอและ result 4 ฟิลด์แบบเดียวกัน
+> ethproxy clients **don't get** `mining.set_difficulty` / `mining.notify`
+> (T-Rex would log `Unregistered stratum method`). New work is pushed as
+> `{"id":0,"jsonrpc":"2.0","result":[...]}`; `eth_getWork` is answered with
+> the request's id and the same 4-field result.
 >
-> ใช้ `stratum+tcp://`, `ethstratum+tcp://` หรือ `stratum+http://` กับ T-Rex ก็ได้ เพราะทั้งหมดตกลงมาเป็น ethproxy ฝั่ง pool รองรับหมดแล้ว ส่วน `stratum2+tcp://` / `stratum2+ssl://` จะตกลงมาเป็น NiceHash ethstratum (รองรับแล้วเช่นกัน)
+> `stratum+tcp://`, `ethstratum+tcp://` or `stratum+http://` all work with
+> T-Rex, as they all end up on ethproxy; `stratum2+tcp://` / `stratum2+ssl://`
+> end up on NiceHash ethstratum (supported as well).
 >
-> GMiner 3.43 ใช้ `--proto` เป็นตัวตัดสินหลัก: `--proto proxy` หรือไม่ระบุ proto → ethproxy ต้องได้ result 4 ฟิลด์ตามข้างบน, ส่วน `--proto stratum` → NiceHash EthereumStratum/1.0.0 (subscribe array, `mining.set_difficulty`, `mining.notify`) แม้จะใส่ scheme `stratum+tcp://` ใน `--server` ก็ตาม
+> GMiner 3.43 decides mainly by `--proto`: `--proto proxy` or no proto →
+> ethproxy with the 4-field result above; `--proto stratum` → NiceHash
+> EthereumStratum/1.0.0 (subscribe array, `mining.set_difficulty`,
+> `mining.notify`), even with a `stratum+tcp://` scheme in `--server`.
 
-### Vardiff สำหรับ Ethash/Etchash
+### Vardiff for Ethash/Etchash
 
-ต่างจากระบบ Bitcoin-style เดิม: ETH vardiff ตั้งเป้า **ประมาณ 1 share/นาที** แทน 10 share/นาที เพราะ share ขนาดเล็กเกินไปทำให้ DB และ network รับภาระโดยไม่เพิ่มความแม่นยำของ hashrate
+The same vardiff as the other algos. Set the share rate with `spm_min` /
+`spm_max` (shares/min) in `[STRATUM]`; the samples use `0.5`–`2` (about 1
+share/min), as too many small shares load the DB and network without making
+the hashrate more accurate.
 
-- วัดจาก **fixed window 3 นาที** และคำนวณตอนส่ง job ใหม่ (ประมาณทุก 20 วินาที) ไม่ใช้ EMA ที่อัปเดตเฉพาะตอนมี share เข้ามา
-- ปรับได้ใน `[STRATUM]` ด้วย `eth_vardiff_window` (วินาที ค่าเริ่มต้น 180) และ `eth_vardiff_target` (share/นาที ค่าเริ่มต้น 1)
-- อัตรา share ต่อนาที (เทียบกับ `eth_vardiff_target`):
-  - `>= 4x` → เพิ่ม difficulty `2x`
-  - `>= 2x` → เพิ่ม `1.5x`
-  - `0.5x–2x` → คงเดิม
-  - `<= 0.5x` → ลด `0.75x`
-  - `<= 0.25x` → ลด `2x`
-- ทุกครั้งที่เปลี่ยน difficulty window จะเริ่มใหม่ทันที
-- ควรตั้ง `diff_min` / `diff_max` ใน config ให้กว้าง (ตัวอย่าง `0.01`–`100`) เพราะค่า default แบบ Bitcoin คือ `difficulty/2` ซึ่งสูงเกินไปสำหรับ ETH ที่ใช้สเกล `2^32`
-- `d=X` ยังล็อก difficulty ตลอด session (ยกเว้น flood protection >100 share/นาที); `sd=X` เป็นแค่ค่าเริ่มต้น แล้ว vardiff จะปรับตามอัตรา share หลัง 3 นาที
+- Set `diff_min` / `diff_max` wide (e.g. `0.01`–`100`): the default
+  `difficulty/2` is too high for ETH on the `2^32` scale.
+- When the difficulty changes mid-job, the pool resends the current job
+  under a new job id so the miner applies the new difficulty right away;
+  ethproxy gets the new target in the work push.
+- `d=X` fixes the difficulty only with `allow_static_diff = true`; `sd=X` is
+  only the starting value.
 
-> **การ์ด VRAM 4GB (เช่น GTX 1050 Ti):** DAG epoch ปัจจุบัน (~231) ใช้ ~2.8GB ถ้า T-Rex ฟ้อง `not enough free memory to mine ethash` ให้ลด workload ด้วย `--intensity 16 --kernel 0` หรือ `--dag-build-mode 1` และปิดโปรแกรมอื่นที่ใช้ VRAM ด้วย (Rigel มักพอแม้ intensity ต่ำกว่า)
+> **4 GB VRAM cards (e.g. GTX 1050 Ti):** the current DAG epoch (~231) needs
+> ~2.8 GB. If T-Rex reports `not enough free memory to mine ethash`, lower the
+> workload with `--intensity 16 --kernel 0` or `--dag-build-mode 1` and close
+> other programs using VRAM (Rigel usually fits even at lower intensity).
 
-**สำคัญ:** ถ้าเปิดหลาย coin ใน `algo='ethash'` เดียวกัน ให้ระบุ `mc=SYMBOL` เสมอ (หรือตั้ง `autoexchange = 0` ใน `[STRATUM]`) มิฉะนั้น stratum จะส่ง job จากทุก chain ให้ miner → seed hash เปลี่ยน → Rigel ต้องสร้าง DAG ใหม่หลาย GB ทุกครั้งที่ job เปลี่ยน และอาจหลุดการเชื่อมต่อ
+**Important:** with several coins on the same `algo='ethash'`, always pass
+`mc=SYMBOL` (or set `autoexchange = 0` in `[STRATUM]`). Otherwise the stratum
+sends jobs from every chain to the miner → the seed hash changes → Rigel has
+to rebuild a multi-GB DAG on every job switch and may disconnect.
 
-สิ่งที่ stratum ส่งให้ miner แบบ EthereumStratum:
+What the stratum sends to EthereumStratum miners:
 
-- `mining.subscribe` มี 2 รูปแบบตาม miner:
-  - **NiceHash / ethminer / PhoenixMiner / lolMiner ฯลฯ** → `[["mining.notify","<sessionId>","EthereumStratum/1.0.0"],"<extranonce1>"]` ตาม spec NiceHash (ไม่มี extranonce2; job แรกจะส่งหลัง `mining.authorize`)
-  - **Rigel** → `{"mining_notify":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":"true"},"extranonce":"..."}`
-    (Rigel decode ผลลัพธ์เป็น struct ที่มีฟิลด์ `mining_notify` กับ `extranonce` โดย `mining_notify` เป็น object เดียวที่มีฟิลด์ `job_id`, `seed_hash`, `header_hash`, `_clean_jobs` เป็น **string ทั้งหมด** — ไม่ใช่ array ของคำสั่งและ `_clean_jobs` ไม่ใช่ boolean; ถ้าตอบผิดรูปแบบ Rigel จะฟ้อง `data did not match any variant of untagged enum ServerMessage` แต่ยังขุดต่อได้จาก notification ที่ส่งตามหลังมา)
-- `mining.extranonce.subscribe` → ตอบ `true` (รองรับตาม extension ของ NiceHash; pool ไม่เปลี่ยน extranonce กลาง session)
-- `mining.set_difficulty` → difficulty แบบ `2^224 / target` (raw = difficulty × 2^32) เป็น **JSON number** (เช่น `[0.1]`); การส่งเป็น string `["0.1"]` ทำให้ Rigel reject notification แล้ว reconnect
-- `mining.notify` → `[jobId, seedHash, headerHash, true]`; ตาม spec NiceHash pool จะตัด `0x` ออกจาก seed/header ส่วน Rigel ได้รูปแบบเดิมที่มี `0x`
-- `mining.submit` → `[worker, jobId, nonce]`
-  pool รองรับทั้ง nonce แบบเต็ม 16 hex (miner รวม extranonce ไว้แล้ว) และแบบ 12 hex (NiceHash ใช้ extranonce 2 bytes → minernonce 6 bytes) ที่ต้องต่อท้าย `extranonce1`
+- `mining.subscribe` in two shapes, by miner:
+  - **NiceHash / ethminer / PhoenixMiner / lolMiner, …** →
+    `[["mining.notify","<sessionId>","EthereumStratum/1.0.0"],"<extranonce1>"]`
+    per the NiceHash spec (no extranonce2; the first job follows
+    `mining.authorize`)
+  - **Rigel** →
+    `{"mining_notify":{"job_id":"72","seed_hash":"0x...","header_hash":"0x...","_clean_jobs":"true"},"extranonce":"..."}`
+    (Rigel decodes the result into a struct with the fields `mining_notify`
+    and `extranonce`; `mining_notify` is a single object whose `job_id`,
+    `seed_hash`, `header_hash`, `_clean_jobs` are **all strings** — not an
+    array of commands, and `_clean_jobs` is not a boolean. With the wrong
+    shape Rigel logs `data did not match any variant of untagged enum
+    ServerMessage`, but keeps mining from the notifications that follow.)
+- `mining.extranonce.subscribe` → `true` (NiceHash extension; the pool never
+  changes the extranonce mid-session)
+- `mining.set_difficulty` → difficulty as `2^224 / target` (raw = difficulty ×
+  2^32) as a **JSON number** (e.g. `[0.1]`); a string `["0.1"]` makes Rigel
+  reject the notification and reconnect
+- `mining.notify` → `[jobId, seedHash, headerHash, true]`; for NiceHash the
+  pool strips `0x` from seed/header, Rigel keeps the `0x` form
+- `mining.submit` → `[worker, jobId, nonce]`; the pool accepts the full
+  16-hex nonce (extranonce already included) and the 12-hex form (NiceHash
+  2-byte extranonce → 6-byte miner nonce) that gets `extranonce1` prepended
 
-pool เป็นคนคำนวณ mix digest เองจาก `ethash_hash()` แล้วส่ง `eth_submitWork(nonce, header, mix)` ให้ node
+The pool computes the mix digest itself with `ethash_hash()` and sends
+`eth_submitWork(nonce, header, mix)` to the node.
 
-## 8. ตรวจสอบ
+## 8. Checking
 
-ดู log ของ stratum:
+Watch the stratum log:
 
 ```bash
 tail -f /var/log/yiimp/ethash/*.log
 tail -f /var/log/yiimp/etchash/*.log
 ```
 
-สัญญาณที่ควรเห็น:
+What you should see:
 
-- มี job ใหม่เมื่อ node ได้บล็อกใหม่
-- มี `client ... sent diff ... powhash ...` เมื่อรับ share
-- มี `*** ACCEPTED <coin> <height> ...` เมื่อส่งบล็อกสำเร็จ
-- ถ้า node ปฏิเสธบล็อก จะมี `*** REJECTED ...` ใน reject log
+- a new job when the node has a new block
+- `client ... sent diff ... powhash ...` for accepted shares
+- `*** ACCEPTED <coin> <height> ...` when a block was submitted
+- `*** REJECTED ...` in the reject log if the node rejects a block
 
-## 9. หมายเหตุ
+## 9. Notes
 
-- การตรวจ share ใช้ light cache ไม่ต้องโหลด full DAG ทั้งหมด แต่ epoch ใหม่อาจใช้เวลาสร้าง cache อีกหน่อย
-- firopow/Kiiro ไม่ได้ถูกกระทบ — ค่า epoch/delegation เดิมของ firopow ยังเหมือนเดิม
-- ถ้า seed hash ที่ node ส่งไม่ตรงกับ epoch ที่คำนวณจาก height จะมีข้อความ `seed/epoch mismatch` ใน log และ stratum จะใช้ค่าจาก height แทน
+- Share verification uses the light cache, not the full DAG; a new epoch
+  takes a moment to build its cache.
+- firopow/Kiiro are not affected; firopow's epoch values are unchanged.
+- If the node's seed hash does not match the epoch computed from the height,
+  the log shows `seed/epoch mismatch`; the stratum keeps using the seed hash,
+  which is what the miner sees.

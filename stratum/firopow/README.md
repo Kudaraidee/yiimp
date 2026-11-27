@@ -1,6 +1,7 @@
 # Firopow / Firo-family setup
 
-วิธีเปิดใช้งาน algo `firopow` สำหรับเหรียญตระกูล Firo (`FIRO`, `KIIRO`)
+How to enable the `firopow` algo for Firo-family coins (`FIRO`, `KIIRO`).
+Thai version: [README.thai.md](README.thai.md).
 
 ## 1. SQL
 
@@ -8,13 +9,13 @@
 mysql -u root -p yaamp < sql/2026-11-19-add_algo_firopow.sql
 ```
 
- migration นี้เพิ่ม:
+This migration adds:
 
 | algo | port |
 |---|---:|
 | `firopow` | 3641 |
 
-ปรับ port ให้ตรงกับ `[TCP] port` ใน config เสมอ แล้ว flush memcache:
+Keep the port in line with `[TCP] port` in the config, then flush memcache:
 
 ```bash
 printf 'delete yaamp_algo_list\r\ndelete yaamp_visible_algos\r\ndelete yaamp_unvisible_algos\r\ndelete yaamp_algo_ports\r\ndelete yaamp_algo_colors\r\n' | nc 127.0.0.1 11211
@@ -22,30 +23,31 @@ printf 'delete yaamp_algo_list\r\ndelete yaamp_visible_algos\r\ndelete yaamp_unv
 
 ## 2. Coin
 
-เพิ่ม coin ผ่าน admin UI (เช่น `FIRO` หรือ `KIIRO`):
+Add the coin through the admin UI (e.g. `FIRO` or `KIIRO`):
 
 - `algo` = `firopow`
-- RPC ชี้ไปยัง Firo-family node ที่รองรับ Firopow
-- node ต้องรองรับ `getblocktemplate` / `submitblock` แบบ Firopow
+- RPC pointing at a Firo-family node with Firopow support
+- the node must support Firopow `getblocktemplate` / `submitblock`
 - `enable = 1`, `auto_ready = 1`
 
-stratum อ่าน payee ของ `znode` / `community` / `developer` / `datamining`
-จาก GBT แบบ dynamic (รองรับทั้ง `script` และ `payee`) สำหรับ FIRO node
-รุ่นเก่าที่ไม่ส่ง field เหล่านี้ โค้ดจะใช้ค่ hardcoded เดิมเป็น fallback
+The stratum reads the `znode` / `community` / `developer` / `datamining`
+payees from GBT dynamically (both `script` and `payee` are supported). For
+older FIRO nodes that don't send these fields, the previous hardcoded values
+are used as a fallback.
 
-firopow ใช้ RPC แบบ Bitcoin-style เหมือน kawpow ไม่ใช่ `GETH`
+firopow uses Bitcoin-style RPC like kawpow, not `GETH`.
 
 ## 3. Config
 
-ตัวอย่าง: `stratum/config.sample/firopow.conf`
+Sample: `stratum/config.sample/firopow.conf`
 
 ```bash
 cp stratum/config.sample/firopow.conf /etc/yiimp/stratum/firopow.conf
 ```
 
-แก้ `[TCP]`, `[SQL]`, `[STRATUM]` ให้ตรงระบบ
+Adjust `[TCP]`, `[SQL]` and `[STRATUM]` to your setup.
 
-ไม่มี `[ETHASH]` section สำหรับ firopow — ค่าเหล่านี้ถูกกำหนดในไบนารีแล้ว:
+There is no `[ETHASH]` section for firopow; these values are built in:
 
 - `epoch_length = 1300`
 - `period_length = 1`
@@ -53,14 +55,14 @@ cp stratum/config.sample/firopow.conf /etc/yiimp/stratum/firopow.conf
 
 ## 4. Supervisord
 
-เพิ่ม block ไว้ให้แล้วใน `config/supervisord.conf`:
+The block is already in `config/supervisord.conf`:
 
 ```ini
 [program:stratum-firopow]
 command=stratum /etc/yiimp/stratum/firopow.conf
 ```
 
-เปิดใช้งาน:
+Enable it:
 
 ```bash
 supervisorctl reread
@@ -70,12 +72,13 @@ supervisorctl start stratum-firopow
 
 ## 5. Miner
 
-miner ใช้ protocol แบบ special algo ของ yiimp เหมือน kawpow:
+Miners use yiimp's special-algo protocol, like kawpow:
 
 ```
 stratum+tcp://pool.example.com:3641
 ```
 
-## 6. หมายเหตุ
+## 6. Notes
 
-การเพิ่ม ethash/etchash ไม่ได้เปลี่ยนพฤติกรรม firopow ค่าเดิมทั้งหมดยังคงอยู่ใน `stratum/firopow/overrides.cpp`
+Adding ethash/etchash did not change firopow; all its values are still in
+`stratum/firopow/overrides.cpp`.
