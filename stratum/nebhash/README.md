@@ -1,11 +1,13 @@
 # NEB `nebhash` pool support
 
-This directory adds a `neb-pool/1` stratum listener for NEB v1.0.4 mainnet.
+This directory adds a `neb-pool/1` stratum listener for NEB v1.0.9 mainnet.
 
 ## Files
 
-- `blake3_min.c/.h`, `chacha8.c/.h`, `nebhash2.c/.h`, `shares.c/.h` — verbatim
-  C reference PoW engine from the NEB node (Apache-2.0, see `LICENSE`).
+- `blake3_shared.c/.h` — one-shot BLAKE3 wrapper over the canonical
+  `stratum/algos/blake3/` implementation shared with xelisv2.
+- `chacha8.c/.h`, `nebhash2.c/.h`, `shares.c/.h` — verbatim C reference PoW
+  engine from the NEB node (Apache-2.0, see `LICENSE`).
 - `work.cpp/.h` — work-service TCP client, template/job builder, submit
   verification, reference k-window vardiff and chain-share forwarding.
 - `tests/test_neb_pool1.py` — protocol smoke test (subscribe/authorize/notify,
@@ -13,7 +15,7 @@ This directory adds a `neb-pool/1` stratum listener for NEB v1.0.4 mainnet.
 
 ## Runtime requirements
 
-- NEB node v1.0.5 (1.0.2+ compatible) with work service on `127.0.0.1:3441`
+- NEB node v1.0.9 (1.0.2+ compatible) with work service on `127.0.0.1:3441`
   and JSON-RPC on `127.0.0.1:8432`.
 - Pinned dataset `/home/codex/lrs-nodes/neb-node/neb-datasets.bin`
   (`NMDS||LE32(2)||NMD2 arch=1 N=13404||NMD2 arch=1 N=7089`). Slot is
@@ -40,7 +42,7 @@ This directory adds a `neb-pool/1` stratum listener for NEB v1.0.4 mainnet.
   forwarding is intentionally not used. Block credit is applied only after
   the node returns an accepted two-byte `Result` frame.
 - V1 model frames are not supported. The loader accepts only `NMD2` /
-  `neb2_model` datasets from node v1.0.5.
+  `neb2_model` datasets from node v1.0.9.
 - Password tokens `d=` and `sd=` select the session target before the first
   job. An integer `1..48` keeps the reference pool's `k` shift
   (`target = share_target << k`). Any other positive number is the miner's

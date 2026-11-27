@@ -13,7 +13,7 @@
 #include "nebhash/work.h"
 
 extern "C" {
-#include "nebhash/blake3_min.h"
+#include "nebhash/blake3_shared.h"
 #include "nebhash/chacha8.h"
 #include "nebhash/shares.h"
 #include "nebhash/nebhash2.h"
@@ -236,7 +236,7 @@ static void hash_parts(const char *tag, size_t taglen,
 	if (a && alen) buf.insert(buf.end(), a, a + alen);
 	if (b && blen) buf.insert(buf.end(), b, b + blen);
 	if (c && clen) buf.insert(buf.end(), c, c + clen);
-	blake3_hash(buf.data(), buf.size(), out);
+	neb_blake3_hash(buf.data(), buf.size(), out);
 }
 
 // ---------------------------------------------------------------------------
@@ -438,7 +438,7 @@ static bool nebhash_load_datasets(const char *path)
 	CommonLock(&g_neb_lock);
 	for (uint32_t i = 0; i < count; i++) g_neb_datasets[i] = loaded[i];
 	g_neb_dataset_count = (int) count;
-	blake3_hash(bytes.data(), bytes.size(), g_neb_dataset_hash);
+	neb_blake3_hash(bytes.data(), bytes.size(), g_neb_dataset_hash);
 	CommonUnlock(&g_neb_lock);
 
 	char hashhex[65];
@@ -517,7 +517,7 @@ static void nebhash_build_body_root(const NEB_JOB &job,
 	coinbase.insert(coinbase.end(), job.coinbase_suffix.begin(), job.coinbase_suffix.end());
 
 	uint8_t coinhash[32], root[32], le[4];
-	blake3_hash(coinbase.data(), coinbase.size(), coinhash);
+	neb_blake3_hash(coinbase.data(), coinbase.size(), coinhash);
 	hash_parts("leaf", 4, coinhash, 32, NULL, 0, NULL, 0, root);
 	for (size_t i = 0; i < job.branch.size(); i++)
 		hash_parts("node", 4, root, 32, job.branch[i].data(), job.branch[i].size(), NULL, 0, root);
@@ -2192,7 +2192,7 @@ bool nebhash_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return true;
 	}
 
-	blake3_hash(header, 80, key);
+	neb_blake3_hash(header, 80, key);
 	if (!nebhash_evaluate_key(*nbjob, key, ticket))
 	{
 		object_unlock(job);

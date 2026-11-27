@@ -26,7 +26,7 @@ SOURCES_MERAKI=$(SOURCES_MERAKI_C) $(SOURCES_MERAKI_CPP)
 SOURCES_ETHASH=ethash/params.cpp ethash/context.cpp ethash/work.cpp
 SOURCES_RANDOMSCASH=randomscash/randomscash.cpp
 SOURCES_HOMESCRYPT=homescrypt/homescrypt.cpp
-SOURCES_NEBHASH_C=nebhash/blake3_min.c nebhash/chacha8.c nebhash/nebhash2.c nebhash/shares.c
+SOURCES_NEBHASH_C=nebhash/blake3_shared.c nebhash/chacha8.c nebhash/nebhash2.c nebhash/shares.c
 SOURCES_NEBHASH_CPP=nebhash/work.cpp
 SOURCES_NEBHASH=$(SOURCES_NEBHASH_C) $(SOURCES_NEBHASH_CPP)
 
@@ -81,7 +81,7 @@ $(SOURCES_MERAKI): stratum.h meraki/hash.h meraki/helpers.hpp meraki/meraki.h me
 $(SOURCES_ETHASH): stratum.h ethash/params.h ethash/context.h ethash/work.h
 $(SOURCES_RANDOMSCASH): stratum.h randomscash/randomscash.h randomx/src/randomx.h
 $(SOURCES_HOMESCRYPT): stratum.h homescrypt/homescrypt.h
-$(SOURCES_NEBHASH): stratum.h nebhash/work.h nebhash/shares.h nebhash/nebhash2.h nebhash/blake3_min.h nebhash/chacha8.h
+$(SOURCES_NEBHASH): stratum.h nebhash/work.h nebhash/shares.h nebhash/nebhash2.h nebhash/blake3_shared.h nebhash/chacha8.h
 
 # HomeScrypt v1.2 consensus requires exact IEEE-754 fmaf rounding. Never build
 # this translation unit with fast-math or FP contraction.

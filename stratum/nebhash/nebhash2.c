@@ -4,7 +4,7 @@
 #include "nebhash2.h"
 #include <stdlib.h>
 #include <string.h>
-#include "blake3_min.h"
+#include "blake3_shared.h"
 #include "chacha8.h"
 
 /* The tables of section 3, with the derived fields written out (neb2_arch_get checks nothing at run time; the unit
@@ -54,7 +54,7 @@ int neb2_model_init(int arch, const uint8_t seed[32], neb2_model *m) {
   uint8_t in[14 + 32], key[32];
   memcpy(in, "neb-model-init", 14);
   memcpy(in + 14, seed, 32);
-  blake3_hash(in, sizeof in, key);
+  neb_blake3_hash(in, sizeof in, key);
   uint8_t *s = (uint8_t *)malloc((size_t)A->nweights);
   if (!s) return -1;
   chacha8_stream(key, s, (size_t)A->nweights);
@@ -328,7 +328,7 @@ int neb2_share_eval(const neb2_model *m, const neb2_dataset *ds, const uint8_t k
   for (int d = 0; d < 8; d++) put_le32(digest + 4 * d, D[d]);
   memcpy(in, digest, 32);
   memcpy(in + 32, key, 32);
-  blake3_hash(in, sizeof in, ticket);
+  neb_blake3_hash(in, sizeof in, ticket);
   return 0;
 }
 
@@ -387,10 +387,10 @@ void neb2_model_hashes(const neb2_model *m, uint8_t weights_hash[32], uint8_t re
   if (!buf) return;
   memcpy(buf, tw, lw);
   for (int j = 0; j < n / 2; j++) buf[lw + j] = (uint8_t)((m->w[2 * j] & 15) | ((m->w[2 * j + 1] & 15) << 4));
-  blake3_hash(buf, lw + (size_t)n / 2, weights_hash);
+  neb_blake3_hash(buf, lw + (size_t)n / 2, weights_hash);
   memcpy(buf, tr, lr);
   for (int f = 0; f < n; f++) put_le32(buf + lr + 4 * f, (uint32_t)m->r[f]);
-  blake3_hash(buf, lr + 4 * (size_t)n, residual_hash);
+  neb_blake3_hash(buf, lr + 4 * (size_t)n, residual_hash);
   free(buf);
 }
 

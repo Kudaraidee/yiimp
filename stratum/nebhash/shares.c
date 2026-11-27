@@ -4,7 +4,7 @@
 #include "shares.h"
 #include <stdlib.h>
 #include <string.h>
-#include "blake3_min.h"
+#include "blake3_shared.h"
 #include "chacha8.h"
 
 static int clipi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -25,7 +25,7 @@ void neb_model_init(const uint8_t seed[32], neb_model *m) {
   uint8_t in[14 + 32], key[32];
   memcpy(in, "neb-model-init", 14);
   memcpy(in + 14, seed, 32);
-  blake3_hash(in, sizeof in, key);
+  neb_blake3_hash(in, sizeof in, key);
   uint8_t *s = (uint8_t *)malloc(NEB_N1 + NEB_N2);
   chacha8_stream(key, s, NEB_N1 + NEB_N2);
   /* Byte k is the sum of its four 2-bit fields minus 6, in -6..6 (spec section 4). The first NEB_N1 bytes fill W1,
@@ -113,7 +113,7 @@ void neb_share_eval(const neb_model *m, const neb_dataset *ds, const uint8_t key
   for (int d = 0; d < 8; d++) put_le32(digest + 4 * d, D[d]);
   memcpy(in, digest, 32);
   memcpy(in + 32, key, 32);
-  blake3_hash(in, sizeof in, ticket);
+  neb_blake3_hash(in, sizeof in, ticket);
 }
 
 /* Section 6 for one layer, entry by entry. v = R + GS is exact: |R| <= 2^su and |GS| <= n * CLIP, so |v| < 2^31 for
@@ -149,11 +149,11 @@ void neb_model_hashes(const neb_model *m, uint8_t weights_hash[32], uint8_t resi
   for (int j = 0; j < NEB_N1 / 2; j++) buf[lw + j] = (uint8_t)((m->w1[2 * j] & 15) | ((m->w1[2 * j + 1] & 15) << 4));
   for (int j = 0; j < NEB_N2 / 2; j++)
     buf[lw + NEB_N1 / 2 + j] = (uint8_t)((m->w2[2 * j] & 15) | ((m->w2[2 * j + 1] & 15) << 4));
-  blake3_hash(buf, lw + npack, weights_hash);
+  neb_blake3_hash(buf, lw + npack, weights_hash);
   memcpy(buf, tr, lr);
   for (int e = 0; e < NEB_N1; e++) put_le32(buf + lr + 4 * e, (uint32_t)m->r1[e]);
   for (int e = 0; e < NEB_N2; e++) put_le32(buf + lr + 4 * (NEB_N1 + e), (uint32_t)m->r2[e]);
-  blake3_hash(buf, lr + 4 * (NEB_N1 + NEB_N2), residual_hash);
+  neb_blake3_hash(buf, lr + 4 * (NEB_N1 + NEB_N2), residual_hash);
   free(buf);
 }
 
