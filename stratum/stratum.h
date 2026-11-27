@@ -111,6 +111,10 @@ extern int g_sql_port;
 
 extern char g_stratum_coin_include[256];
 extern char g_stratum_coin_exclude[256];
+// Dedicated-port coin binding: when set, authorize with this coin instead of
+// the account's stored coinid. This lets one wallet address mine several
+// chains that share an address format without rebinding the global account.
+extern int g_stratum_forced_coinid;
 
 extern char g_stratum_algo[256];
 extern double g_stratum_difficulty;

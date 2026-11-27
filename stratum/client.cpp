@@ -289,6 +289,25 @@ bool client_validate_user_address(YAAMP_CLIENT *client)
 		return true;
 	}
 
+	// A dedicated port can force one coin for every login. This is needed when
+	// two chains share an address format and the account is already bound to
+	// the other chain: keep the global binding untouched and bind this session
+	// only to the coin configured on this listener.
+	if (g_stratum_forced_coinid > 0)
+	{
+		YAAMP_COIND *forced = (YAAMP_COIND *) object_find(&g_list_coind, g_stratum_forced_coinid);
+		if (!forced || !coind_can_mine(forced) ||
+			(strlen(g_current_algo->name) && strcmp(g_current_algo->name, forced->algo)) ||
+			!coind_validate_user_address(forced, client->username))
+		{
+			clientlog(client, "unable to use forced coinid %d for %s", g_stratum_forced_coinid, client->username);
+			return false;
+		}
+
+		client->coinid = forced->id;
+		return true;
+	}
+
 	int client_workers = 0;
 	if (client->userid == 0) {
 		client_workers = client_workers_byaddress(client->username);

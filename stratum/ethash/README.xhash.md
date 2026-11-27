@@ -43,7 +43,10 @@ miner reporting `d=0.1` performs about `0.1 * 2^32` expected hashes per share.
 3. Leave `rpcuser`/`rpcpasswd` blank: Parallax HTTP RPC has no basic auth and
    the listener is bound to loopback. The stratum reads host/port from the
    coin row. On the yiimp host this node runs as `yiimp-parallax.service`.
-4. Use `stratum/config.sample/xhash.conf` as the runtime config template.
+4. Use `stratum/config.sample/xhash.conf` as the runtime config template. Its
+   `coinid = 15` setting binds every login on the dedicated port to LAX; this
+   keeps a wallet already bound to another EVM chain (for example LRS) working
+   on both ports without changing the account's global coin binding.
 5. Rebuild stratum from committed HEAD with
    `/home/codex/yiimp-runtime/scripts/rebuild-stratum.sh`, then enable
    `yiimp-stratum@xhash.service`.

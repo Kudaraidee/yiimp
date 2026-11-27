@@ -41,6 +41,7 @@ int g_sql_port = 3306;
 
 char g_stratum_coin_include[256];
 char g_stratum_coin_exclude[256];
+int g_stratum_forced_coinid = 0;
 
 char g_stratum_algo[256];
 double g_stratum_difficulty;
@@ -266,6 +267,7 @@ int main(int argc, char **argv)
 	strncpy(g_quote_symbol, iniparser_getstring(ini, "STRATUM:quote_symbol", "USDT"), sizeof(g_quote_symbol) - 1);
 	g_quote_symbol[sizeof(g_quote_symbol) - 1] = '\0';
 	g_quote_coinid = iniparser_getint(ini, "STRATUM:quote_coinid", 9);
+	g_stratum_forced_coinid = iniparser_getint(ini, "STRATUM:coinid", 0);
 
 	// optional coin filters (to mine only one on a special port or a test instance)
 	char *coin_filter = iniparser_getstring(ini, "WALLETS:include", NULL);
