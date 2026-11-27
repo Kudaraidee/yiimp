@@ -35,12 +35,14 @@ miner reporting `d=0.1` performs about `0.1 * 2^32` expected hashes per share.
 
 1. Apply `sql/2026-11-27-add_algo_xhash.sql` (algo id 62, coin id 15, port
    3647/TLS 4647, `rpcencoding=GETH`, `mature_blocks=100`, `powlimit_bits=0`).
-2. Run a PoW-capable Parallax node with the pool beneficiary configured:
+2. Run the official Parallax v2.x node with the pool beneficiary configured:
    - HTTP RPC `127.0.0.1:8555` (8545 is already used by LRS)
-   - WebSocket `127.0.0.1:8556`, P2P `30333`
-   - `eth` and `xhash` RPC namespaces enabled
-3. Fill the `coins` row `rpcuser`/`rpcpasswd` with the node's generated
-   credentials. The stratum reads host/port/credentials from the coin row.
+   - WebSocket `127.0.0.1:8556`, P2P `32110`
+   - HTTP APIs `eth,net,web3,xhash,miner`
+   - `--mine --miner.threads 0 --miner.coinbase <pool address>`
+3. Leave `rpcuser`/`rpcpasswd` blank: Parallax HTTP RPC has no basic auth and
+   the listener is bound to loopback. The stratum reads host/port from the
+   coin row. On the yiimp host this node runs as `yiimp-parallax.service`.
 4. Use `stratum/config.sample/xhash.conf` as the runtime config template.
 5. Rebuild stratum from committed HEAD with
    `/home/codex/yiimp-runtime/scripts/rebuild-stratum.sh`, then enable

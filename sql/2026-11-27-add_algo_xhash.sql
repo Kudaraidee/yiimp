@@ -15,11 +15,11 @@
 -- powlimit_bits = 0 makes the web hashrate estimate difficulty / block_time,
 -- i.e. 4.72e12 / 600s ~= 7.9 GH/s at height 66139.
 --
--- Parallax has a 100-block coinbase maturity. RPC credentials are left blank
--- here: the runtime setup writes the generated credentials after the node is
--- installed. The intended local RPC endpoint is 127.0.0.1:8555 (8545 is
--- already used by the Larissa node); P2P is 30333 and WebSocket 8556.
--- The pool payout address reuses the existing EVM key from the LRS coin row.
+-- Parallax has a 100-block coinbase maturity. The official Go node does not
+-- support HTTP basic auth, so RPC credentials stay blank and HTTP/WS are bound
+-- to loopback only. The local RPC endpoint is 127.0.0.1:8555 (8545 is already
+-- used by the Larissa node); P2P is 32110 and WebSocket 8556. The pool payout
+-- address reuses the existing EVM key from the LRS coin row.
 --
 -- After applying, expire the web memcache keys yaamp_algo_list,
 -- yaamp_visible_algos, yaamp_unvisible_algos, yaamp_algo_ports,
