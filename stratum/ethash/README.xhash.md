@@ -44,7 +44,8 @@ listener switches that session to this wire format:
 
 - subscribe result: `[null, "<2-byte nonce prefix>"]`
 - `mining.notify`: 16-hex job id (8-digit prefix + 8-digit id), seal hash,
-  seed hash, big-endian share target, clean flag, height and nbits
+  seed hash, big-endian share target, clean flag, height and an 8-hex nbits
+  value derived from the node boundary (ccminer treats zero nbits as "no job")
 - no numeric `mining.set_difficulty`; the target travels with each job
 - `mining.submit` accepts
   `[worker, job_id, 0x<nonce16>, 0x<header32>, 0x<mix32>]` and normalizes it

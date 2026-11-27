@@ -35,6 +35,42 @@ static void ethash_bin_to_hex(const uint8_t be[32], char *hex66)
 	hex66[66] = 0;
 }
 
+// KawPoW-family miners use nbits only to decide that a job has data and to
+// display network difficulty. XHash has no compact powlimit in the database,
+// so derive a standard compact form from the network boundary sent by the node.
+static void ethash_target_bits(const char *target_hex, char out[9])
+{
+	uint8_t be[32];
+	if (!ethash_parse_hex(target_hex, be))
+	{
+		snprintf(out, 9, "207fffff");
+		return;
+	}
+
+	int first = 0;
+	while (first < 32 && be[first] == 0) first++;
+	if (first == 32)
+	{
+		snprintf(out, 9, "00000001");
+		return;
+	}
+
+	int nbytes = 32 - first;
+	uint32_t mantissa = ((uint32_t)be[first] << 16) |
+		((uint32_t)(first + 1 < 32 ? be[first + 1] : 0) << 8) |
+		(first + 2 < 32 ? be[first + 2] : 0);
+	if (first + 3 < 32 && be[first + 3] >= 0x80)
+	{
+		mantissa++;
+		if (mantissa & 0x1000000)
+		{
+			mantissa >>= 8;
+			nbytes++;
+		}
+	}
+	snprintf(out, 9, "%08x", ((uint32_t)nbytes << 24) | (mantissa & 0xffffff));
+}
+
 const char *ethash_strip_prefix(const char *src)
 {
 	if (src && (!strncmp(src, "0x", 2) || !strncmp(src, "0X", 2)))
@@ -232,7 +268,11 @@ void ethash_kawpow_job_mining_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client
 	std::string target = client && !client->share_target.IsNull() ?
 		client->share_target.ToString() :
 		"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-	const char *nbits = templ->nbits[0] ? templ->nbits : "";
+	char nbits[9];
+	if (templ->nbits[0] && strlen(templ->nbits) == 8)
+		snprintf(nbits, sizeof(nbits), "%s", templ->nbits);
+	else
+		ethash_target_bits(templ->eth_target, nbits);
 
 	sprintf(buffer,
 		"{\"id\":null,\"method\":\"mining.notify\",\"params\":"
@@ -674,7 +714,6 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 			json_params->u.array.values[3]->u.string.ptr);
 		if (memcmp(submitted_mix.bytes, mix_be, 32) != 0)
 		{
-			object_unlock(job);
 			client_submit_error(client, job, 27, "Invalid mix digest",
 				templ->eth_header, mixhex, nonce);
 			return true;
@@ -683,7 +722,6 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 
 	if (final_hash > share_target)
 	{
-		object_unlock(job);
 		client_submit_error(client, job, 26, "Low difficulty share",
 			templ->eth_header, mixhex, nonce);
 		return true;
@@ -691,7 +729,6 @@ bool ethash_submit(YAAMP_CLIENT *client, json_value *json_params)
 
 	if (share_find(job->id, templ->eth_header, mixhex, nonce, client->username))
 	{
-		object_unlock(job);
 		client_submit_error(client, job, 22, "Duplicate share",
 			templ->eth_header, mixhex, nonce);
 		return true;
