@@ -23,6 +23,12 @@ struct ETHASH_ENGINE
 	// Classic eth_getWork returns three fields; xhash_getWork returns four.
 	bool work_includes_height;
 
+	// If the advertised seed does not match the seed derived from the work
+	// epoch, reject the work instead of sending jobs miners cannot solve.
+	// Classic ethash keeps the old log-and-continue behaviour so custom epoch
+	// chains with a non-reversible seed still work.
+	bool require_exact_seed;
+
 	// Epoch of a work package. The seed is the 32-byte big-endian seed hash
 	// advertised by the node; it is authoritative when it can identify an
 	// epoch (classic Ethash). XHash has no reverse seed lookup, so its epoch

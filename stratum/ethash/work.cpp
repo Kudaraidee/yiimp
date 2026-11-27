@@ -169,9 +169,12 @@ bool ethash_build_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ)
 	{
 		// The seed hash is what the miner sees in mining.notify, so it must
 		// match the verification context: a mismatch would reject every
-		// share against a different DAG.
+		// share against a different cache. XHash has no reverse seed lookup,
+		// so its height-derived epoch and the node seed have to agree.
 		stratumlog("%s: seed/epoch mismatch for %s (epoch %d, height %d)\n",
 			engine->name, coind->symbol, epoch, height);
+		if (engine->require_exact_seed)
+			return false;
 	}
 
 	ethash_bin_to_hex(header_be, templ->eth_header);

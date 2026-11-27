@@ -19,11 +19,13 @@ number, so it is used directly (no `+1` like classic `eth_blockNumber`).
 ## Share verification
 
 `mining.notify` carries the advertised seed hash and seal hash. The stratum
-derives the epoch, verifies the seed for that epoch, and verifies submitted
-nonces against the same light cache. The share target and the block boundary
-both use big-endian 256-bit values, so `mining.set_difficulty`/ethproxy
-targets and the verifier target always agree. Difficulty changes therefore
-cannot invalidate already-issued shares.
+derives the epoch from the `xhash_getWork` height and requires the advertised
+seed to equal `xhash_calculate_epoch_seed(epoch)`; a mismatch is treated as a
+failed work poll so miners are never handed jobs that cannot be verified.
+Submitted nonces are verified against that same light cache. The share target
+and the block boundary both use big-endian 256-bit values, so
+`mining.set_difficulty`/ethproxy targets and the verifier target always agree.
+Difficulty changes therefore cannot invalidate already-issued shares.
 
 The node boundary is `floor((2^256-1)/difficulty)`. Yiimp's `2^224/diff`
 share target is the same scale Hashwarp uses (`2^256/(diff*2^32)`), so a
