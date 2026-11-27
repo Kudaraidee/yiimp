@@ -12,6 +12,7 @@
 #   make HARDEN=0         without -D_FORTIFY_SOURCE=3 -fstack-protector-strong
 #   make V=1              print full commands
 #   make check            hash vectors and template tests (tests/Makefile)
+#   make list-algos       algorithms with family and flags (algos/registry.def)
 #   make clean | install | print-VAR
 
 include arch.mk
@@ -105,7 +106,7 @@ LINK_LIBS := $(patsubst iniparser/libiniparser.a,$(LIBINI),$(patsubst algos/liba
 LINK_DEPS := $(filter-out -%,$(LINK_LIBS))
 
 # --- targets -----------------------------------------------------------------
-.PHONY: all buildonly libs gitsubmodules check install clean
+.PHONY: all buildonly libs gitsubmodules check install clean list-algos
 .DEFAULT_GOAL := all
 
 all: gitsubmodules
@@ -167,6 +168,9 @@ install:
 
 clean:
 	rm -rf build stratum
+
+list-algos:
+	@awk -F'[(),"]+' '/^ALGO\(/ { for (i = 2; i <= 7; i++) gsub(/ /, "", $$i); printf "%-16s %-9s diff %-8s %s\n", $$2, $$6, $$4, ($$7 == "0" ? "" : $$7) }' algos/registry.def
 
 print-%:
 	@echo $($*)

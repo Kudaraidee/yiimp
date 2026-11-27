@@ -373,7 +373,6 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 	if(job->block_found) return;
 	if(job->deleted) return;
 
-	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 
 	uint64_t hash_int = 0; uint64_t coin_target = 0;
 	if (is_equihash) {
@@ -647,7 +646,7 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 	if (is_nebhash)
 		return nebhash_submit(client, json_params);
 
-	if (is_ethash || is_etchash)
+	if (is_eth)
 		return ethash_submit(client, json_params);
 
 	// simple backport, will need some rework
@@ -655,7 +654,7 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return meraki_submit(client, json_params);
 	}
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow) {
+	if (is_progpow && !is_meraki) {
 		return kawpow_submit(client, json_params);
 	}
 	// submit(worker_name, jobid, extranonce2, ntime, nonce):
@@ -665,7 +664,6 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return false;
 	}
 
-	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 
 	char extranonce2[32] = { 0 };
 	char extra[160] = { 0 };

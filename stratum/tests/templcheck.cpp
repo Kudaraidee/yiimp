@@ -116,11 +116,7 @@ int main(int argc, char **argv)
 	// same algo setup as main() in stratum.cpp
 	g_current_algo = stratum_find_algo(g_stratum_algo);
 	if (!g_current_algo) { fprintf(stderr, "unknown algo %s\n", g_stratum_algo); return 2; }
-	is_kawpow  = !strcmp(g_current_algo->name, "kawpow");
-	is_firopow = !strcmp(g_current_algo->name, "firopow");
-	is_phihash = !strcmp(g_current_algo->name, "phihash");
-	is_meowpow = !strcmp(g_current_algo->name, "meowpow");
-	is_meraki = !strcmp(g_current_algo->name, "meraki");
+	stratum_set_algo_flags(g_current_algo);
 	coind->pos = !strcasecmp(coind->rpcencoding, "POS");
 
 	str_overflows = 0;

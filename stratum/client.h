@@ -8,6 +8,18 @@
 //	char ip[64];
 //};
 
+// stratum protocol family of an algorithm (algos/registry.def)
+enum YAAMP_ALGO_FAMILY
+{
+	ALGO_FAMILY_STD,	// bitcoin-style stratum
+	ALGO_FAMILY_PROGPOW,	// kawpow-style header/mix stratum
+	ALGO_FAMILY_ETHASH,	// EthereumStratum / ethproxy
+	ALGO_FAMILY_EQUIHASH,
+	ALGO_FAMILY_NEB,	// neb-pool/1
+};
+
+#define ALGO_NO_ROLLTIME	0x1	// miners must not change ntime
+
 struct YAAMP_ALGO
 {
 	char name[64];
@@ -23,6 +35,9 @@ struct YAAMP_ALGO
 	double rent;
 
 	bool overflow;
+
+	int family;	// YAAMP_ALGO_FAMILY
+	unsigned flags;	// ALGO_*
 };
 
 struct YAAMP_CLIENT_ALGO

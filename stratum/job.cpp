@@ -141,7 +141,7 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 	job->count++;
 
 //	debuglog(" assign %x, %f, %d, %s\n", job->id, client->speed, client->reconnecting, client->sock->ip);
-	if(eth_session)
+	if (is_eth)
 	{
 		// Never reconnect an Ethereum miner because of a nonce-prefix change.
 		// Update the baseline instead; ethproxy work pushes carry the prefix

@@ -42,7 +42,7 @@ bool client_suggest_target(YAAMP_CLIENT *client, json_value *json_params)
 bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 {
 	//if(client_find_my_ip(client->sock->ip)) return false;
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki || is_ethash || is_etchash)
+	if (is_progpow || is_eth)
 		get_nonce_prefix(client->extranonce1_default);
 	else
 		get_next_extraonce1(client->extranonce1_default);
@@ -93,7 +93,7 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		// NiceHash EthereumStratum/1.0.0 advertises the protocol as the second
 		// subscribe parameter. Rigel advertises the same string but uses its
 		// own object-shaped subscribe reply, so exclude it explicitly.
-		if ((is_ethash || is_etchash) && json_params->u.array.length > 1 &&
+		if (is_eth && json_params->u.array.length > 1 &&
 			json_params->u.array.values[1]->u.string.ptr)
 		{
 			const char *v = json_params->u.array.values[1]->u.string.ptr;
@@ -207,7 +207,7 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 		nebhash_subscribe_result(client, result, sizeof(result));
 		client_send_result(client, "%s", result);
 	}
-	else if (is_ethash || is_etchash)
+	else if (is_eth)
 	{
 		if (client->is_nicehash_ethstratum)
 		{
@@ -252,11 +252,11 @@ bool client_subscribe(YAAMP_CLIENT *client, json_value *json_params)
 				jobid, seed, header, client->extranonce1);
 		}
 	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
+	else if (is_progpow)
 	{
 		kawpow_send_nonceprefix(client);
 	}
-	else if (strstr(g_current_algo->name, "equihash") == g_current_algo->name) {
+	else if (is_equihash) {
 		// send extranonce
 		client_send_result(	client, "[null,\"%s\"]",client->extranonce1);
 	}
@@ -905,7 +905,7 @@ void *client_thread(void *p)
 		{
 			clientlog(client, "using getwork"); // client using http:// url
 		}
-		else if((is_ethash || is_etchash) && !strcmp(method, "eth_submitLogin"))
+		else if(is_eth && !strcmp(method, "eth_submitLogin"))
 		{
 			// T-Rex uses ethproxy-style calls even for stratum+tcp:// on the
 			// ethash algorithm. Treat it as a first-class protocol here.
@@ -957,10 +957,10 @@ void *client_thread(void *p)
 			b = client_authorize(client, json_params);
 		}
 
-		else if((is_ethash || is_etchash) && !strcmp(method, "eth_getWork"))
+		else if(is_eth && !strcmp(method, "eth_getWork"))
 			b = ethash_ethproxy_get_work(client);
 
-		else if((is_ethash || is_etchash) && !strcmp(method, "eth_submitWork"))
+		else if(is_eth && !strcmp(method, "eth_submitWork"))
 			b = ethash_ethproxy_submit_work(client, json_params);
 
 		else if(!strcmp(method, "eth_submitHashrate"))

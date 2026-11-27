@@ -60,6 +60,7 @@ double g_stratum_spm_spam;
 int g_stratum_share_timeout;
 int g_stratum_speed_slot_secs;
 int g_stratum_idle_timeout;
+bool g_stratum_allow_static_diff;
 
 double g_stratum_nicehash_difficulty;
 double g_stratum_nicehash_min_diff;
@@ -124,6 +125,30 @@ bool is_etchash = false;
 bool is_randomscash = false;
 bool is_homescrypt = false;
 bool is_nebhash = false;
+bool is_progpow = false;
+bool is_eth = false;
+bool is_equihash = false;
+
+// is_* from the algo's registry family and name; once at startup
+void stratum_set_algo_flags(const YAAMP_ALGO *algo)
+{
+	const char *n = algo->name;
+	is_progpow  = algo->family == ALGO_FAMILY_PROGPOW;
+	is_eth      = algo->family == ALGO_FAMILY_ETHASH;
+	is_equihash = algo->family == ALGO_FAMILY_EQUIHASH;
+	is_nebhash  = algo->family == ALGO_FAMILY_NEB;
+
+	is_kawpow      = !strcmp(n, "kawpow");
+	is_firopow     = !strcmp(n, "firopow");
+	is_phihash     = !strcmp(n, "phihash");
+	is_meowpow     = !strcmp(n, "meowpow");
+	is_evrprogpow  = !strcmp(n, "evrprogpow");
+	is_meraki      = !strcmp(n, "meraki");
+	is_ethash      = !strcmp(n, "ethash");
+	is_etchash     = !strcmp(n, "etchash");
+	is_homescrypt  = !strcmp(n, "homescrypt");
+	is_randomscash = !strcmp(n, "randomscash");
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -168,171 +193,11 @@ static void neoscrypt_hash(const char* input, char* output, uint32_t len)
 
 YAAMP_ALGO g_algos[] =
 {
-	{"0x10", hash0x10, 1, 0, 0},
-	{"a5a", a5a_hash, 0x10000, 0, 0},
-	{"aergo", aergo_hash, 1, 0, 0},
-	{"allium", allium_hash, 0x100, 0, 0},
-	{"anime", anime_hash, 1, 0, 0},
-	{"argon2d250", argon2d_crds_hash, 0x10000, 0, 0 }, // Credits Argon2d Implementation
-	{"argon2d500", argon2d_dyn_hash, 0x10000, 0, 0 }, // Dynamic Argon2d Implementation
-	{"argon2d4096", argon2d_uis_hash, 0x10000, 0, 0 }, // Argon2d4096/UIS, Argon2 v1.3
-	{"argon2d1000", argon2d1000_hash, 0x10000, 0, 0 }, // Argon2d1000 Implementation
-	{"argon2d16000", argon2d16000_hash, 0x10000, 0, 0 }, // Argon2d16000 Implementation
-	{"astralhash", astralhash_hash, 0x100, 0, 0},
-	{"balloon", balloon_hash, 1, 0, 0},
-	{"bastion", bastion_hash, 1, 0 },
-	{"bcd", bcd_hash, 1, 0, 0},
-	{"bitcore", timetravel10_hash, 0x100, 0, 0},
-	{"blake", blake_hash, 1, 0 },
-	{"blake2s", blake2s_hash, 1, 0 },
-	{"blakecoin", blakecoin_hash, 1 /*0x100*/, 0, sha256_hash_hex },
-	{"bmw", bmw_hash, 1, 0, 0},
-	{"bmw512", bmw512_hash, 0x100, 0, 0},
-	{"c11", c11_hash, 1, 0, 0},
-	{"cosa", cosa_hash, 1, 0, 0}, //Cosanta (COSA)
-	{"cpupower", cpupower_hash, 0x10000, 0, 0}, //CPUchain
-	{"curvehash", curve_hash, 1, 0, 0},
-	{"decred", decred_hash, 1, 0 },
-	{"dedal", dedal_hash, 0x100, 0, 0},
-	{"deep", deep_hash, 1, 0, 0},
-	{"dmd-gr", groestl_hash, 0x100, 0, 0}, /* diamond (double groestl) */
-	{"equihash", equi_hash, 0x100, 0, 0},
-	{"equihash125", equi_hash, 0x100, 0, 0},
-	{"equihash144", equi_hash, 0x100, 0, 0},
-	{"equihash192", equi_hash, 0x100, 0, 0},
-	{"equihash96", equi_hash, 0x100, 0, 0},
-	{"etchash", sha256_double_hash, 1, 0, 0},
-	{"ethash", sha256_double_hash, 1, 0, 0},
-	{"evrprogpow", sha256_double_hash, 1, 0, 0},
-	{"firopow", sha256_double_hash, 1, 0, 0},
-	{"flex", flex_hash, 1, 0, sha3d_hash_hex},
-	{"fresh", fresh_hash, 0x100, 0, 0},
-	{"geek", geek_hash, 1, 0, 0},
-	{"gr", gr_hash, 0x10000, 0, 0},
-	{"groestl", groestl_hash, 0x100, 0, sha256_hash_hex }, /* groestlcoin */
-	{"heavyhash", heavyhash_hash, 1, 0, 0}, /* OBTC */
-	{"hex", hex_hash, 0x100, 0, sha256_hash_hex },
-	{"hive", hive_hash, 0x10000, 0, 0},
-	{"hmq1725", hmq17_hash, 0x10000, 0, 0},
-	{"homescrypt", homescrypt_hash, 1, 0, 0},
-	{"honeycomb", beenode_hash, 0x10000, 0, 0},
-	{"hoohash-pepew", hoohash_hash, 0x10000, 0, 0},
-	{"hsr", hsr_hash, 1, 0, 0},
-	{"interchained", interchained_hash, 0x10000, 0, 0 },
-	{"jeonghash", jeonghash_hash, 0x100, 0, 0},
-	{"jha", jha_hash, 0x10000, 0},
-	{"kawpow", sha256_double_hash, 1, 0, 0},
-	{"keccak", keccak256_hash, 0x80, 0, sha256_hash_hex },
-	{"keccakc", keccak256_hash, 0x100, 0, 0},
-	{"lbk3", lbk3_hash, 0x100, 0, 0},
-	{"lbry", lbry_hash, 0x100, 0, 0},
-	{"luffa", luffa_hash, 1, 0, 0},
-	{"lyra2", lyra2re_hash, 0x80, 0, 0},
-	{"lyra2v2", lyra2v2_hash, 0x100, 0, 0},
-	{"lyra2v3", lyra2v3_hash, 0x100, 0, 0},
-	{"lyra2vc0ban", lyra2vc0ban_hash, 0x100, 0, 0},
-	{"lyra2z", lyra2z_hash, 0x100, 0, 0},
-	{"lyra2z330", lyra2z330_hash, 0x100, 0, 0},
-	{"m7m", m7m_hash, 0x10000, 0, 0},
-	{"meraki", sha256_double_hash, 1, 0, 0}, // Telestai Progpow variant
-	{"memehash", meme_hash, 1, 0, 0}, /*PepePow Algo*/
-	{"meowpow", sha256_double_hash, 1, 0, 0},
-	{"megabtx", megabtx_hash, 0x100, 0, 0}, /* Bitcore New Algo*/
-	{"megamec", megamec_hash, 0x100, 0, 0}, /* Megacoin New Algo*/
-	{"mike", mike_hash, 0x10000, 0, 0},
-	{"minotaur", minotaur_hash, 1, 0, 0},
-	{"minotaurx", minotaurx_hash, 1, 0, 0},
-	{"myr-gr", groestlmyriad_hash, 1, 0, 0}, /* groestl + sha 64 */
-	// PoW is verified against the node work-service model/ticket, not this
-	// placeholder hash (the same pattern used by Ethash/Etchash).
-	{"nebhash", sha256_double_hash, 1, 0, 0},
-	{"neoscrypt", neoscrypt_hash, 0x10000, 0, 0},
-	{"neoscrypt-xaya", neoscrypt_hash, 0x10000, 0, 0},
-	{"nist5", nist5_hash, 1, 0, 0},
-	{"pawelhash", pawelhash_hash, 0x100, 0, 0},
-	{"penta", penta_hash, 1, 0, 0},
-	{"phi", phi_hash, 1, 0, 0},
-	{"phi2", phi2_hash, 0x100, 0, 0},
-	{"phi5", phi5_hash, 1, 0, 0},
-	{"phihash", sha256_double_hash, 1, 0, 0},
-	{"pipe", pipe_hash, 1,0,0},
-	{"polytimos", polytimos_hash, 1, 0, 0},
-	{"power2b", power2b_hash, 0x10000, 0, 0 },
-	{"quark", quark_hash, 1, 0, 0},
-	{"qubit", qubit_hash, 1, 0, 0},
-	{"rainforest", rainforest_hash, 0x100, 0, 0},
-	// Scash/cpuminer-scash scale stratum difficulty by 65536 (the miner uses
-	// diff/65536 when building its target; MiningCore's coin template uses the
-	// same shareMultiplier). Without this, every valid CPU share is rejected
-	// as "low difficulty share" by the pool.
-	{"randomscash", sha256_double_hash, 65536, 0, 0},
-	{"renesis", renesis_hash, 1, 0, 0},
-	{"rinhash", rinhash_hash, 1, 0, 0},
-	{"scrypt", scrypt_hash, 0x10000, 0, 0},
-	{"scryptn", scryptn_hash, 0x10000, 0, 0},
-	{"sha256", sha256_double_hash, 1, 0, 0},
-	{"sha256d", sha256_double_hash, 1, 0, 0},
-	{"sha256dt", sha256dt_hash, 1, 0, 0},
-	{"sha256csm", sha256csm_hash, 1, 0, 0},
-	{"sha256t", sha256t_hash, 1, 0, 0}, // sha256 3x
-	{"sha3d", sha3d_hash, 1, 0, sha3d_hash_hex},
-	{"sha512256d", sha512_256_double_hash, 1, 0, 0},
-	{"sib", sib_hash, 1, 0, 0},
-	{"skydoge", skydoge_hash, 1, 0, 0}, /* Skydoge */
-	{"skein", skein_hash, 1, 0, 0}, 
-	{"skein2", skein2_hash, 1, 0, 0},
-	{"skunk", skunk_hash, 1, 0, 0},
-	{"sonoa", sonoa_hash, 1, 0, 0},
-	{"soterg", soterg_hash, 1, 0, 0},
-	{"timetravel", timetravel_hash, 0x100, 0, 0},
-	{"tribus", tribus_hash, 1, 0, 0},
-	{"vanilla", blakecoin_hash, 1, 0 },
-	{"veltor", veltor_hash, 1, 0, 0},
-	{"velvet", velvet_hash, 0x10000, 0, 0},
-	{"vitalium", vitalium_hash, 1, 0, 0},
-	{"x11", x11_hash, 1, 0, 0},
-	{"x11evo", x11evo_hash, 1, 0, 0},
-	{"x11k", x11k_hash, 1, 0, 0},
-	{"x11kvs", x11kvs_hash, 0x100, 0, 0,7},
-	{"x12", x12_hash, 1, 0, 0},
-	{"x13", x13_hash, 1, 0, 0},
-	{"x14", x14_hash, 1, 0, 0},
-	{"x15", x15_hash, 1, 0, 0},
-	{"x16r", x16r_hash, 0x100, 0, 0},
-	{"x16rv2", x16rv2_hash, 0x100, 0, 0},
-	{"x16rt", x16rt_hash, 0x100, 0, 0},
-	{"x16s", x16s_hash, 0x100, 0, 0},
-	{"x17", x17_hash, 1, 0, 0},
-	{"x17r", x17r_hash, 1, 0, 0},	//ufo-project
-	{"x18", x18_hash, 1, 0, 0},
-	{"x20r", x20r_hash, 0x100, 0, 0},
-	{"x21s", x21s_hash, 0x100, 0, 0},
-	{"x22i", x22i_hash, 1, 0, 0},
-	{"x25x", x25x_hash, 1, 0, 0},
-	{"xevan", xevan_hash, 0x100, 0, 0},
-	{"xelisv2-pepew", xelisv2_hash, 0x10000, 0, 0},
-	{"yescrypt", yescrypt_hash, 0x10000, 0, 0},
-	{"yescryptR8", yescryptR8_hash, 0x10000, 0, 0 },
-	{"yescryptR16", yescryptR16_hash, 0x10000, 0, 0 },
-	{"yescryptR32", yescryptR32_hash, 0x10000, 0, 0 },
-	{"yespower", yespower_hash, 0x10000, 0, 0 },
-	{"yespowerIC", yespowerIC_hash, 0x10000, 0, 0 }, //IsotopeC[IC]
-	{"yespowerIOTS", yespowerIOTS_hash, 0x10000, 0, 0 }, //Iots [IOTS]
-	{"yespowerLITB", yespowerLITB_hash, 0x10000, 0, 0 }, //LightBit[LITB]
-	{"yespowerLTNCG", yespowerLTNCG_hash, 0x10000, 0, 0 }, //LightningCash Gold[LTNCG]
-	{"yespowerR16", yespowerR16_hash, 0x10000, 0, 0 },
-	{"yespowerRES", yespowerRES_hash, 0x10000, 0, 0 }, //Resistanse[RES] 
-	{"yespowerSUGAR", yespowerSUGAR_hash, 0x10000, 0, 0 }, //Sugarchain[SUGAR] 
-	{"yespowerTIDE", yespowerTIDE_hash, 0x10000, 0, 0 }, //Tidecoin[TDC] 
-	{"yespowerURX", yespowerURX_hash, 0x10000, 0, 0 }, //UraniumX[URX] 
-	{"yespowerMGPC", yespowerMGPC_hash, 0x10000, 0, 0 }, //Magpiecoin[MGPC] 
-	{"yespowerARWN", yespowerARWN_hash, 0x10000, 0, 0 }, //Arowanacoin[ARWN] 
-	{"yespowerADVC", yespowerADVC_hash, 0x10000, 0, 0 },  
-	{"whirlcoin", whirlpool_hash, 1, 0, sha256_hash_hex }, /* old sha merkleroot */
-	{"whirlpool", whirlpool_hash, 1, 0 }, /* sha256d merkleroot */
-	{"whirlpoolx", whirlpoolx_hash, 1, 0, 0},
-	{"zr5", zr5_hash, 1, 0, 0},
-	{"", NULL, 0, 0},
+#define ALGO(name, hash, diff_multiplier, merkle, family, flags) \
+	{ name, hash, diff_multiplier, 0, merkle, 0, 0, 0, 0, false, ALGO_FAMILY_##family, flags },
+#include "algos/registry.def"
+#undef ALGO
+	{},	// end of table (empty name)
 };
 
 YAAMP_ALGO *g_current_algo = NULL;
@@ -440,6 +305,8 @@ int main(int argc, char **argv)
 	g_stratum_speed_slot_secs = std::max(1, speed_window / YAAMP_SPEED_SLOTS);
 	// no valid share for this long at the lowest difficulty (or 3x as long in any case): disconnect
 	g_stratum_idle_timeout = std::max(60, iniparser_getint(ini, "STRATUM:idle_timeout", 600));
+	// d= in the password fixes the difficulty (only spam raises it); off: d= is a start value like sd=
+	g_stratum_allow_static_diff = iniparser_getboolean(ini, "STRATUM:allow_static_diff", false);
 
 	char *new_log_directory = iniparser_getstring(ini, "STRATUM:logdir", NULL);
 	if (new_log_directory) { strcpy(g_log_directory, new_log_directory); }
@@ -501,50 +368,7 @@ int main(int argc, char **argv)
 	if(!g_current_algo) yaamp_error("invalid algo");
 	if(!g_current_algo->hash_function) yaamp_error("no hash function");
 
-	if (!strcmp(g_current_algo->name,"kawpow"))
-	{
-		is_kawpow = true;
-	}
-	else if(!strcmp(g_current_algo->name,"firopow"))
-	{
-		is_firopow = true;
-	}
-	else if(!strcmp(g_current_algo->name,"phihash"))
-	{
-		is_phihash = true;
-	}
-	else if (!strcmp(g_current_algo->name,"meowpow"))
-	{
-		is_meowpow = true;
-	}
-	else if (!strcmp(g_current_algo->name,"evrprogpow"))
-	{
-		is_evrprogpow = true;
-	}
-	else if (!strcmp(g_current_algo->name,"meraki"))
-	{
-		is_meraki = true;
-	}
-	else if (!strcmp(g_current_algo->name,"ethash"))
-	{
-		is_ethash = true;
-	}
-	else if (!strcmp(g_current_algo->name,"etchash"))
-	{
-		is_etchash = true;
-	}
-	else if (!strcmp(g_current_algo->name,"randomscash"))
-	{
-		is_randomscash = true;
-	}
-	else if (!strcmp(g_current_algo->name,"homescrypt"))
-	{
-		is_homescrypt = true;
-	}
-	else if (!strcmp(g_current_algo->name,"nebhash"))
-	{
-		is_nebhash = true;
-	}
+	stratum_set_algo_flags(g_current_algo);
 
 //	struct rlimit rlim_files = {0x10000, 0x10000};
 //	setrlimit(RLIMIT_NOFILE, &rlim_files);
@@ -577,10 +401,7 @@ int main(int argc, char **argv)
 	}
 
 	// ntime should not be changed by miners for these algos
-	g_allow_rolltime = strcmp(g_stratum_algo,"x11evo");
-	g_allow_rolltime = g_allow_rolltime && strcmp(g_stratum_algo,"timetravel");
-	g_allow_rolltime = g_allow_rolltime && strcmp(g_stratum_algo,"bitcore");
-	g_allow_rolltime = g_allow_rolltime && strcmp(g_stratum_algo,"exosis");
+	g_allow_rolltime = !(g_current_algo->flags & ALGO_NO_ROLLTIME);
 	if (!g_allow_rolltime)
 		stratumlog("note: time roll disallowed for %s algo\n", g_current_algo->name);
 

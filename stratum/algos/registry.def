@@ -1,0 +1,169 @@
+/* Stratum algorithm registry: one line per algorithm, expanded by stratum.cpp
+ * into g_algos[] (keep the order, tests/vectors/hash.txt walks the table).
+ *
+ * ALGO(name, hash function, diff multiplier, merkle function, family, flags)
+ *   family: STD (bitcoin-style stratum), PROGPOW, ETHASH, EQUIHASH, NEB
+ *   flags:  0 or ALGO_NO_ROLLTIME (miners must not change ntime)
+ */
+
+ALGO("0x10", hash0x10, 1, 0, STD, 0)
+ALGO("a5a", a5a_hash, 0x10000, 0, STD, 0)
+ALGO("aergo", aergo_hash, 1, 0, STD, 0)
+ALGO("allium", allium_hash, 0x100, 0, STD, 0)
+ALGO("anime", anime_hash, 1, 0, STD, 0)
+ALGO("argon2d250", argon2d_crds_hash, 0x10000, 0, STD, 0) // Credits Argon2d Implementation
+ALGO("argon2d500", argon2d_dyn_hash, 0x10000, 0, STD, 0) // Dynamic Argon2d Implementation
+ALGO("argon2d4096", argon2d_uis_hash, 0x10000, 0, STD, 0) // Argon2d4096/UIS, Argon2 v1.3
+ALGO("argon2d1000", argon2d1000_hash, 0x10000, 0, STD, 0) // Argon2d1000 Implementation
+ALGO("argon2d16000", argon2d16000_hash, 0x10000, 0, STD, 0) // Argon2d16000 Implementation
+ALGO("astralhash", astralhash_hash, 0x100, 0, STD, 0)
+ALGO("balloon", balloon_hash, 1, 0, STD, 0)
+ALGO("bastion", bastion_hash, 1, 0, STD, 0)
+ALGO("bcd", bcd_hash, 1, 0, STD, 0)
+ALGO("bitcore", timetravel10_hash, 0x100, 0, STD, ALGO_NO_ROLLTIME)
+ALGO("blake", blake_hash, 1, 0, STD, 0)
+ALGO("blake2s", blake2s_hash, 1, 0, STD, 0)
+ALGO("blakecoin", blakecoin_hash, 1, sha256_hash_hex, STD, 0) /* was 0x100 */
+ALGO("bmw", bmw_hash, 1, 0, STD, 0)
+ALGO("bmw512", bmw512_hash, 0x100, 0, STD, 0)
+ALGO("c11", c11_hash, 1, 0, STD, 0)
+ALGO("cosa", cosa_hash, 1, 0, STD, 0) //Cosanta (COSA)
+ALGO("cpupower", cpupower_hash, 0x10000, 0, STD, 0) //CPUchain
+ALGO("curvehash", curve_hash, 1, 0, STD, 0)
+ALGO("decred", decred_hash, 1, 0, STD, 0)
+ALGO("dedal", dedal_hash, 0x100, 0, STD, 0)
+ALGO("deep", deep_hash, 1, 0, STD, 0)
+ALGO("dmd-gr", groestl_hash, 0x100, 0, STD, 0) /* diamond (double groestl) */
+ALGO("equihash", equi_hash, 0x100, 0, EQUIHASH, 0)
+ALGO("equihash125", equi_hash, 0x100, 0, EQUIHASH, 0)
+ALGO("equihash144", equi_hash, 0x100, 0, EQUIHASH, 0)
+ALGO("equihash192", equi_hash, 0x100, 0, EQUIHASH, 0)
+ALGO("equihash96", equi_hash, 0x100, 0, EQUIHASH, 0)
+ALGO("etchash", sha256_double_hash, 1, 0, ETHASH, 0)
+ALGO("ethash", sha256_double_hash, 1, 0, ETHASH, 0)
+ALGO("evrprogpow", sha256_double_hash, 1, 0, PROGPOW, 0)
+ALGO("firopow", sha256_double_hash, 1, 0, PROGPOW, 0)
+ALGO("flex", flex_hash, 1, sha3d_hash_hex, STD, 0)
+ALGO("fresh", fresh_hash, 0x100, 0, STD, 0)
+ALGO("geek", geek_hash, 1, 0, STD, 0)
+ALGO("gr", gr_hash, 0x10000, 0, STD, 0)
+ALGO("groestl", groestl_hash, 0x100, sha256_hash_hex, STD, 0) /* groestlcoin */
+ALGO("heavyhash", heavyhash_hash, 1, 0, STD, 0) /* OBTC */
+ALGO("hex", hex_hash, 0x100, sha256_hash_hex, STD, 0)
+ALGO("hive", hive_hash, 0x10000, 0, STD, 0)
+ALGO("homescrypt", homescrypt_hash, 1, 0, STD, 0)
+ALGO("hmq1725", hmq17_hash, 0x10000, 0, STD, 0)
+ALGO("honeycomb", beenode_hash, 0x10000, 0, STD, 0)
+ALGO("hoohash-pepew", hoohash_hash, 0x10000, 0, STD, 0)
+ALGO("hsr", hsr_hash, 1, 0, STD, 0)
+ALGO("interchained", interchained_hash, 0x10000, 0, STD, 0)
+ALGO("jeonghash", jeonghash_hash, 0x100, 0, STD, 0)
+ALGO("jha", jha_hash, 0x10000, 0, STD, 0)
+ALGO("kawpow", sha256_double_hash, 1, 0, PROGPOW, 0)
+ALGO("keccak", keccak256_hash, 0x80, sha256_hash_hex, STD, 0)
+ALGO("keccakc", keccak256_hash, 0x100, 0, STD, 0)
+ALGO("lbk3", lbk3_hash, 0x100, 0, STD, 0)
+ALGO("lbry", lbry_hash, 0x100, 0, STD, 0)
+ALGO("luffa", luffa_hash, 1, 0, STD, 0)
+ALGO("lyra2", lyra2re_hash, 0x80, 0, STD, 0)
+ALGO("lyra2v2", lyra2v2_hash, 0x100, 0, STD, 0)
+ALGO("lyra2v3", lyra2v3_hash, 0x100, 0, STD, 0)
+ALGO("lyra2vc0ban", lyra2vc0ban_hash, 0x100, 0, STD, 0)
+ALGO("lyra2z", lyra2z_hash, 0x100, 0, STD, 0)
+ALGO("lyra2z330", lyra2z330_hash, 0x100, 0, STD, 0)
+ALGO("m7m", m7m_hash, 0x10000, 0, STD, 0)
+ALGO("memehash", meme_hash, 1, 0, STD, 0) /*PepePow Algo*/
+ALGO("meraki", sha256_double_hash, 1, 0, PROGPOW, 0)
+ALGO("meowpow", sha256_double_hash, 1, 0, PROGPOW, 0)
+ALGO("megabtx", megabtx_hash, 0x100, 0, STD, 0) /* Bitcore New Algo*/
+ALGO("megamec", megamec_hash, 0x100, 0, STD, 0) /* Megacoin New Algo*/
+ALGO("mike", mike_hash, 0x10000, 0, STD, 0)
+ALGO("minotaur", minotaur_hash, 1, 0, STD, 0)
+ALGO("minotaurx", minotaurx_hash, 1, 0, STD, 0)
+ALGO("myr-gr", groestlmyriad_hash, 1, 0, STD, 0) /* groestl + sha 64 */
+// PoW is verified against the node work-service model/ticket, not this
+// placeholder hash (the same pattern used by Ethash/Etchash).
+ALGO("nebhash", sha256_double_hash, 1, 0, NEB, 0)
+ALGO("neoscrypt", neoscrypt_hash, 0x10000, 0, STD, 0)
+ALGO("neoscrypt-xaya", neoscrypt_hash, 0x10000, 0, STD, 0)
+ALGO("nist5", nist5_hash, 1, 0, STD, 0)
+ALGO("pawelhash", pawelhash_hash, 0x100, 0, STD, 0)
+ALGO("penta", penta_hash, 1, 0, STD, 0)
+ALGO("phi", phi_hash, 1, 0, STD, 0)
+ALGO("phi2", phi2_hash, 0x100, 0, STD, 0)
+ALGO("phi5", phi5_hash, 1, 0, STD, 0)
+ALGO("phihash", sha256_double_hash, 1, 0, PROGPOW, 0)
+ALGO("pipe", pipe_hash, 1, 0, STD, 0)
+ALGO("polytimos", polytimos_hash, 1, 0, STD, 0)
+ALGO("power2b", power2b_hash, 0x10000, 0, STD, 0)
+ALGO("quark", quark_hash, 1, 0, STD, 0)
+ALGO("qubit", qubit_hash, 1, 0, STD, 0)
+ALGO("rainforest", rainforest_hash, 0x100, 0, STD, 0)
+// cpuminer-scash targets diff/65536 (MiningCore shareMultiplier too)
+ALGO("randomscash", sha256_double_hash, 0x10000, 0, STD, 0)
+ALGO("renesis", renesis_hash, 1, 0, STD, 0)
+ALGO("rinhash", rinhash_hash, 1, 0, STD, 0)
+ALGO("scrypt", scrypt_hash, 0x10000, 0, STD, 0)
+ALGO("scryptn", scryptn_hash, 0x10000, 0, STD, 0)
+ALGO("sha256", sha256_double_hash, 1, 0, STD, 0)
+ALGO("sha256d", sha256_double_hash, 1, 0, STD, 0)
+ALGO("sha256dt", sha256dt_hash, 1, 0, STD, 0)
+ALGO("sha256csm", sha256csm_hash, 1, 0, STD, 0)
+ALGO("sha256t", sha256t_hash, 1, 0, STD, 0) // sha256 3x
+ALGO("sha3d", sha3d_hash, 1, sha3d_hash_hex, STD, 0)
+ALGO("sha512256d", sha512_256_double_hash, 1, 0, STD, 0)
+ALGO("sib", sib_hash, 1, 0, STD, 0)
+ALGO("skydoge", skydoge_hash, 1, 0, STD, 0) /* Skydoge */
+ALGO("skein", skein_hash, 1, 0, STD, 0)
+ALGO("skein2", skein2_hash, 1, 0, STD, 0)
+ALGO("skunk", skunk_hash, 1, 0, STD, 0)
+ALGO("sonoa", sonoa_hash, 1, 0, STD, 0)
+ALGO("soterg", soterg_hash, 1, 0, STD, 0)
+ALGO("timetravel", timetravel_hash, 0x100, 0, STD, ALGO_NO_ROLLTIME)
+ALGO("tribus", tribus_hash, 1, 0, STD, 0)
+ALGO("vanilla", blakecoin_hash, 1, 0, STD, 0)
+ALGO("veltor", veltor_hash, 1, 0, STD, 0)
+ALGO("velvet", velvet_hash, 0x10000, 0, STD, 0)
+ALGO("vitalium", vitalium_hash, 1, 0, STD, 0)
+ALGO("x11", x11_hash, 1, 0, STD, 0)
+ALGO("x11evo", x11evo_hash, 1, 0, STD, ALGO_NO_ROLLTIME)
+ALGO("x11k", x11k_hash, 1, 0, STD, 0)
+ALGO("x11kvs", x11kvs_hash, 0x100, 0, STD, 0)
+ALGO("x12", x12_hash, 1, 0, STD, 0)
+ALGO("x13", x13_hash, 1, 0, STD, 0)
+ALGO("x14", x14_hash, 1, 0, STD, 0)
+ALGO("x15", x15_hash, 1, 0, STD, 0)
+ALGO("x16r", x16r_hash, 0x100, 0, STD, 0)
+ALGO("x16rv2", x16rv2_hash, 0x100, 0, STD, 0)
+ALGO("x16rt", x16rt_hash, 0x100, 0, STD, 0)
+ALGO("x16s", x16s_hash, 0x100, 0, STD, 0)
+ALGO("x17", x17_hash, 1, 0, STD, 0)
+ALGO("x17r", x17r_hash, 1, 0, STD, 0) //ufo-project
+ALGO("x18", x18_hash, 1, 0, STD, 0)
+ALGO("x20r", x20r_hash, 0x100, 0, STD, 0)
+ALGO("x21s", x21s_hash, 0x100, 0, STD, 0)
+ALGO("x22i", x22i_hash, 1, 0, STD, 0)
+ALGO("x25x", x25x_hash, 1, 0, STD, 0)
+ALGO("xevan", xevan_hash, 0x100, 0, STD, 0)
+ALGO("xelisv2-pepew", xelisv2_hash, 0x10000, 0, STD, 0)
+ALGO("yescrypt", yescrypt_hash, 0x10000, 0, STD, 0)
+ALGO("yescryptR8", yescryptR8_hash, 0x10000, 0, STD, 0)
+ALGO("yescryptR16", yescryptR16_hash, 0x10000, 0, STD, 0)
+ALGO("yescryptR32", yescryptR32_hash, 0x10000, 0, STD, 0)
+ALGO("yespower", yespower_hash, 0x10000, 0, STD, 0)
+ALGO("yespowerIC", yespowerIC_hash, 0x10000, 0, STD, 0) //IsotopeC[IC]
+ALGO("yespowerIOTS", yespowerIOTS_hash, 0x10000, 0, STD, 0) //Iots [IOTS]
+ALGO("yespowerLITB", yespowerLITB_hash, 0x10000, 0, STD, 0) //LightBit[LITB]
+ALGO("yespowerLTNCG", yespowerLTNCG_hash, 0x10000, 0, STD, 0) //LightningCash Gold[LTNCG]
+ALGO("yespowerR16", yespowerR16_hash, 0x10000, 0, STD, 0)
+ALGO("yespowerRES", yespowerRES_hash, 0x10000, 0, STD, 0) //Resistanse[RES]
+ALGO("yespowerSUGAR", yespowerSUGAR_hash, 0x10000, 0, STD, 0) //Sugarchain[SUGAR]
+ALGO("yespowerTIDE", yespowerTIDE_hash, 0x10000, 0, STD, 0) //Tidecoin[TDC]
+ALGO("yespowerURX", yespowerURX_hash, 0x10000, 0, STD, 0) //UraniumX[URX]
+ALGO("yespowerMGPC", yespowerMGPC_hash, 0x10000, 0, STD, 0) //Magpiecoin[MGPC]
+ALGO("yespowerARWN", yespowerARWN_hash, 0x10000, 0, STD, 0) //Arowanacoin[ARWN]
+ALGO("yespowerADVC", yespowerADVC_hash, 0x10000, 0, STD, 0)
+ALGO("whirlcoin", whirlpool_hash, 1, sha256_hash_hex, STD, 0) /* old sha merkleroot */
+ALGO("whirlpool", whirlpool_hash, 1, 0, STD, 0) /* sha256d merkleroot */
+ALGO("whirlpoolx", whirlpoolx_hash, 1, 0, STD, 0)
+ALGO("zr5", zr5_hash, 1, 0, STD, 0)

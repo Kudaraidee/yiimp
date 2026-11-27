@@ -350,8 +350,7 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 		client->vardiff_window_start = current_timestamp();
 	}
 
-	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
-	if (is_ethash || is_etchash)
+	if (is_eth)
 	{
 		// Ethereum Stratum uses the ethash difficulty scale: target is
 		// 2^224 / difficulty (i.e. 2^256 / (difficulty * 2^32)), matching
@@ -381,7 +380,7 @@ int client_send_difficulty(YAAMP_CLIENT *client, double difficulty)
 		client_call(client, "mining.set_target", "[\"%s\"]", client->share_target.ToString().c_str());
 		client->next_target = client->share_target;
 	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
+	else if (is_progpow && !is_meraki)
 	{
 		uint256 share_target;
 		diff_to_target(share_target, difficulty);
@@ -444,16 +443,14 @@ void client_initialize_difficulty(YAAMP_CLIENT *client)
 	// formats can still contain both.
 	if (client_password_param(client->password, "decred", 6)) return;
 
-	// d= pins the difficulty for the whole session. sd= only seeds the initial
-	// difficulty; vardiff is still free to adjust it later. d= wins if both
-	// are present.
+	// d= pins the difficulty only when allow_static_diff is enabled; otherwise
+	// it is a start value like sd=. sd= always seeds and lets vardiff adjust.
 	const char *value = client_password_param(client->password, "d", 1);
-	bool difficulty_fixed = true;
-	if (!value)
-	{
+	bool difficulty_fixed = false;
+	if (value)
+		difficulty_fixed = g_stratum_allow_static_diff;
+	else
 		value = client_password_param(client->password, "sd", 2);
-		difficulty_fixed = false;
-	}
 	if (!value) return;
 
 	if (client_uses_precise_difficulty())

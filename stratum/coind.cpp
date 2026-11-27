@@ -215,10 +215,10 @@ void coind_init(YAAMP_COIND *coind)
 
 	yaamp_create_mutex(&coind->mutex);
 
-	// Ethereum nodes do not implement the Bitcoin wallet RPCs used below.
-	// Work and height come from eth_getWork/eth_blockNumber instead, and the
-	// pool beneficiary is configured directly on the node.
-	if (is_ethash || is_etchash || is_nebhash)
+	// Ethereum and NEB nodes have none of the wallet RPCs below: work and
+	// height come from eth_getWork/eth_blockNumber (or the NEB work service),
+	// and the pool beneficiary is configured directly on the node.
+	if (is_eth || is_nebhash)
 		return;
 
 	strcpy(account, coind->account);

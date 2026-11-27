@@ -226,7 +226,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	char script1[4*1024];
 	char script2[32];
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
+	if (is_progpow)
 	{
 		// coinbase v_in only current height
 		sprintf(script1, "%s", eheight);
@@ -289,7 +289,6 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 			coinbase_aux(templ, script2, sizeof(script2));
 
 		// nonce not included in coinbase of equihash-coins
-		bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 		int script_len = strlen(script1)/2 + strlen(script2)/2 + (is_equihash?0:8);
 		sprintf(templ->coinb1, "%s%s01"
 			"0000000000000000000000000000000000000000000000000000000000000000"

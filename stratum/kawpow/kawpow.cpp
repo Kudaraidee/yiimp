@@ -368,7 +368,7 @@ bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
     decode_nbits(coin_target, nbits);
 
     if (hash < coin_target) {
-        if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow) {
+        if (is_progpow && !is_firopow && !is_meraki) {
             kawpow_block(client, job, templ, nonce, mixhash, hash);
         }
         if (is_firopow) {

@@ -48,7 +48,7 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer, int gen = 0)
 		return;
 	}
 
-	if (strstr(g_current_algo->name, "equihash") == g_current_algo->name)
+	if (is_equihash)
 	{
 		static char version_reversed[1024];
 		static char prev_hash_reversed[1024];
@@ -183,6 +183,34 @@ YAAMP_JOB *job_get_last_for_ethash(YAAMP_CLIENT *client)
 	return job_get_last(0);
 }
 
+// NEB notifications carry a 26 KiB model hash plus a merkle branch
+#define NEB_NOTIFY_BUFSIZE (512*1024)
+
+// mining.notify (or the ethproxy work push) for this client; the message to send
+static const char *job_notify_buffer(YAAMP_JOB *job, YAAMP_CLIENT *client, char *buffer, int gen = 0)
+{
+	if (is_nebhash)
+	{
+		static thread_local char *neb_buffer = NULL;
+		if (!neb_buffer) neb_buffer = (char *)malloc(NEB_NOTIFY_BUFSIZE);
+		if (!neb_buffer) { buffer[0] = 0; return buffer; }
+		nebhash_job_mining_notify_buffer(job, client, neb_buffer, NEB_NOTIFY_BUFSIZE);
+		return neb_buffer;
+	}
+
+	if (is_eth && client->is_ethproxy)
+		ethash_ethproxy_work_buffer(job, client, buffer);
+	else if (is_eth)
+		ethash_job_mining_notify_buffer(job, client, buffer);
+	else if (is_progpow)
+		kawpow_job_mining_notify_buffer(job, client, buffer, gen);
+	else if (is_homescrypt && homescrypt_uses_header_notify(client))
+		homescrypt_job_mining_notify_buffer(job, client, buffer);
+	else
+		job_mining_notify_buffer(job, buffer, gen);
+	return buffer;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void job_send_last(YAAMP_CLIENT *client)
@@ -203,34 +231,11 @@ void job_send_last(YAAMP_CLIENT *client)
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
 	client->jobid_sent = job->id;
 
-	// NEB notifications carry a 26 KiB model hash plus a merkle branch.
-	char buffer[512*1024];
-	if (client->is_ethproxy && (is_ethash || is_etchash))
-	{
-		ethash_ethproxy_work_buffer(job, client, buffer);
-	}
-	else if (is_ethash || is_etchash)
-	{
-		ethash_job_mining_notify_buffer(job, client, buffer);
-	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
-	{
-		kawpow_job_mining_notify_buffer(job, client, buffer);
-	}
-	else if (is_nebhash)
-	{
-		nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
-	}
-	else if (is_homescrypt && homescrypt_uses_header_notify(client))
-	{
-		homescrypt_job_mining_notify_buffer(job, client, buffer);
-	}
-	else {
-		job_mining_notify_buffer(job, buffer);
-	}
+	char buffer[YAAMP_SMALLBUFSIZE];
+	const char *msg = job_notify_buffer(job, client, buffer);
 
 	client_record_job_target(client, job->id, client->share_target);
-	socket_send_raw(client->sock, buffer, strlen(buffer));
+	socket_send_raw(client->sock, msg, strlen(msg));
 }
 
 // send the client its current job again under a new id (gen), so a new
@@ -240,34 +245,10 @@ void job_resend(YAAMP_CLIENT *client, YAAMP_JOB *job, int gen)
 	// Use the same notify shape as the original job. Only the Stratum v1 and
 	// Progpow builders accept a generation; the other feature protocols keep
 	// their own format (their job-id parser does not use leading zeros).
-	// NEB notifications carry a 26 KiB model hash plus a merkle branch.
-	char buffer[512*1024];
-	if (client->is_ethproxy && (is_ethash || is_etchash))
-	{
-		ethash_ethproxy_work_buffer(job, client, buffer);
-	}
-	else if (is_ethash || is_etchash)
-	{
-		ethash_job_mining_notify_buffer(job, client, buffer);
-	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
-	{
-		kawpow_job_mining_notify_buffer(job, client, buffer, gen);
-	}
-	else if (is_nebhash)
-	{
-		nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
-	}
-	else if (is_homescrypt && homescrypt_uses_header_notify(client))
-	{
-		homescrypt_job_mining_notify_buffer(job, client, buffer);
-	}
-	else
-	{
-		job_mining_notify_buffer(job, buffer, gen);
-	}
+	char buffer[YAAMP_SMALLBUFSIZE];
+	const char *msg = job_notify_buffer(job, client, buffer, gen);
 
-	socket_send_raw(client->sock, buffer, strlen(buffer));
+	socket_send_raw(client->sock, msg, strlen(msg));
 }
 
 void job_send_jobid(YAAMP_CLIENT *client, int jobid)
@@ -279,37 +260,14 @@ void job_send_jobid(YAAMP_CLIENT *client, int jobid)
 		return;
 	}
 
-	// NEB notifications carry a 26 KiB model hash plus a merkle branch.
-	char buffer[512*1024];
-	if (client->is_ethproxy && (is_ethash || is_etchash))
-	{
-		ethash_ethproxy_work_buffer(job, client, buffer);
-	}
-	else if (is_ethash || is_etchash)
-	{
-		ethash_job_mining_notify_buffer(job, client, buffer);
-	}
-	else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
-	{
-		kawpow_job_mining_notify_buffer(job, client, buffer);
-	}
-	else if (is_nebhash)
-	{
-		nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
-	}
-	else if (is_homescrypt && homescrypt_uses_header_notify(client))
-	{
-		homescrypt_job_mining_notify_buffer(job, client, buffer);
-	}
-	else {
-		job_mining_notify_buffer(job, buffer);
-	}
+	char buffer[YAAMP_SMALLBUFSIZE];
+	const char *msg = job_notify_buffer(job, client, buffer);
 
 	YAAMP_JOB_TEMPLATE *templ = job->templ;
 	client->jobid_sent = job->id;
 	client_record_job_target(client, job->id, client->share_target);
 
-	socket_send_raw(client->sock, buffer, strlen(buffer));
+	socket_send_raw(client->sock, msg, strlen(msg));
 	object_unlock(job);
 }
 
@@ -342,32 +300,9 @@ void job_broadcast(YAAMP_JOB *job)
 		// it so the miner and the verifier see the same target on this job.
 		if (is_meraki) client_adjust_difficulty(client);
 
-		// NEB notifications carry a 26 KiB model hash plus a merkle branch.
-		char buffer[512*1024];
+		char buffer[YAAMP_SMALLBUFSIZE];
 		memset(buffer, 0, sizeof(buffer));
-		if (client->is_ethproxy && (is_ethash || is_etchash))
-		{
-			ethash_ethproxy_work_buffer(job, client, buffer);
-		}
-		else if (is_ethash || is_etchash)
-		{
-			ethash_job_mining_notify_buffer(job, client, buffer);
-		}
-		else if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow || is_meraki)
-		{
-			kawpow_job_mining_notify_buffer(job, client, buffer);
-		}
-		else if (is_nebhash)
-		{
-			nebhash_job_mining_notify_buffer(job, client, buffer, sizeof(buffer));
-		}
-		else if (is_homescrypt && homescrypt_uses_header_notify(client))
-		{
-			homescrypt_job_mining_notify_buffer(job, client, buffer);
-		}
-		else {
-			job_mining_notify_buffer(job, buffer);
-		}
+		const char *msg = job_notify_buffer(job, client, buffer);
 	
 		// set_difficulty goes out before this job: the miner applies it from this job on
 		// Meraki was already adjusted above, before its target was embedded in the notify.
@@ -379,7 +314,7 @@ void job_broadcast(YAAMP_JOB *job)
 
 		setsockopt(client->sock->sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
-		if (socket_send_raw(client->sock, buffer, strlen(buffer)) == -1) {
+		if (socket_send_raw(client->sock, msg, strlen(msg)) == -1) {
 			int err = errno;
 			client->broadcast_timeouts++;
 			// too much timeouts, disconnect him
@@ -405,10 +340,9 @@ void job_broadcast(YAAMP_JOB *job)
 
 	///////////////////////
 
-	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 
 	double coin_diff;
-	if (is_ethash || is_etchash)
+	if (is_eth)
 	{
 		// eth_getWork gives a 256-bit target, not Bitcoin's compact nbits.
 		// ethash_build_template() already converted it to the network

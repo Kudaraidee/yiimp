@@ -266,9 +266,9 @@ static void decred_fix_template(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, j
 
 YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 {
-	// Ethereum nodes do not implement getblocktemplate; work comes from
-	// eth_getWork and the miner is paid through the node's beneficiary.
-	if (is_ethash || is_etchash || is_nebhash)
+	// Ethereum and NEB nodes have no getblocktemplate: work comes from
+	// eth_getWork / the NEB work service, with the beneficiary set on the node.
+	if (is_eth || is_nebhash)
 	{
 		YAAMP_JOB_TEMPLATE *work_templ = new YAAMP_JOB_TEMPLATE;
 		memset(work_templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
@@ -302,7 +302,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 		// segwit at height 1 and does not currently emit mweb template fields.
 		strcpy(params, "[{\"rules\":[\"segwit\",\"mweb\"]}]");
 	}
-	else if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow || is_meraki) {
+	else if (is_progpow && !is_firopow) {
 		sprintf(params, "[]");
 	}
 	else {
@@ -658,7 +658,6 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	coinbase_create(coind, templ, json_result);
 	json_value_free(json);
 
-	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
 
 	// create coinbase-string and merkleroot-string
 	int coinbase_len = strlen(templ->coinbase);
@@ -681,22 +680,22 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	string merkleroot = merkle_with_first(templ->txsteps, doublehash);
 	strcpy(templ->merkleroot, merkleroot.c_str());
 
-	if (is_kawpow || is_firopow || is_phihash || is_meowpow || is_evrprogpow)
-	{
-		update_epoch(coind->id, templ->height);
-		templ->header_seed = get_kawpow_seed(templ->height);
-		if (is_kawpow || is_phihash || is_meowpow || is_evrprogpow)
-		{
-			templ->header_hash = build_header_hash(templ);
-		}
-	}
-	else if (is_meraki)
+	if (is_meraki)
 	{
 		// Telestai's Meraki fork uses a fixed 27500-block epoch and its own
 		// KISS99 seed constant, so it must not share the Kawpow context.
 		meraki_update_epoch(coind->id, templ->height);
 		templ->header_seed = meraki_epoch_seed(templ->height);
 		templ->header_hash = build_header_hash(templ);
+	}
+	else if (is_progpow && !is_meraki)
+	{
+		update_epoch(coind->id, templ->height);
+		templ->header_seed = get_kawpow_seed(templ->height);
+		if (!is_firopow)
+		{
+			templ->header_hash = build_header_hash(templ);
+		}
 	}
 
 	return templ;
@@ -743,7 +742,7 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 		templ->neb_time_start == job_last->templ->neb_time_start;
 
 	if(	!force && job_last && job_last->templ && job_last->templ->created + 45 > time(NULL) &&
-		(is_ethash || is_etchash ? same_eth_work :
+		(is_eth ? same_eth_work :
 		(is_nebhash ? same_neb_work :
 		(templ->height == job_last->templ->height &&
 		templ->txcount == job_last->templ->txcount &&
@@ -783,8 +782,7 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 			stratumlog("%s %d not reporting\n", coind->name, coind->height);
 	}
 
-	bool is_equihash = (strstr(g_current_algo->name, "equihash") == g_current_algo->name);
-	if (is_ethash || is_etchash)
+	if (is_eth)
 	{
 		uint8_t target_be[32];
 		if (ethash_parse_hex_target(templ->eth_target, target_be))

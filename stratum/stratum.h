@@ -84,6 +84,10 @@ extern bool is_etchash;
 extern bool is_randomscash;
 extern bool is_homescrypt;
 extern bool is_nebhash;
+// protocol families (algos/registry.def); the names above are single algos
+extern bool is_progpow;
+extern bool is_eth;
+extern bool is_equihash;
 
 extern int g_tcp_port;
 
@@ -127,6 +131,7 @@ extern double g_stratum_spm_spam;
 extern int g_stratum_share_timeout;
 extern int g_stratum_speed_slot_secs;
 extern int g_stratum_idle_timeout;
+extern bool g_stratum_allow_static_diff;
 
 extern double g_stratum_nicehash_difficulty;
 extern double g_stratum_nicehash_min_diff;
@@ -202,6 +207,7 @@ extern int g_quote_coinid;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 YAAMP_ALGO *stratum_find_algo(const char *name);
+void stratum_set_algo_flags(const YAAMP_ALGO *algo);
 
 // Set compute_hash=false when only the serialized header is needed (for the
 // official Lumenite miner's complete-header mining.notify).
