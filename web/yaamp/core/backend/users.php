@@ -6,7 +6,7 @@
 function yaamp_geth_address_valid($coin, $address)
 {
 	return $coin && isset($coin->rpcencoding) && $coin->rpcencoding === 'GETH' &&
-		preg_match('/^0x[0-9a-fA-F]{40}$/', (string) $address) === 1;
+		preg_match('/^0x[0-9a-fA-F]{40}$/i', (string) $address) === 1;
 }
 
 function BackendUsersUpdate()

@@ -25,7 +25,7 @@ class UserService
     {
         return $coin !== null
             && (string) $coin->rpcencoding === 'GETH'
-            && preg_match('/^0x[0-9a-fA-F]{40}$/', $address) === 1;
+            && preg_match('/^0x[0-9a-fA-F]{40}$/i', $address) === 1;
     }
 
     /**
