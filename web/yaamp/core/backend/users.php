@@ -1,5 +1,14 @@
 <?php
 
+// GETH-family daemons (Larissa, Parallax/XHash, ...) have no validateaddress
+// RPC. Their payout addresses are plain 20-byte EVM hex addresses; validate
+// locally so an explicit c=<symbol> can bind the account to that coin.
+function yaamp_geth_address_valid($coin, $address)
+{
+	return $coin && isset($coin->rpcencoding) && $coin->rpcencoding === 'GETH' &&
+		preg_match('/^0x[0-9a-fA-F]{40}$/', (string) $address) === 1;
+}
+
 function BackendUsersUpdate()
 {
 	$t1 = microtime(true);
@@ -24,7 +33,9 @@ function BackendUsersUpdate()
 
 				$remote = new WalletRPC($coin);
 
-				$b = $remote->validateaddress($user->username);
+				$b = yaamp_geth_address_valid($coin, $user->username)
+					? array('isvalid' => true)
+					: $remote->validateaddress($user->username);
 				if(arraySafeVal($b,'isvalid'))
 				{
 					$old_balance = $user->balance;
@@ -61,7 +72,9 @@ function BackendUsersUpdate()
 		{
 			$remote = new WalletRPC($coin);
 
-			$b = $remote->validateaddress($user->username);
+			$b = yaamp_geth_address_valid($coin, $user->username)
+				? array('isvalid' => true)
+				: $remote->validateaddress($user->username);
 			if(!arraySafeVal($b,'isvalid')) continue;
 
 			if ($old_usercoinid && $old_usercoinid != $coin->id) {

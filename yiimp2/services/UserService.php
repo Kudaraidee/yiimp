@@ -16,6 +16,19 @@ use app\components\rpc\WalletRPC;
 class UserService
 {
     /**
+     * GETH-family daemons (including Parallax/XHash) have no validateaddress
+     * RPC. Their payout addresses are plain 20-byte EVM hex addresses, so
+     * validate locally and let an explicit c=<symbol> bind the account to the
+     * requested coin instead of falling back to the quote wallet.
+     */
+    private function isGethAddressValid($coin, string $address): bool
+    {
+        return $coin !== null
+            && (string) $coin->rpcencoding === 'GETH'
+            && preg_match('/^0x[0-9a-fA-F]{40}$/', $address) === 1;
+    }
+
+    /**
      * For each user whose coinid is unresolved (NULL) or whose coinsymbol has changed,
      * validate their wallet address against known coin daemons and assign the correct coin.
      * Ports: BackendUsersUpdate()
@@ -48,7 +61,9 @@ class UserService
                     }
 
                     $remote = new WalletRPC($coin);
-                    $b      = $remote->validateaddress($user->username);
+                    $b      = $this->isGethAddressValid($coin, (string) $user->username)
+                        ? ['isvalid' => true]
+                        : $remote->validateaddress($user->username);
 
                     if ($b['isvalid'] ?? false) {
                         $oldBalance = (float) $user->balance;
@@ -89,7 +104,9 @@ class UserService
 
             foreach ($coins as $coin) {
                 $remote = new WalletRPC($coin);
-                $b      = $remote->validateaddress($user->username);
+                $b      = $this->isGethAddressValid($coin, (string) $user->username)
+                    ? ['isvalid' => true]
+                    : $remote->validateaddress($user->username);
 
                 if (!($b['isvalid'] ?? false)) {
                     continue;
