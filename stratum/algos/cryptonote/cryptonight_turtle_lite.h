@@ -8,6 +8,7 @@ extern "C" {
 #include <stdint.h>
 
 void cryptonightturtlelite_hash(const char* input, char* output, uint32_t len, int variant);
+void cryptonightturtlelite_hash_flex(const char* input, char* output, uint32_t len, int variant);
 void cryptonightturtlelite_fast_hash(const char* input, char* output, uint32_t len);
 
 #ifdef __cplusplus

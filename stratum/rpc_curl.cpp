@@ -199,7 +199,7 @@ static int sockopt_keepalive_cb(void *userdata, curl_socket_t fd,
 
 static json_value *curl_json_rpc(YAAMP_RPC *rpc, const char *url, const char *rpc_req, int *curl_err)
 {
-	char auth_hdr[512] = { 0 };
+	char auth_hdr[sizeof(rpc->credential) + 32] = { 0 };
 	char curl_err_str[CURL_ERROR_SIZE] = { 0 };
 	struct data_buffer all_data = { 0 };
 	struct upload_buffer upload_data;
@@ -389,9 +389,9 @@ static json_value *rpc_curl_do_call(YAAMP_RPC *rpc, char const *data)
 {
 	CommonLock(&rpc->mutex);
 
-	char url[1024];
+	char url[sizeof(rpc->host) + 32];
 	int curl_err = 0;
-	sprintf(url, "http%s://%s:%d", rpc->ssl?"s":"", rpc->host, rpc->port);
+	snprintf(url, sizeof(url), "http%s://%s:%d", rpc->ssl?"s":"", rpc->host, rpc->port);
 	strcpy(curl_last_err, "");
 
 	json_value *res = curl_json_rpc(rpc, url, data, &curl_err);

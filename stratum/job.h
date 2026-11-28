@@ -85,6 +85,7 @@ struct YAAMP_JOB_TEMPLATE
 	char merkleroot[4096];
 
 	char header[256];
+	int decred_data_len;	// decred getwork data length (header + padding)
 
 	char xaya_nbits[32];
 	char xaya_header[1024];

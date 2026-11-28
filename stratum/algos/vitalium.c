@@ -10,7 +10,7 @@
 #include <sha3/sph_echo.h>
 #include <sha3/sph_shavite.h>
 #include <sha3/sph_luffa.h>
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 
 #include "common.h"
 

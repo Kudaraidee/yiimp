@@ -28,7 +28,7 @@
 
 #include "SWIFFTX/SWIFFTX.h"
 #include "lane.h"
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 #include "Lyra2.h"
 
 #include "common.h"

@@ -209,11 +209,11 @@ void build_submit_values_equihash(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMP
 		const char *nonce1, const char *ntime, const char *nonce, const char *equihash_solution)
 {
 
-	sprintf(submitvalues->coinbase, "%s", templ->coinbase);
+	STRSET(submitvalues->coinbase, templ->coinbase);
 	int coinbase_len = strlen(submitvalues->coinbase);
 
-	unsigned char coinbase_bin[2048];
-	memset(coinbase_bin, 0, 2048);
+	unsigned char coinbase_bin[sizeof(submitvalues->coinbase)/2];
+	memset(coinbase_bin, 0, sizeof(coinbase_bin));
 	binlify(coinbase_bin, submitvalues->coinbase);
 
 	char doublehash[128];
@@ -257,7 +257,7 @@ void build_submit_values_equihash(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMP
 				finalsaplingroot_reversed,
 				time_reversed, bits_reversed, nonce1, nonce);
 
-	sprintf(submitvalues->solution_hex,"%s", equihash_solution);
+	STRSET(submitvalues->solution_hex, equihash_solution);
 	binlify((unsigned char*)submitvalues->solution_bin, submitvalues->solution_hex);
 
 	// strip solution size
@@ -273,7 +273,7 @@ void build_submit_values_equihash(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMP
 	// header_be contains full header+solution, not bigendian header
 	static char header_solution_bin[8192]; memset(header_solution_bin,0,8192);
 
-	sprintf(submitvalues->header_be, "%s%s", submitvalues->header, equihash_solution);
+	STRFMT(submitvalues->header_be, "%s%s", submitvalues->header, equihash_solution);
 	int header_solution_len = strlen(submitvalues->header_be)/2;
 	binlify((unsigned char*)header_solution_bin, submitvalues->header_be);
 
@@ -286,7 +286,7 @@ void build_submit_values_equihash(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMP
 /////////////////////////////////////////////
 
 static void create_decred_header(YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *out,
-	const char *ntime, const char *nonce, const char *nonce2, const char *vote, bool usegetwork)
+	const char *ntime, const char *nonce, const char *nonce1, const char *nonce2, const char *vote, bool usegetwork)
 {
 	struct __attribute__((__packed__)) {
 		uint32_t version;
@@ -312,8 +312,9 @@ static void create_decred_header(YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *ou
 
 	memcpy(&header, templ->header, sizeof(header));
 
+	// extranonce1 at offset 144, extranonce2 at 148, nonce as raw header bytes
 	memset(header.extra, 0, 32);
-	sscanf(nonce, "%08x", &header.nonce);
+	binlify((unsigned char *) &header.nonce, nonce);
 
 	if (strcmp(vote, "")) {
 		uint16_t votebits = 0;
@@ -321,13 +322,14 @@ static void create_decred_header(YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *ou
 		header.votebits = (header.votebits & 1) | (votebits & 0xfffe);
 	}
 
-	binlify(header.extra, nonce2);
+	binlify(header.extra, nonce1);
+	binlify(header.extra + 4, nonce2);
 
 	hexlify(out->header, (const unsigned char*) &header, 180);
 	memcpy(out->header_bin, &header, sizeof(header));
 }
 
-static void build_submit_values_decred(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
+void build_submit_values_decred(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
 	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce, const char *vote, bool usegetwork)
 {
 	if (!usegetwork) {
@@ -353,16 +355,110 @@ static void build_submit_values_decred(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB
 		printf("merkle root %s\n", merkleroot.c_str());
 #endif
 	}
-	create_decred_header(templ, submitvalues, ntime, nonce, nonce2, vote, usegetwork);
+	create_decred_header(templ, submitvalues, ntime, nonce, nonce1, nonce2, vote, usegetwork);
 
 	int header_len = strlen(submitvalues->header)/2;
 	g_current_algo->hash_function((char *)submitvalues->header_bin, (char *)submitvalues->hash_bin, header_len);
 
 	hexlify(submitvalues->hash_hex, submitvalues->hash_bin, 32);
 	string_be(submitvalues->hash_hex, submitvalues->hash_be);
+
+	// the block id is still BLAKE-256 of the header
+	decred_block_hash((char *)submitvalues->header_bin, (char *)submitvalues->block_hash_bin, header_len);
+	hexlify(submitvalues->block_hash_hex, submitvalues->block_hash_bin, 32);
+	string_be(submitvalues->block_hash_hex, submitvalues->block_hash_be);
 }
 
 /////////////////////////////////////////////////////////////////////////////////
+
+// Aux proof of work for a merged-mined coin (getauxblock/submitauxblock):
+// parent coinbase, parent hash, parent merkle branch, aux merkle branch and
+// parent header. No side effects, so templcheck can print it.
+string client_build_auxpow(YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *submitvalues, YAAMP_COIND_AUX *aux)
+{
+	char hex[16];
+	string out = submitvalues->coinbase;			// parent coinbase
+	// DASH based aux coins like OSMI use different serialized byte stream
+	// todo: needs some fine tuning for old-style coins like UIS on x11
+	if (strcmp(g_stratum_algo, "x11"))
+		out += submitvalues->hash_be;			// parent hash
+
+	// parent merkle steps
+	snprintf(hex, sizeof(hex), "%02x", (unsigned char)templ->txsteps.size());
+	out += hex;
+	for (vector<string>::const_iterator i = templ->txsteps.begin(); i != templ->txsteps.end(); ++i)
+		out += *i;
+	out += "00000000";
+
+	// aux merkle steps
+	vector<string> lresult = coind_aux_merkle_branch(templ->auxs, templ->auxs_size, aux->index);
+	snprintf(hex, sizeof(hex), "%02x", (unsigned char)lresult.size());
+	out += hex;
+	for (vector<string>::const_iterator i = lresult.begin(); i != lresult.end(); ++i)
+		out += *i;
+	snprintf(hex, sizeof(hex), "%02x000000", (unsigned char)aux->index);
+	out += hex;
+
+	out += submitvalues->header_be;				// parent header
+	return out;
+}
+
+// Full block for submitblock: header, tx count, coinbase, transactions and
+// the coin specific parts. No side effects except templ->xaya_nbits.
+string client_build_block(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *submitvalues)
+{
+	char count_hex[COMPACTSIZE_HEX];
+	ser_compactsize(templ->txcount, count_hex);
+
+	string out;
+	if (!strcmp("sha256csm", g_current_algo->name)) {
+		out = submitvalues->header_be;
+		out += "0000000000000000000000000000000000000000000000000000000000000000";
+		out += count_hex;
+		out += submitvalues->coinbase;
+	} else if (!strcmp(g_stratum_algo, "neoscrypt-xaya")) {
+		string_be(templ->nbits, &templ->xaya_nbits[0]);
+		out = submitvalues->xaya_header;
+		out += "02";
+		out += templ->xaya_nbits;
+		out += submitvalues->header;
+		out += count_hex;
+		out += templ->xaya_coinbase;
+	} else {
+		out = submitvalues->header_be;
+		out += count_hex;
+		out += submitvalues->coinbase;
+	}
+
+	if (g_current_algo->name && !strcmp("jha", g_current_algo->name)) {
+		// block header of 88 bytes
+		out = submitvalues->header_be;
+		out += "8400000008000000";
+		out += count_hex;
+		out += submitvalues->coinbase;
+	}
+
+	for (vector<string>::const_iterator i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
+		out += *i;
+
+	// POS coins need a zero byte appended to block, the daemon replaces it with the signature
+	if (coind->pos)
+		out += "00";
+
+	if (!strcmp("DCR", coind->rpcencoding)) {
+		// regenerated header; getwork wants the node's padding back as well
+		char hex[2 * 192 + 1];
+		int len = coind->usegetwork && templ->decred_data_len > 180 ? templ->decred_data_len : 180;
+		hexlify(hex, submitvalues->header_bin, len);
+		out = hex;
+	}
+
+	if (templ->mweb) {
+		out += "01";
+		out += templ->mweb;
+	}
+	return out;
+}
 
 static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VALUES *submitvalues,
 	char *extranonce2, char *ntime, char *nonce, char *vote, uint32_t versionmask)
@@ -401,16 +497,6 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 		block_hash_ok = !negative && !overflow && full_hash <= full_target;
 	}
 
-	int block_size = YAAMP_SMALLBUFSIZE;
-	vector<string>::const_iterator i;
-
-	for(i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
-		block_size += strlen((*i).c_str());
-	if (templ->mweb) block_size += strlen(templ->mweb);
-
-	char *block_hex = (char *)malloc(block_size);
-	if(!block_hex) return;
-
 	// do aux first
 	for(int i=0; i<templ->auxs_size; i++)
 	{
@@ -432,39 +518,9 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 		uint64_t coin_target_aux = get_hash_difficulty(target_aux);
 		if ((hash_int <= coin_target_aux) && (!current_aux->skip_submitblock))
 		{
-			memset(block_hex, 0, block_size);
+			string auxpow = client_build_auxpow(templ, submitvalues, current_aux);
 
-			strcat(block_hex, submitvalues->coinbase);		// parent coinbase
-			// DASH based aux coins like OSMI use different serialized byte stream
-			// todo: needs some fine tuning for old-style coins like UIS on x11
-			if (strcmp(g_stratum_algo, "x11")) {
-				strcat(block_hex, submitvalues->hash_be);		// parent hash
-			}
-			////////////////////////////////////////////////// parent merkle steps
-
-			sprintf(block_hex+strlen(block_hex), "%02x", (unsigned char)templ->txsteps.size());
-
-			vector<string>::const_iterator i;
-			for(i = templ->txsteps.begin(); i != templ->txsteps.end(); ++i)
-				sprintf(block_hex + strlen(block_hex), "%s", (*i).c_str());
-
-			strcat(block_hex, "00000000");
-
-			////////////////////////////////////////////////// auxs merkle steps
-
-			vector<string> lresult = coind_aux_merkle_branch(templ->auxs, templ->auxs_size, current_aux->index);
-			sprintf(block_hex+strlen(block_hex), "%02x", (unsigned char)lresult.size());
-
-			for(i = lresult.begin(); i != lresult.end(); ++i)
-				sprintf(block_hex+strlen(block_hex), "%s", (*i).c_str());
-
-			sprintf(block_hex+strlen(block_hex), "%02x000000", (unsigned char)current_aux->index);
-
-			////////////////////////////////////////////////// parent header
-
-			strcat(block_hex, submitvalues->header_be);
-
-			bool b = coind_submitgetauxblock(coind_aux, current_aux->hash, block_hex);
+			bool b = coind_submitgetauxblock(coind_aux, current_aux->hash, auxpow.c_str());
 			if(b)
 			{
 				debuglog("*** ACCEPTED %s %d (+1)\n", coind_aux->name, coind_aux->height);
@@ -490,54 +546,9 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 
 	if(block_hash_ok)
 	{
-		char count_hex[8] = { 0 };
-		if (templ->txcount <= 252)
-			sprintf(count_hex, "%02x", templ->txcount & 0xFF);
-		else
-			sprintf(count_hex, "fd%02x%02x", templ->txcount & 0xFF, templ->txcount >> 8);
+		string block = client_build_block(coind, templ, submitvalues);
 
-		memset(block_hex, 0, block_size);
-		
-		if (!strcmp("sha256csm", g_current_algo->name)) 
-		{
-			sprintf(block_hex, "%s%s%s%s", submitvalues->header_be, "0000000000000000000000000000000000000000000000000000000000000000", count_hex, submitvalues->coinbase);
-		} else if(!strcmp(g_stratum_algo, "neoscrypt-xaya")) {
-				string_be(templ->nbits,&templ->xaya_nbits[0]);
-				sprintf(block_hex, "%s02%s%s%s%s", submitvalues->xaya_header, templ->xaya_nbits,
-				submitvalues->header, count_hex, templ->xaya_coinbase);
-		} else {
-			sprintf(block_hex, "%s%s%s", submitvalues->header_be, count_hex, submitvalues->coinbase);
-		}
-
-		if (g_current_algo->name && !strcmp("jha", g_current_algo->name)) {
-			// block header of 88 bytes
-			sprintf(block_hex, "%s8400000008000000%s%s", submitvalues->header_be, count_hex, submitvalues->coinbase);
-		}
-
-		vector<string>::const_iterator i;
-		for(i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
-			sprintf(block_hex+strlen(block_hex), "%s", (*i).c_str());
-
-		// POS coins need a zero byte appended to block, the daemon replaces it with the signature
-		if(coind->pos)
-			strcat(block_hex, "00");
-
-		if(!strcmp("DCR", coind->rpcencoding)) {
-			// submit the regenerated block header
-			char hex[384];
-			hexlify(hex, submitvalues->header_bin, 180);
-			if (coind->usegetwork)
-				snprintf(block_hex, block_size, "%s8000000100000000000005a0", hex);
-			else
-				snprintf(block_hex, block_size, "%s", hex);
-		}
-
-		if(templ->mweb) {
-			strcat(block_hex, "01");
-			strcat(block_hex, templ->mweb);
-		}
-
-		bool b = coind_submit(coind, block_hex);
+		bool b = coind_submit(coind, block.c_str());
 		if(b)
 		{
 			debuglog("*** ACCEPTED %s %d (diff %g) by %s (id: %d)\n", coind->name, templ->height,
@@ -568,12 +579,13 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 
 			string_be(doublehash2, hash1);
 
-			if(coind->usegetwork && !strcmp("DCR", coind->rpcencoding)) {
-				// no merkle stuff
-				strcpy(hash1, submitvalues->hash_hex);
+			const bool is_dcr = !strcmp("DCR", coind->rpcencoding);
+			if(coind->usegetwork && is_dcr) {
+				// block id is BLAKE-256, not the PoW hash
+				strcpy(hash1, submitvalues->block_hash_hex);
 			}
 
-			const char *block_hash = is_randomscash ? submitvalues->block_hash_be : submitvalues->hash_be;
+			const char *block_hash = (is_randomscash || is_dcr) ? submitvalues->block_hash_be : submitvalues->hash_be;
 
 			block_add(client->userid, client->workerid, coind->id, templ->height,
 				target_to_diff_coin(coin_target, coind->powlimit_bits - ((is_equihash)? 0 : 16)),
@@ -600,13 +612,11 @@ static void client_do_submit(YAAMP_CLIENT *client, YAAMP_JOB *job, YAAMP_JOB_VAL
 			debuglog("*** REJECTED :( %s block %d %d txs\n", coind->name, templ->height, templ->txcount);
 			rejectlog("REJECTED %s block %d\n", coind->symbol, templ->height);
 			if (g_debuglog_hash) {
-				//debuglog("block %s\n", block_hex);
+				//debuglog("block %s\n", block.c_str());
 				debuglog("--------------------------------------------------------------\n");
 			}
 		}
 	}
-
-	free(block_hex);
 }
 
 bool dump_submit_debug(const char *title, YAAMP_CLIENT *client, YAAMP_JOB *job, char *extranonce2, char *ntime, char *nonce)
@@ -715,7 +725,7 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 	if (json_params->u.array.length == 6) {
 		if (strstr(g_stratum_algo, "sha256")) {
 			// get versionbits for asicboost
-			strncpy(versionbits, json_params->u.array.values[5]->u.string.ptr, 32);
+			strncpy(versionbits, json_params->u.array.values[5]->u.string.ptr, sizeof(versionbits) - 1);
 			string_lower(versionbits);
 			versionmask = strtoul(versionbits, NULL, 16);
 		}
@@ -795,30 +805,7 @@ bool client_submit(YAAMP_CLIENT *client, json_value *json_params)
 		return true;
 	}
 
-	// check if the submitted extranonce is valid
-	if(is_decred && client->extranonce2size > 4) {
-		char extra1_id[16], extra2_id[16];
-		int cmpoft = client->extranonce2size*2 - 8;
-		STRSET(extra1_id, &client->extranonce1[cmpoft]);
-		STRSET(extra2_id, &extranonce2[cmpoft]);
-		int extradiff = (int) strcmp(extra2_id, extra1_id);
-		int extranull = (int) !strcmp(extra2_id, "00000000");
-		if (extranull && client->extranonce2size > 8)
-			extranull = (int) !strcmp(&extranonce2[8], "00000000" "00000000");
-		if (extranull) {
-			debuglog("extranonce %s is empty!, should be %s - %s\n", extranonce2, extra1_id, client->sock->ip);
-			client_submit_error(client, job, 27, "Invalid extranonce2 suffix", extranonce2, ntime, nonce);
-			return true;
-		}
-		if (extradiff) {
-			// some ccminer pre-release doesn't fill correctly the extranonce
-			client_submit_error(client, job, 27, "Invalid extranonce2 suffix", extranonce2, ntime, nonce);
-			socket_send(client->sock, "{\"id\":null,\"method\":\"mining.set_extranonce\",\"params\":[\"%s\",%d]}\n",
-				client->extranonce1, client->extranonce2size);
-			return true;
-		}
-	}
-	else if((!is_equihash) && (!ishexa(extranonce2, client->extranonce2size*2))) {
+	if((!is_equihash) && (!ishexa(extranonce2, client->extranonce2size*2))) {
 		client_submit_error(client, job, 27, "Invalid nonce2", extranonce2, ntime, nonce);
 		return true;
 	}

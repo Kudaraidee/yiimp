@@ -8,6 +8,7 @@ extern "C" {
 #include <stdint.h>
 
 void cryptonightlite_hash(const char* input, char* output, uint32_t len, int variant);
+void cryptonightlite_hash_flex(const char* input, char* output, uint32_t len, int variant);
 void cryptonightlite_fast_hash(const char* input, char* output, uint32_t len);
 
 #ifdef __cplusplus

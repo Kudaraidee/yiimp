@@ -124,18 +124,18 @@ FILE *g_rejectlog = NULL;
 
 void initlog(const char *algo)
 {
-	char debugfile[1024];
+	char debugfile[sizeof(g_log_directory) + 300];
 
 	if (algo != NULL) {
-		sprintf(debugfile, "%sstratum-%s.log", g_log_directory ,algo);
+		snprintf(debugfile, sizeof(debugfile), "%sstratum-%.255s.log", g_log_directory, algo);
 		g_debuglog = fopen(debugfile, "a");
 	}
 
-	sprintf(debugfile, "%sstratum.log", g_log_directory);
+	snprintf(debugfile, sizeof(debugfile), "%sstratum.log", g_log_directory);
 	g_stratumlog = fopen(debugfile, "a");
-	sprintf(debugfile, "%sstratum-client.log", g_log_directory);
+	snprintf(debugfile, sizeof(debugfile), "%sstratum-client.log", g_log_directory);
 	g_clientlog = fopen(debugfile, "a");
-	sprintf(debugfile, "%sstratum-reject.log", g_log_directory);
+	snprintf(debugfile, sizeof(debugfile), "%sstratum-reject.log", g_log_directory);
 	g_rejectlog = fopen(debugfile, "a");
 }
 
@@ -174,7 +174,7 @@ void clientlog(YAAMP_CLIENT *client, const char *format, ...)
 	strftime(buffer2, 80, "%Y-%m-%d %H:%M:%S", timeinfo);
 
 	char buffer3[YAAMP_SMALLBUFSIZE];
-	sprintf(buffer3, "%s [%s] %s, %s, %s\n", buffer2, client->sock->ip, client->username, g_current_algo->name, buffer);
+	snprintf(buffer3, sizeof(buffer3), "%s [%s] %s, %s, %s\n", buffer2, client->sock->ip, client->username, g_current_algo->name, buffer);
 
 	printf("%s", buffer3);
 	if(g_debuglog)
@@ -427,7 +427,7 @@ void base64_decode(char *normal, const char *base64)
 		if(base64[i] == '=')
 			break;
 
-		unsigned char digit = decoding_tab[base64[i]];
+		unsigned char digit = decoding_tab[(unsigned char) base64[i]];
 
 		current <<= 6;
 		current |= digit;
@@ -519,24 +519,18 @@ void ser_number(int n, char *a)
 //	printf("ser_number %d, %s\n", n, a);
 }
 
+// Bitcoin CompactSize as hex: one byte below 253, else fd/fe/ff and a
+// little-endian 2/4/8-byte value. a holds COMPACTSIZE_HEX chars.
 void ser_compactsize(uint64_t nSize, char *a)
 {
-	if (nSize < 253)
-	{
-		sprintf(a, "%02lx", nSize);
+	const int bytes = nSize < 253 ? 0 : nSize <= 0xffff ? 2 : nSize <= 0xffffffffULL ? 4 : 8;
+	if (!bytes) {
+		sprintf(a, "%02x", (unsigned int) nSize);
+		return;
 	}
-	else if (nSize <= (unsigned short)-1)
-	{
-		sprintf(a, "%02x%04lx", 253, nSize);
-	}
-	else if (nSize <= (unsigned int)-1)
-	{
-		sprintf(a, "%02x%08lx", 254, nSize);
-	}
-	else
-	{
-		sprintf(a, "%02x%016lx", 255, nSize);
-	}
+	a += sprintf(a, "%02x", bytes == 2 ? 0xfd : bytes == 4 ? 0xfe : 0xff);
+	for (int i = 0; i < bytes; i++, nSize >>= 8)
+		a += sprintf(a, "%02x", (unsigned int) (nSize & 0xff));
 }
 
 void ser_string_be(const char *input, char *output, int len)
@@ -1053,9 +1047,36 @@ uint64_t share_to_target(double diff)
 
 thread_local int str_overflows = 0;
 
+// Oversized miner input can fail on every submit: log at most
+// STR_FAIL_LOG_MAX refusals per minute, then how many were not logged.
+#define STR_FAIL_LOG_MAX	10
+static pthread_mutex_t str_fail_mutex = PTHREAD_MUTEX_INITIALIZER;
+static time_t str_fail_window = 0;
+static int str_fail_logged = 0;
+static int str_fail_dropped = 0;
+
 bool str_fail(const char *what, size_t need, size_t cap)
 {
 	str_overflows++;
+
+	time_t now = time(NULL);
+	int dropped = 0;
+	pthread_mutex_lock(&str_fail_mutex);
+	if (now - str_fail_window >= 60) {
+		dropped = str_fail_dropped;
+		str_fail_window = now;
+		str_fail_logged = 0;
+		str_fail_dropped = 0;
+	}
+	bool log = str_fail_logged < STR_FAIL_LOG_MAX;
+	if (log) str_fail_logged++;
+	else str_fail_dropped++;
+	pthread_mutex_unlock(&str_fail_mutex);
+
+	if (dropped)
+		stratumlog("ERROR: %d more oversized values were not logged\n", dropped);
+	if (!log)
+		return false;
 	if (need)
 		stratumlog("ERROR: %s needs %zu bytes, has %zu\n", what, need, cap);
 	else

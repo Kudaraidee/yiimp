@@ -22,7 +22,7 @@
 #include "../sha3/sph_tiger.h"
 #include "../sha3/sph_haval.h"
 #include "Lyra2.h"
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 #include "cryptonote/cryptonight_dark.h"
 #include "cryptonote/cryptonight_dark_lite.h"
 #include "cryptonote/cryptonight_fast.h"

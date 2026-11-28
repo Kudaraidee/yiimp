@@ -15,7 +15,7 @@
 #include "../sha3/sph_simd.h"
 #include "../sha3/sph_echo.h"
 
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 
 void sib_hash(const char *input, char* output, uint32_t len)
 {

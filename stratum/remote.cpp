@@ -140,7 +140,7 @@ void *remote_thread(void *p)
 
 		else if(remote->status == YAAMP_REMOTE_AUTHORIZE)
 		{
-			char message_authorize[2*1024];
+			char message_authorize[sizeof(remote->username) + sizeof(remote->password) + 128];
 			sprintf(message_authorize, "{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"%s\",\"%s\"]}\n",
 				remote->username, remote->password);
 

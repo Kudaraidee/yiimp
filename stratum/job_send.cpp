@@ -68,7 +68,7 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer, int gen = 0)
 		string_be(templ->version, version_reversed);
 		string_be(templ->prevhash_hex, prev_hash_reversed);
 //		string_be(templ->merkleroot, merkleroot_reversed);
-		sprintf(merkleroot_reversed, "%s", templ->merkleroot);
+		STRSET(merkleroot_reversed, templ->merkleroot);
 		string_be(templ->saplingroothash, finalsaplingroot_reversed);
 		string_be(templ->ntime, time_reversed);
 		string_be(templ->nbits, bits_reversed);
@@ -89,9 +89,15 @@ static void job_mining_notify_buffer(YAAMP_JOB *job, char *buffer, int gen = 0)
 		return;
 	}
 
-	// standard stratum
+	// standard stratum; decred getwork: nbits as raw header bytes
+	const char *nbits = templ->nbits;
+	char decred_nbits[9];
+	if (templ->decred_data_len) {
+		hexlify(decred_nbits, (const unsigned char *) templ->header + 116, 4);
+		nbits = decred_nbits;
+	}
 	str_format(buffer, YAAMP_SMALLBUFSIZE, false, "notify", "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%s\",\"%s\",\"%s\",\"%s\",[%s],\"%s\",\"%s\",\"%s\",true]}\n",
-		jobid, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, templ->nbits, templ->ntime);
+		jobid, templ->prevhash_be, templ->coinb1, templ->coinb2, templ->txmerkles, templ->version, nbits, templ->ntime);
 }
 
 // MukiMiner expects a complete serialized 80-byte header and only substitutes

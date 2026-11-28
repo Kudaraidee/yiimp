@@ -474,8 +474,7 @@ static shared_ptr<NEB_MODEL> nebhash_decode_model(uint8_t slot,
 		return shared_ptr<NEB_MODEL>();
 	}
 
-	shared_ptr<NEB_MODEL> m(new NEB_MODEL);
-	memset(m.get(), 0, sizeof(NEB_MODEL));
+	shared_ptr<NEB_MODEL> m(new NEB_MODEL());
 	m->slot = slot;
 	m->arch = arch;
 	memcpy(m->hash, payload, 32);
@@ -1322,7 +1321,7 @@ static bool neb_send_frame(int sock, uint8_t type, const vector<uint8_t> &payloa
 static bool neb_parse_job(const uint8_t *p, size_t len, shared_ptr<NEB_JOB> &out)
 {
 	NEB_READER r(p, len);
-	if (!(out.reset(new NEB_JOB), r.u64(&out->node_id))) return false;
+	if (!(out.reset(new NEB_JOB()), r.u64(&out->node_id))) return false;
 	// The Job frame does not carry its dataset slot; it comes from the Model
 	// frame immediately before it. Initialize these fields so a missing or
 	// out-of-order Model is reported deterministically instead of using heap
@@ -2143,8 +2142,7 @@ bool nebhash_submit(YAAMP_CLIENT *client, json_value *json_params)
 
 	// Rebuild the immutable part of the job from the template. Templates are
 	// self-contained so late shares after a job change still verify.
-	shared_ptr<NEB_JOB> nbjob(new NEB_JOB);
-	memset(nbjob.get(), 0, sizeof(NEB_JOB));
+	shared_ptr<NEB_JOB> nbjob(new NEB_JOB());
 	nbjob->node_id = templ->neb_node_id;
 	nbjob->version = templ->neb_version;
 	nbjob->time_start = templ->neb_time_start;

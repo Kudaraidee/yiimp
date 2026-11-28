@@ -435,7 +435,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	else if(!strcmp(coind->symbol, "FIRO")) // Firo-family: dynamic payees, with legacy fallback
 	{
-		char outputs_count[4] = { 0 };
+		char outputs_count[COMPACTSIZE_HEX] = { 0 };
 		char script_dests[4096] = { 0 };
 		unsigned int outputs = 1;
 
@@ -448,7 +448,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		firo_pack_payee(coind, script_dests, json_result, "datamining", outputs);
 
 		if (outputs > base_outputs) {
-			sprintf(outputs_count, "%02x", outputs);
+			ser_compactsize(outputs, outputs_count);
 			strcat(templ->coinb2, outputs_count);
 			if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
 
@@ -489,7 +489,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	else if(!strcmp(coind->symbol, "KIIRO")) // Firo-family: additive outputs, raw scripts
 	{
-		char outputs_count[4] = { 0 };
+		char outputs_count[COMPACTSIZE_HEX] = { 0 };
 		char script_dests[4096] = { 0 };
 		unsigned int outputs = 1; // pool/miner output
 
@@ -499,7 +499,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		firo_pack_payee(coind, script_dests, json_result, "developer", outputs);
 		firo_pack_payee(coind, script_dests, json_result, "datamining", outputs);
 
-		sprintf(outputs_count, "%02x", outputs);
+		ser_compactsize(outputs, outputs_count);
 		strcat(templ->coinb2, outputs_count);
 		if (templ->has_segwit_txs) strcat(templ->coinb2, commitment);
 
@@ -576,7 +576,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 	else if(!strcmp(coind->symbol, "STAK")) //hardcoded everything
 	{
 		char script_payee[512] = { 0 };
-		char payees[4];
+		char payees[COMPACTSIZE_HEX];
 		int npayees = (templ->has_segwit_txs) ? 2 : 1;
 		bool masternode_payments = json_get_bool(json_result, "masternode_payments");
 		bool masternodes_enabled = json_get_bool(json_result, "enforce_masternode_payments");
@@ -605,7 +605,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		++npayees;
 		available -= charity_amount;
 		base58_decode(coind->charity_address, script_payee);
-		sprintf(payees, "%02x", npayees);
+		ser_compactsize(npayees, payees);
 		STRADD(templ->coinb2, payees);
 		if (templ->has_segwit_txs) STRADD(templ->coinb2, commitment);
 		char echarity_amount[32];
@@ -639,7 +639,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		char script_dests[sizeof(templ->coinb2)] = { 0 };
 		char script_payee[128] = { 0 };
         char script_treasury[128] = { 0 };
-		char payees[4];
+		char payees[COMPACTSIZE_HEX];
 		int npayees = 1;
 		bool masternode_enabled = json_get_bool(json_result, "masternode_payments_enforced");
 		json_value* masternode = json_get_object(json_result, "masternode");
@@ -666,7 +666,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 				job_pack_tx(coind, script_dests, amount, script_payee);
 			}
 		}
-		sprintf(payees, "%02x", npayees);
+		ser_compactsize(npayees, payees);
 		STRADD(templ->coinb2, payees);
 		STRADD(templ->coinb2, script_dests);
 		job_pack_tx(coind, templ->coinb2, available, NULL);
@@ -719,7 +719,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	else if (!strcmp(coind->symbol, "ADVC"))
 	{
-		char payees[4];
+		char payees[COMPACTSIZE_HEX];
 		int npayees = 2;
 		char script_dests[sizeof(templ->coinb2)] = { 0 };
 
@@ -737,14 +737,14 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		job_pack_tx(coind, script_dests, miner_amount, NULL);
 		job_pack_tx(coind, script_dests, developer_amount, developer_script_payee);
 
-		sprintf(payees, "%02x", npayees);
+		ser_compactsize(npayees, payees);
 		STRADD(templ->coinb2, payees);
 		STRADD(templ->coinb2, script_dests);
 		STRADD(templ->coinb2, "00000000");
 
 		if (coinbase_payload && strlen(coinbase_payload) > 0)
 		{
-   			char coinbase_payload_size[18];
+			char coinbase_payload_size[COMPACTSIZE_HEX];
 	        ser_compactsize((unsigned int)(strlen(coinbase_payload) >> 1), coinbase_payload_size);
 	        STRADD(templ->coinb2, coinbase_payload_size);
 	        STRADD(templ->coinb2, coinbase_payload);
@@ -756,7 +756,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
     else if(!strcmp(coind->symbol, "KCN") || !strcmp(coind->symbol, "LCN"))
 	{
-		char outputs_count[4] = { 0 };
+		char outputs_count[COMPACTSIZE_HEX] = { 0 };
         char devscript2[256] = { 0 };
         char devscript_len[3] = { 0 };
         unsigned int outputs = 2;
@@ -766,9 +766,9 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
         const char *devscript = json_get_string(devreward, "scriptpubkey");
         encode_tx_value(dev_amount, devvalue);
         snprintf(devscript2, 255, "%s", devscript);
-        sprintf(devscript_len, "%02x", strlen(devscript2) >> 1);
+        sprintf(devscript_len, "%02x", (unsigned int) (strlen(devscript2) >> 1));
         if (templ->has_segwit_txs) outputs++;
-        sprintf(outputs_count, "%02x", outputs);
+        ser_compactsize(outputs, outputs_count);
         STRADD(templ->coinb2, outputs_count);
         job_pack_tx(coind, templ->coinb2, available, NULL);
         coind->reward = (double)available/100000000*coind->reward_mul;
@@ -1092,7 +1092,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		pays.push_back(tmpPay);
 	}
 
-	char payees[4]; // addresses count
+	char payees[COMPACTSIZE_HEX]; // addresses count
 	int npayees = (templ->has_segwit_txs) ? 2 : 1;
 	char script_dests[sizeof(templ->coinb2)] = { 0 };
 
@@ -1125,7 +1125,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 		job_pack_tx(coind, script_dests, charity_amount, script_payee);
 	} */
 
-	sprintf(payees, "%02x", npayees);
+	ser_compactsize(npayees, payees);
 	STRADD(templ->coinb2, payees);
 	if (templ->has_segwit_txs) STRADD(templ->coinb2, commitment);
 	if (!pays.empty()) STRADD(templ->coinb2, script_dests);
@@ -1139,7 +1139,7 @@ void coinbase_create(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, json_value *
 
 	STRADD(templ->coinb2, "00000000"); // locktime
 	if(!pays.empty() and coinbase_payload and strlen(coinbase_payload) > 0) {
-		char coinbase_payload_size[18];
+		char coinbase_payload_size[COMPACTSIZE_HEX];
 		ser_compactsize((unsigned int)(strlen(coinbase_payload) >> 1), coinbase_payload_size);
 		STRADD(templ->coinb2, coinbase_payload_size);
 		STRADD(templ->coinb2, coinbase_payload);

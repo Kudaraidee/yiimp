@@ -105,7 +105,7 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 				RETURN_ON_CONDITION(i == YAAMP_JOB_MAXSUBIDS, false);
 			}
 
-			sprintf(client->extranonce1, "%s%02x", remote->nonce1, client->extranonce1_id);
+			RETURN_ON_CONDITION(!STRFMT(client->extranonce1, "%s%02x", remote->nonce1, client->extranonce1_id), false);
 			client->extranonce2size = remote->nonce2size-1;
 			client->difficulty_remote = difficulty_remote;
 		}
@@ -122,13 +122,6 @@ static bool job_assign_client(YAAMP_JOB *job, YAAMP_CLIENT *client, double maxha
 		{
 			strcpy(client->extranonce1, client->extranonce1_default);
 			client->extranonce2size = client->extranonce2size_default;
-		}
-
-		// decred uses an extradata field in block header, 2 first uint32 are set by the miner
-		if (g_current_algo->name && !strcmp(g_current_algo->name,"decred")) {
-			memset(client->extranonce1, '0', sizeof(client->extranonce1));
-			memcpy(&client->extranonce1[16], client->extranonce1_default, 8);
-			client->extranonce1[24] = '\0';
 		}
 
 		client->difficulty_remote = 0;

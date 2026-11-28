@@ -22,7 +22,7 @@
 #include <sha3/sph_tiger.h>
 
 #include "SWIFFTX/SWIFFTX.h"
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 #include "Lyra2.h"
 
 #include "common.h"

@@ -30,7 +30,7 @@ ALGO("c11", c11_hash, 1, 0, STD, 0)
 ALGO("cosa", cosa_hash, 1, 0, STD, 0) //Cosanta (COSA)
 ALGO("cpupower", cpupower_hash, 0x10000, 0, STD, 0) //CPUchain
 ALGO("curvehash", curve_hash, 1, 0, STD, 0)
-ALGO("decred", decred_hash, 1, 0, STD, 0)
+ALGO("decred", decred_hash, 1, 0, STD, ALGO_NO_ROLLTIME)
 ALGO("dedal", dedal_hash, 0x100, 0, STD, 0)
 ALGO("deep", deep_hash, 1, 0, STD, 0)
 ALGO("dmd-gr", groestl_hash, 0x100, 0, STD, 0) /* diamond (double groestl) */

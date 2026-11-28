@@ -232,38 +232,51 @@ void coind_init(YAAMP_COIND *coind)
 
 	snprintf(params, sizeof(params), "[\"legacy\"]");
 
+	// the wallet answers are copied with STRSET: an oversized one leaves the
+	// wallet empty instead of overflowing it
 	json_value *json = rpc_call(&coind->rpc, "getrawchangeaddress", params);
-	if (json and json->u.object.values[0].value->type == json_string) {
-		strcpy(coind->wallet, json->u.object.values[0].value->u.string.ptr);
+	if (json && json->u.object.length && json->u.object.values[0].value->type == json_string) {
+		STRSET(coind->wallet, json->u.object.values[0].value->u.string.ptr);
 	}
 	if (!valid) {
+		if (json) json_value_free(json);
 		json = rpc_call(&coind->rpc, "getaddressesbyaccount", params);
 
 		if (json && json_is_array(json) && json->u.object.length) {
 			debuglog("is array...\n");
 			if (json->u.object.values[0].value->type == json_string)
-				strcpy(coind->wallet, json->u.object.values[0].value->u.string.ptr);
+				STRSET(coind->wallet, json->u.object.values[0].value->u.string.ptr);
 		}
 	}
 	if (!valid) {
+		if (json) json_value_free(json);
 		json = rpc_call(&coind->rpc, "getaddressesbylabel", params);
-		if (json and !strcmp(json->u.object.values[0].name, "result") and !strcmp(json->u.object.values[1].name, "error"))
-			if (json->u.object.values[1].value->type != json_object) { //{"result":{"SeaVFG3CRtSSP97BE5mhJA33EGtT1MkCj9":{"purpose":"receive"}},"error":null,"id":"3"}
-				strcpy(coind->wallet, json->u.object.values[0].value->u.object.values[0].name);
+		if (json && json->u.object.length >= 2 && !strcmp(json->u.object.values[0].name, "result")
+			&& !strcmp(json->u.object.values[1].name, "error"))
+		{
+			json_value *result = json->u.object.values[0].value;
+			json_value *error = json->u.object.values[1].value;
+			if (error->type != json_object) {
+				//{"result":{"SeaVFG3CRtSSP97BE5mhJA33EGtT1MkCj9":{"purpose":"receive"}},"error":null,"id":"3"}
+				if (result->type == json_object && result->u.object.length)
+					STRSET(coind->wallet, result->u.object.values[0].name);
 			}
-			else { //{"result":null,"error":{"code":-18,"message":"No wallet is loaded. Load a wallet using loadwallet or create a new one with createwallet. (Note: A default wallet is no longer automatically created)"},"id":"3"}
-				if (json->u.object.values[1].value->u.object.values[0].value->type == json_integer and json->u.object.values[1].value->u.object.values[0].value->u.integer == -18) {
-					debuglog("NOTICE -- coind_init -- %s says there's no wallet (code -18), creating\n", coind->symbol);
-					json = rpc_call(&coind->rpc, "createwallet", params);
-					json = rpc_call(&coind->rpc, "getnewaddress", params);
-					if (json and json->u.object.values[0].value->type == json_string) {
-						strcpy(coind->wallet, json->u.object.values[0].value->u.string.ptr);
-					}
+			else if (error->u.object.length && error->u.object.values[0].value->type == json_integer
+				&& error->u.object.values[0].value->u.integer == -18) {
+				//{"result":null,"error":{"code":-18,"message":"No wallet is loaded. ..."},"id":"3"}
+				debuglog("NOTICE -- coind_init -- %s says there's no wallet (code -18), creating\n", coind->symbol);
+				json_value_free(json);
+				json = rpc_call(&coind->rpc, "createwallet", params);
+				if (json) json_value_free(json);
+				json = rpc_call(&coind->rpc, "getnewaddress", params);
+				if (json && json->u.object.length && json->u.object.values[0].value->type == json_string) {
+					STRSET(coind->wallet, json->u.object.values[0].value->u.string.ptr);
 				}
 			}
+		}
 	}
 
-	json_value_free(json);
+	if (json) json_value_free(json);
 
 	coind_validate_address(coind);
 	if (strlen(coind->wallet)) {

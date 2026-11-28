@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "sha256_Y.h"
 #include "sysendian.h"
@@ -711,6 +712,10 @@ smix(uint64_t * B, size_t r, uint64_t N, uint32_t p, uint32_t t,
 #endif
 }
 
+/* Key of the ClientKey HMAC, set per algorithm by yescrypt_bsty();
+ * NULL: the salt (plain yescrypt, BSTY). */
+__thread const char *yescrypt_client_key = NULL;
+
 /**
  * yescrypt_kdf(shared, local, passwd, passwdlen, salt, saltlen,
  *     N, r, p, t, flags, buf, buflen):
@@ -942,18 +947,10 @@ yescrypt_kdf(const yescrypt_shared_t * shared, yescrypt_local_t * local,
 		{
 			HMAC_SHA256_CTX_Y ctx;
 			HMAC_SHA256_Init_Y(&ctx, buf, buflen);
-			if (r == 32)	{ // yescryptR32
-				HMAC_SHA256_Update_Y(&ctx, "WaviBanana", 10);
-			} else
-			if (r == 16)	{ // yescryptR16
-				HMAC_SHA256_Update_Y(&ctx, "Client Key", 10);
-			} else
-			if (r == 8)	{ // yescryptR8
-				HMAC_SHA256_Update_Y(&ctx, "Client Key", 10);
-			}
-			else	{ // yescrypt
+			if (yescrypt_client_key)
+				HMAC_SHA256_Update_Y(&ctx, yescrypt_client_key, strlen(yescrypt_client_key));
+			else
 				HMAC_SHA256_Update_Y(&ctx, salt, saltlen);
-			}
 			HMAC_SHA256_Final_Y((uint8_t *)sha256, &ctx);
 		}
 		/* Compute StoredKey */

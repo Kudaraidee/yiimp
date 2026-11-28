@@ -223,8 +223,7 @@ void db_update_coinds(YAAMP_DB *db)
 		{
 			   if (!strlen(g_stratum_coin_include) || (strlen(g_stratum_coin_include) && strstr(g_stratum_coin_include, row[20])))
 		   {
-			coind = new YAAMP_COIND;
-			memset(coind, 0, sizeof(YAAMP_COIND));
+			coind = new YAAMP_COIND();
 
 			coind->newcoind = true;
 			coind->newblock = true;
@@ -257,6 +256,7 @@ void db_update_coinds(YAAMP_DB *db)
 		if(row[10]) coind->hassubmitblock = atoi(row[10]);
 
 		coind->rpc.ssl = 0;
+		STRSET(coind->rpc.cert, "");
 		// deprecated method to set ssl and cert (before db specific fields)
 		if(row[2]) {
 			char buffer[1024];
@@ -275,7 +275,6 @@ void db_update_coinds(YAAMP_DB *db)
 				coind->rpc.ssl = 1;
 				STRFMT(coind->rpc.cert, "/usr/share/ca-certificates/%s.crt", cert);
 			}
-			STRSET(coind->rpc.cert, "");
 			STRSET(coind->rpc.host, buffer);
 		}
 
@@ -316,8 +315,9 @@ void db_update_coinds(YAAMP_DB *db)
 		if(row[27]) STRSET(coind->symbol2, row[27]); // if pool + aux, prevent double submit
 
 		if(row[28]) coind->rpc.curl = atoi(row[28]) != 0;
-		if(row[29]) coind->rpc.ssl = atoi(row[29]) != 0;
-		if(row[30]) STRSET(coind->rpc.cert, row[30]);
+		// rpcssl/rpccert add to an https:// rpchost, they don't reset it
+		if(row[29] && atoi(row[29])) coind->rpc.ssl = 1;
+		if(row[30] && row[30][0]) STRSET(coind->rpc.cert, row[30]);
 
 		if(row[31]) STRSET(coind->account, row[31]);
 		if(row[32]) coind->multialgos = atoi(row[32]);
@@ -433,8 +433,7 @@ void db_update_remotes(YAAMP_DB *db)
 		YAAMP_REMOTE *remote = (YAAMP_REMOTE *)object_find(&g_list_remote, atoi(row[0]));
 		if(!remote)
 		{
-			remote = new YAAMP_REMOTE;
-			memset(remote, 0, sizeof(YAAMP_REMOTE));
+			remote = new YAAMP_REMOTE();
 
 			remote->id = atoi(row[0]);
 			newremote = true;
@@ -563,8 +562,7 @@ void db_update_renters(YAAMP_DB *db)
 		YAAMP_RENTER *renter = (YAAMP_RENTER *)object_find(&g_list_renter, atoi(row[0]));
 		if(!renter)
 		{
-			renter = new YAAMP_RENTER;
-			memset(renter, 0, sizeof(YAAMP_RENTER));
+			renter = new YAAMP_RENTER();
 
 			renter->id = atoi(row[0]);
 			g_list_renter.AddTail(renter);

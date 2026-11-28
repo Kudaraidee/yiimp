@@ -276,6 +276,7 @@ void sha3d_hash_hex(const char *input, char *output, unsigned int len);
 #include "algos/lyra2v3.h"
 #include "algos/lyra2z.h"
 #include "algos/blake.h"
+#include "algos/decred.h"
 #include "algos/blakecoin.h"
 #include "algos/blake2s.h"
 #include "algos/qubit.h"

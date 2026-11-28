@@ -50,8 +50,7 @@ static void share_add_worker(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, c
 	YAAMP_WORKER *worker = share_find_worker(client, job, valid, height, coinid);
 	if(!worker)
 	{
-		worker = new YAAMP_WORKER;
-		memset(worker, 0, sizeof(YAAMP_WORKER));
+		worker = new YAAMP_WORKER();
 
 		worker->userid = client->userid;
 		worker->workerid = client->workerid;
@@ -122,8 +121,7 @@ void share_add(YAAMP_CLIENT *client, YAAMP_JOB *job, bool valid, char *extranonc
 		}
 	}
 
-	YAAMP_SHARE *share = new YAAMP_SHARE;
-	memset(share, 0, sizeof(YAAMP_SHARE));
+	YAAMP_SHARE *share = new YAAMP_SHARE();
 
 	share->jobid = job? job->id: 0;
 	STRSET(share->extranonce2, extranonce2);
@@ -254,8 +252,7 @@ void block_prune(YAAMP_DB *db)
 
 void block_add(int userid, int workerid, int coinid, int height, double diff, double diff_user, const char *h1, const char *h2, int segwit, bool solo)
 {
-	YAAMP_BLOCK *block = new YAAMP_BLOCK;
-	memset(block, 0, sizeof(YAAMP_BLOCK));
+	YAAMP_BLOCK *block = new YAAMP_BLOCK();
 
 	block->created = time(NULL);
 	block->userid = userid;
@@ -353,8 +350,7 @@ bool block_confirm(int coinid, const char *blockhash)
 
 YAAMP_SUBMIT *submit_add(int remoteid, double difficulty)
 {
-	YAAMP_SUBMIT *submit = new YAAMP_SUBMIT;
-	memset(submit, 0, sizeof(YAAMP_SUBMIT));
+	YAAMP_SUBMIT *submit = new YAAMP_SUBMIT();
 
 	submit->created = time(NULL);
 	submit->valid = true;

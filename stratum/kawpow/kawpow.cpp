@@ -166,6 +166,29 @@ uint256 build_header_hash(YAAMP_JOB_TEMPLATE* templ)
     return header_hash;
 }
 
+// Full block for submitblock: kawpow header (with nonce and mix hash),
+// tx count, coinbase and transactions. No side effects (templcheck).
+string kawpow_build_block(YAAMP_JOB_TEMPLATE *templ, const char *nonce64, const char *mixhash)
+{
+    char block_header[256];
+    memset(block_header, 0, sizeof(block_header));
+
+    char coin_base[sizeof(YAAMP_JOB_VALUES::coinbase)];	// build_kawpow_header() copies the coinbase
+    memset(coin_base, 0, sizeof(coin_base));
+
+    build_kawpow_header(templ, nonce64, mixhash, block_header, coin_base);
+
+    char count_hex[COMPACTSIZE_HEX];
+    ser_compactsize(templ->txcount, count_hex);
+
+    string out = block_header;
+    out += count_hex;
+    out += coin_base;
+    for (vector<string>::const_iterator i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
+        out += *i;
+    return out;
+}
+
 void kawpow_block(YAAMP_CLIENT* client, YAAMP_JOB* job, YAAMP_JOB_TEMPLATE *templ, const char* nonce64, const char* mixhash, uint256& blockhash)
 {
     if (!templ) {
@@ -180,39 +203,10 @@ void kawpow_block(YAAMP_CLIENT* client, YAAMP_JOB* job, YAAMP_JOB_TEMPLATE *temp
     if (job->deleted)
         return;
 
-    int block_size = YAAMP_SMALLBUFSIZE + 8192;
-    vector<string>::const_iterator i;
-
-    for (i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
-        block_size += strlen((*i).c_str());
-
-    char* block_hex = (char*)malloc(block_size);
-    if (!block_hex)
-        return;
-
-    char block_header[256];
-    memset(block_header, 0, sizeof(block_header));
-
-    char coin_base[sizeof(YAAMP_JOB_VALUES::coinbase)];	// build_kawpow_header() copies the coinbase
-    memset(coin_base, 0, sizeof(coin_base));
-
-    build_kawpow_header(templ, nonce64, mixhash, block_header, coin_base);
+    string block = kawpow_build_block(templ, nonce64, mixhash);
 
     {
-        char count_hex[8] = { 0 };
-        if (templ->txcount <= 252)
-            sprintf(count_hex, "%02x", templ->txcount & 0xFF);
-        else
-            sprintf(count_hex, "fd%02x%02x", templ->txcount & 0xFF, templ->txcount >> 8);
-
-        memset(block_hex, 0, block_size);
-        sprintf(block_hex, "%s%s%s", block_header, count_hex, coin_base);
-
-        vector<string>::const_iterator i;
-        for (i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
-            sprintf(block_hex + strlen(block_hex), "%s", (*i).c_str());
-
-        bool b = coind_submit(coind, block_hex);
+        bool b = coind_submit(coind, block.c_str());
         if (b) {
             debuglog("*** ACCEPTED %s %d by %s (id: %d)\n", coind->name, templ->height,
                 client->sock->ip, client->userid);
@@ -231,8 +225,6 @@ void kawpow_block(YAAMP_CLIENT* client, YAAMP_JOB* job, YAAMP_JOB_TEMPLATE *temp
             rejectlog("REJECTED %s block %d\n", coind->symbol, templ->height);
         }
     }
-
-    free(block_hex);
 }
 
 bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)

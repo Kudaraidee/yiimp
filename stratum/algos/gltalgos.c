@@ -23,7 +23,7 @@
 #include "../sha3/sph_whirlpool.h"
 #include "../sha3/sph_sha2.h"
 #include "../sha3/sph_haval.h"
-#include "../sha3/sph_gost.h"
+#include <sha3/sph_streebog.h>
 
 
 void pawelhash_hash(const char* input, char* output, uint32_t len)

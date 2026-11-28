@@ -300,6 +300,9 @@ int client_send_error(YAAMP_CLIENT *client, int error, const char *string);
 bool client_ask_stats(YAAMP_CLIENT *client);
 
 bool client_submit(YAAMP_CLIENT *client, json_value *json_params);
+// block and aux proof of work as submitted (no side effects)
+string client_build_block(YAAMP_COIND *coind, YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *submitvalues);
+string client_build_auxpow(YAAMP_JOB_TEMPLATE *templ, YAAMP_JOB_VALUES *submitvalues, YAAMP_COIND_AUX *aux);
 void client_submit_error(YAAMP_CLIENT *client, YAAMP_JOB *job, int id, const char *message, char *extranonce2, char *ntime, char *nonce);
 
 int client_workers_count(YAAMP_CLIENT *client);

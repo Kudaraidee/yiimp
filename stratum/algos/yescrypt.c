@@ -323,9 +323,13 @@ uint8_t* yescrypt_gensalt(uint32_t N_log2, uint32_t r, uint32_t p, yescrypt_flag
 	    buf, sizeof(buf));
 }
 
+extern __thread const char *yescrypt_client_key;
+
+/* client_key: yescryptR8/R16 "Client Key", R32 "WaviBanana", NULL for plain
+ * yescrypt (BSTY), which keys with the salt. r alone cannot tell them apart. */
 static int yescrypt_bsty(const uint8_t * passwd, size_t passwdlen,
     const uint8_t * salt, size_t saltlen, uint64_t N, uint32_t r, uint32_t p,
-    uint8_t * buf, size_t buflen)
+    const char *client_key, uint8_t * buf, size_t buflen)
 {
 	yescrypt_shared_t shared;
 	yescrypt_local_t local;
@@ -339,9 +343,11 @@ static int yescrypt_bsty(const uint8_t * passwd, size_t passwdlen,
 			return -1;
 	}
 
+	yescrypt_client_key = client_key;
 	retval = yescrypt_kdf(&shared, &local,
 	    passwd, passwdlen, salt, saltlen, N, r, p, 0, YESCRYPT_FLAGS,
 	    buf, buflen);
+	yescrypt_client_key = NULL;
 
 	yescrypt_free_local(&local);
 	yescrypt_free_shared(&shared);
@@ -352,20 +358,20 @@ static int yescrypt_bsty(const uint8_t * passwd, size_t passwdlen,
 /* main hash 80 bytes input */
 void yescrypt_hash(const char *input, char *output, uint32_t len)
 {
-	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 2048, 8, 1, (uint8_t*)output, 32);
+	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 2048, 8, 1, NULL, (uint8_t*)output, 32);
 }
 
 void yescryptR8_hash(const char *input, char *output, uint32_t len)
 {
-	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 2048, 8, 1, (uint8_t*)output, 32);
+	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 2048, 8, 1, "Client Key", (uint8_t*)output, 32);
 }
 
 void yescryptR16_hash(const char *input, char *output, uint32_t len)
 {
-	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 4096, 16, 1, (uint8_t*)output, 32);
+	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 4096, 16, 1, "Client Key", (uint8_t*)output, 32);
 }
 
 void yescryptR32_hash(const char *input, char *output, uint32_t len)
 {
-	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 4096, 32, 1, (uint8_t*)output, 32);
+	yescrypt_bsty((uint8_t*)input, len, (uint8_t*)input, len, 4096, 32, 1, "WaviBanana", (uint8_t*)output, 32);
 }

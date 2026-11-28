@@ -20,7 +20,7 @@
 #include <sha3/sph_shabal.h>
 #include <sha3/sph_whirlpool.h>
 #include <sha3/sph_haval.h>
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 
 #include "common.h"
 

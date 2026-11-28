@@ -8,7 +8,7 @@
 #include <sha3/sph_cubehash.h>
 #include <sha3/sph_fugue.h>
 #include <sha3/sph_echo.h>
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 
 #include "common.h"
 

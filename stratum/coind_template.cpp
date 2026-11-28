@@ -80,8 +80,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template_memorypool(YAAMP_COIND *coind)
 		return NULL;
 	}
 
-	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE;
-	memset(templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE();
 
 	templ->created = time(NULL);
 	templ->value = json_get_int(json_result, "coinbasevalue");
@@ -157,7 +156,14 @@ static int decred_parse_header(YAAMP_JOB_TEMPLATE *templ, const char *header_hex
 
 	//debuglog("HEADER: %s\n", header_hex);
 
-	binlify((unsigned char*) &header, header_hex);
+	// getwork data: 180-byte header plus 12 bytes BLAKE-256 padding (hashtag).
+	// Decode at most sizeof(header), binlify() writes as much as the string holds.
+	char hex[sizeof(header) * 2 + 1];
+	snprintf(hex, sizeof(hex), "%s", header_hex);
+	memset(&header, 0, sizeof(header));
+	binlify((unsigned char*) &header, hex);
+	if (getwork)
+		templ->decred_data_len = std::min((int) (strlen(header_hex) / 2), (int) sizeof(header));
 
 	templ->height = header.height;
 	// reversed to tell its not a normal stratum coinbase
@@ -178,7 +184,7 @@ static int decred_parse_header(YAAMP_JOB_TEMPLATE *templ, const char *header_hex
 }
 
 // decred getwork over stratum
-static YAAMP_JOB_TEMPLATE *decred_create_worktemplate(YAAMP_COIND *coind)
+YAAMP_JOB_TEMPLATE *decred_create_worktemplate(YAAMP_COIND *coind)
 {
 	char rpc_error[1024] = { 0 };
 	#define GETWORK_RETRY_MAX 3
@@ -221,19 +227,21 @@ retry:
 		return NULL;
 	}
 
-	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE;
-	memset(templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE();
 
 	templ->created = time(NULL);
 
 	decred_parse_header(templ, header_hex, true);
 	json_value_free(gw);
 
-	// bypass coinbase and merkle for now... send without nonce/extradata
-	const unsigned char *hdr = (unsigned char *) &templ->header[36];
-	hexlify(templ->coinb1, hdr, 192 - 80);
-	const unsigned char *sfx = (unsigned char *) &templ->header[176];
-	hexlify(templ->coinb2, sfx, 180 - 176); // stake version
+	// coinb1: header bytes 36..180, extra data zeroed (extranonce1 at 144,
+	// extranonce2 at 148); prevhash and ntime as raw header bytes
+	unsigned char *hdr = (unsigned char *) templ->header;
+	memset(hdr + 144, 0, 32);
+	hexlify(templ->coinb1, hdr + 36, 180 - 36);
+	templ->coinb2[0] = 0;
+	hexlify(templ->prevhash_be, hdr + 4, 32);
+	hexlify(templ->ntime, hdr + 136, 4);
 
 	vector<string> txhashes;
 	txhashes.push_back("");
@@ -270,8 +278,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	// eth_getWork / the NEB work service, with the beneficiary set on the node.
 	if (is_eth || is_nebhash)
 	{
-		YAAMP_JOB_TEMPLATE *work_templ = new YAAMP_JOB_TEMPLATE;
-		memset(work_templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+		YAAMP_JOB_TEMPLATE *work_templ = new YAAMP_JOB_TEMPLATE();
 		bool built = is_nebhash ?
 			nebhash_build_template(coind, work_templ) :
 			ethash_build_template(coind, work_templ);
@@ -291,7 +298,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 
 	if (is_firopow) {
 		// Kiiro Core requires explicit segwit rule support in the GBT request.
-		sprintf(params, "[{\"mode\":\"template\",\"rules\":[\"segwit\"]},\"%s\"]", coind->wallet);
+		STRFMT(params, "[{\"mode\":\"template\",\"rules\":[\"segwit\"]},\"%s\"]", coind->wallet);
 	}
 	else if (is_randomscash) {
 		// Scash Core rejects template requests that do not advertise segwit.
@@ -397,8 +404,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 
 	}
 
-	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE;
-	memset(templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE();
 
 	templ->created = time(NULL);
 	templ->value = json_get_int(json_result, "coinbasevalue");
@@ -512,7 +518,7 @@ YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind)
 	// temporary hack, until wallet is fixed...
 	if (!strcmp(coind->symbol, "MBL")) { // MBL: chainid in version
 		unsigned int nVersion = (unsigned int)json_get_int(json_result, "version");
-		if (nVersion & 0xFFFF0000UL == 0) {
+		if ((nVersion & 0xFFFF0000UL) == 0) {
 			nVersion |= (0x16UL << 16);
 			debuglog("%s version %s >> %08x\n", coind->symbol, templ->version, nVersion);
 		}
@@ -828,8 +834,7 @@ bool coind_create_job(YAAMP_COIND *coind, bool force)
 		object_delete(coind->job);
 	}
 
-	coind->job = new YAAMP_JOB;
-	memset(coind->job, 0, sizeof(YAAMP_JOB));
+	coind->job = new YAAMP_JOB();
 
 	coind->job->status = JOB_STATUS_ACTIVE;
 	coind->job->jobage = time(NULL);

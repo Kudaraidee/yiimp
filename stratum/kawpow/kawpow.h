@@ -10,4 +10,6 @@ uint256 build_header_hash(YAAMP_JOB_TEMPLATE *templ);
 bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params);
 bool kawpow_check_nonceprefix(YAAMP_CLIENT* client, std::string nonce);
 
+std::string kawpow_build_block(YAAMP_JOB_TEMPLATE *templ, const char *nonce64, const char *mixhash);
+
 #endif // KAWPOW_KAWPOW_H

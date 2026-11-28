@@ -59,8 +59,7 @@ void remote_create_job(YAAMP_REMOTE *remote, json_value *json_params)
 
 	if(json_params->u.array.length<8) return;
 
-	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE;
-	memset(templ, 0, sizeof(YAAMP_JOB_TEMPLATE));
+	YAAMP_JOB_TEMPLATE *templ = new YAAMP_JOB_TEMPLATE();
 	str_overflows = 0;
 
 	STRSET(templ->prevhash_be, json_params->u.array.values[1]->u.string.ptr);
@@ -93,8 +92,7 @@ void remote_create_job(YAAMP_REMOTE *remote, json_value *json_params)
 
 	templ->height = getblocheight(templ->coinb1);
 
-	remote->job = new YAAMP_JOB;
-	memset(remote->job, 0, sizeof(YAAMP_JOB));
+	remote->job = new YAAMP_JOB();
 
 	sprintf(remote->job->name, "JOB%d", remote->id);
 	if(remote->nonce2size == 2) strcat(remote->job->name, "*");

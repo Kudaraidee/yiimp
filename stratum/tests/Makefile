@@ -143,6 +143,8 @@ check-hash: $(HASHCHECK)
 	$(HASHCHECK) --check vectors/hash.txt
 
 check-templ: $(TEMPLCHECK)
+	$(TEMPLCHECK) --compactsize
+	@n=$$($(TEMPLCHECK) --strfail | grep -c 'needs'); echo "strfail: $$n of 25 refusals logged"; [ "$$n" = 10 ]
 	@fail=0; for d in $(FIXTURES); do \
 	  if $(TEMPLCHECK) $$d > $(OUT)/templ.out 2>&1 && ! grep -q '^template=' $(OUT)/templ.out \
 	     && diff -u $${d}expected.txt $(OUT)/templ.out > $(OUT)/templ.diff; then \

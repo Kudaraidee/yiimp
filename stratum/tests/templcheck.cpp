@@ -2,6 +2,8 @@
 // the result, to catch buffer overflows on oversized RPC values.
 //
 //   templcheck <fixture-dir>
+//   templcheck --compactsize    CompactSize (varint) known answers
+//   templcheck --strfail        refused writes, for the log rate limit
 //
 // <fixture-dir>/coind.conf    key=value settings for the coin (see below)
 // <fixture-dir>/<method>.json full JSON-RPC answer per method, served by
@@ -12,7 +14,11 @@
 //
 // coind.conf keys: algo symbol wallet pubkey script_pubkey rpcencoding
 //   charity_address charity_percent reward_mul segwit mweb usememorypool
-//   p2wpkh hasmasternodes txmessage isaux
+//   p2wpkh hasmasternodes txmessage isaux usegetwork
+//
+// A getauxblock.json in the fixture adds one merged-mined aux coin. The
+// output also has the block (and auxpow) the share would submit, built for
+// the coin's protocol: standard, equihash, decred getwork or kawpow.
 
 #include <string>
 #include <strings.h>
@@ -33,6 +39,12 @@ extern "C" time_t time(time_t *t)
 void build_submit_values(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
 	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce, uint32_t versionbits);
 YAAMP_JOB_TEMPLATE *coind_create_template(YAAMP_COIND *coind);
+YAAMP_JOB_TEMPLATE *decred_create_worktemplate(YAAMP_COIND *coind);
+void coind_getauxblock(YAAMP_COIND *coind);
+void build_submit_values_equihash(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
+	const char *nonce1, const char *ntime, const char *nonce, const char *equihash_solution);
+void build_submit_values_decred(YAAMP_JOB_VALUES *submitvalues, YAAMP_JOB_TEMPLATE *templ,
+	const char *nonce1, const char *nonce2, const char *ntime, const char *nonce, const char *vote, bool usegetwork);
 
 // newer code declares build_submit_values(..., bool compute_hash = true):
 // prefer that form when it exists
@@ -81,6 +93,7 @@ static void load_conf(const char *dir, YAAMP_COIND *coind)
 		else if (!strcmp(k, "hasmasternodes"))  coind->hasmasternodes = atoi(v);
 		else if (!strcmp(k, "txmessage"))       coind->txmessage = atoi(v);
 		else if (!strcmp(k, "isaux"))           coind->isaux = atoi(v);
+		else if (!strcmp(k, "usegetwork"))      coind->usegetwork = atoi(v);
 		else { fprintf(stderr, "coind.conf: unknown key %s\n", k); exit(2); }
 	}
 	fclose(f);
@@ -91,10 +104,39 @@ static void print_field(const char *name, const char *value)
 	printf("%s=%s\n", name, value);
 }
 
+// Bitcoin CompactSize: tx and output counts, payload lengths
+static int check_compactsize()
+{
+	static const struct { uint64_t n; const char *hex; } kat[] = {
+		{0, "00"}, {252, "fc"}, {253, "fdfd00"}, {300, "fd2c01"}, {0xffff, "fdffff"},
+		{0x10000, "fe00000100"}, {0xffffffffULL, "feffffffff"},
+		{0x100000000ULL, "ff0000000001000000"}, {0x0123456789abcdefULL, "ffefcdab8967452301"},
+	};
+	int failed = 0;
+	for (const auto &k : kat) {
+		char hex[COMPACTSIZE_HEX];
+		ser_compactsize(k.n, hex);
+		if (strcmp(hex, k.hex)) {
+			printf("compactsize %llu: got %s, want %s\n", (unsigned long long) k.n, hex, k.hex);
+			failed++;
+		}
+	}
+	printf("compactsize: %d checked, %d failed\n", (int) (sizeof(kat) / sizeof(kat[0])), failed);
+	return failed ? 1 : 0;
+}
+
 int main(int argc, char **argv)
 {
+	if (argc == 2 && !strcmp(argv[1], "--compactsize"))
+		return check_compactsize();
+	// 25 refused writes: the Makefile expects 10 logged lines
+	if (argc == 2 && !strcmp(argv[1], "--strfail")) {
+		char small[4];
+		for (int i = 0; i < 25; i++) STRSET(small, "too long");
+		return str_overflows == 25 ? 0 : 1;
+	}
 	if (argc != 2) {
-		fprintf(stderr, "usage: %s <fixture-dir>\n", argv[0]);
+		fprintf(stderr, "usage: %s <fixture-dir> | --compactsize\n", argv[0]);
 		return 2;
 	}
 	snprintf(g_rpc_fixture_dir, sizeof(g_rpc_fixture_dir), "%s", argv[1]);
@@ -102,8 +144,7 @@ int main(int argc, char **argv)
 	snprintf(g_log_directory, sizeof(g_log_directory), "/tmp/");
 	initlog("templcheck");
 
-	YAAMP_COIND *coind = new YAAMP_COIND;
-	memset(coind, 0, sizeof(YAAMP_COIND));   // as db.cpp does
+	YAAMP_COIND *coind = new YAAMP_COIND();
 	coind->id = 1;
 	coind->reward_mul = 1;
 	strcpy(coind->rpcencoding, "POW");
@@ -118,9 +159,29 @@ int main(int argc, char **argv)
 	if (!g_current_algo) { fprintf(stderr, "unknown algo %s\n", g_stratum_algo); return 2; }
 	stratum_set_algo_flags(g_current_algo);
 	coind->pos = !strcasecmp(coind->rpcencoding, "POS");
+	bool is_decred = !strcmp(coind->rpcencoding, "DCR");
+
+	// merged mining: one aux coin, its getauxblock answer from the fixture
+	char auxpath[2048];
+	snprintf(auxpath, sizeof(auxpath), "%s/getauxblock.json", argv[1]);
+	if (access(auxpath, R_OK) == 0) {
+		YAAMP_COIND *aux = new YAAMP_COIND();
+		aux->id = 2;
+		strcpy(aux->name, "TAUX");
+		strcpy(aux->symbol, "TAUX");
+		aux->isaux = aux->enable = aux->auto_ready = true;
+		aux->height = 1;
+		aux->difficulty = 1;
+		yaamp_create_mutex(&aux->aux_mutex);
+		aux->aux.coind = aux;
+		coind_getauxblock(aux);
+		g_list_coind.AddTail(aux);
+	}
 
 	str_overflows = 0;
-	YAAMP_JOB_TEMPLATE *templ = coind_create_template(coind);
+	// as coind_create_job(): decred getwork has its own template
+	YAAMP_JOB_TEMPLATE *templ = coind->usegetwork && is_decred ?
+		decred_create_worktemplate(coind) : coind_create_template(coind);
 	if (templ && str_overflows) {
 		printf("template=REJECTED\n");   // coind_create_job() drops it
 		return 0;
@@ -152,11 +213,40 @@ int main(int argc, char **argv)
 	print_field("commitment", coind->commitment);
 	snprintf(num, sizeof(num), "%.8f", coind->reward); print_field("reward", num);
 
+	if (is_progpow) {
+		print_field("header_hash", templ->header_hash.ToString().c_str());
+		print_field("header_seed", templ->header_seed.ToString().c_str());
+	}
+
 	// a share on this job, as client_submit() builds it
 	static YAAMP_JOB_VALUES submit;
-	submit_values(0, &submit, templ, "01020304", "00000000", (const char *)templ->ntime, "00000000", (uint32_t)0);
+	if (is_equihash) {
+		// solution: CompactSize 1344 + a fixed pattern (not a valid solution)
+		static char solution[2 * 1347 + 1];
+		strcpy(solution, "fd4005");
+		for (int i = 0; i < 2 * 1344; i++) solution[6 + i] = "0123456789abcdef"[i % 16];
+		solution[6 + 2 * 1344] = 0;
+		build_submit_values_equihash(&submit, templ, "01020304", templ->ntime,
+			"00000000000000000000000000000000000000000000000000000000", solution);
+	}
+	else if (is_decred)
+		build_submit_values_decred(&submit, templ, "01020304", "00000000", templ->ntime, "00000000", "", coind->usegetwork);
+	else
+		submit_values(0, &submit, templ, "01020304", "00000000", (const char *)templ->ntime, "00000000", (uint32_t)0);
 	print_field("submit_coinbase", submit.coinbase);
 	print_field("submit_header", submit.header_be);
 	print_field("submit_hash", submit.hash_hex);
+
+	// what a block or aux block found by that share would submit
+	if (is_progpow && !is_firopow && !is_meraki)
+		print_field("submit_block", kawpow_build_block(templ, "0123456789abcdef",
+			"00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff").c_str());
+	else if (!is_progpow)
+		print_field("submit_block", client_build_block(coind, templ, &submit).c_str());
+	for (int i = 0; i < templ->auxs_size; i++)
+		if (templ->auxs[i]) {
+			snprintf(num, sizeof(num), "submit_auxpow_%d", i);
+			print_field(num, client_build_auxpow(templ, &submit, templ->auxs[i]).c_str());
+		}
 	return 0;
 }

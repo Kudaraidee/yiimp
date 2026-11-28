@@ -8,7 +8,7 @@
 #include <sha3/sph_shabal.h>
 //#include <sha3/sph_streebog.h>
 
-#include "gost.h"
+#include <sha3/sph_streebog.h>
 
 void veltor_hash(const char *input, char* output, uint32_t len)
 {

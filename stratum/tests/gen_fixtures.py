@@ -13,6 +13,7 @@ deterministic (hashes derive from counters), so regenerating changes nothing.
 import hashlib
 import json
 import os
+import struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -102,6 +103,29 @@ write_case('fixtures', 'x11-payees-100', dict(BASE, algo='x11', symbol='TDASH'),
 # litecoin MWEB: the extension block data is kept for block submission
 write_case('fixtures', 'ltc-mweb', dict(BASE, algo='scrypt', symbol='TLTC', segwit=1, mweb=1),
            {'getblocktemplate': gbt(ntx=2, segwit=True, mweb=''.join(h('mweb', i) for i in range(16)))})
+
+# ravencoin-style kawpow: header hash, epoch seed and the kawpow block
+write_case('fixtures', 'kawpow-basic', dict(BASE, algo='kawpow', symbol='TRVN'),
+           {'getblocktemplate': gbt(height=2000, ntx=2)})
+# zcash-style equihash (rpcencoding ZEC): sapling root in the header, no nonce
+# in the coinbase
+write_case('fixtures', 'equihash-basic', dict(BASE, algo='equihash', symbol='TZEC', rpcencoding='ZEC'),
+           {'getblocktemplate': gbt(ntx=2, version=4, finalsaplingroothash=h('sapling', 1)),
+            'getblocksubsidy': {'miner': 3.125, 'founders': 0.0}})
+# merged mining: one aux coin, its commitment in the parent coinbase and the auxpow
+write_case('fixtures', 'aux-merged', BASE,
+           {'getblocktemplate': gbt(ntx=3),
+            'getauxblock': {'hash': h('auxblock', 1), 'chainid': 7,
+                            'target': '0000000000000000000000000000000000000000000000000000ffff00000000'}})
+# decred getwork: 180-byte header plus BLAKE-256 padding (192 bytes)
+dcr_header = struct.pack('<I32s32s32sH6sHBBIIQIIII32sI',
+                         6, bytes.fromhex(h('dcrprev', 1)), bytes.fromhex(h('dcrmerkle', 1)),
+                         bytes.fromhex(h('dcrstake', 1)), 1, bytes(6), 5, 1, 0, 40000,
+                         0x1a1b2c3d, 150000000, 800000, 4000, 1767225600, 0, bytes(32), 9)
+assert len(dcr_header) == 180
+write_case('fixtures', 'dcr-getwork', dict(BASE, algo='decred', symbol='TDCR', rpcencoding='DCR', usegetwork=1),
+           {'getwork': {'data': dcr_header.hex() + '8000000100000000000005a0',
+                        'target': '00000000ffff0000000000000000000000000000000000000000000000000000'}})
 
 # ---- overflow inputs -------------------------------------------------------
 # 200 payees: coinb2[8K]
