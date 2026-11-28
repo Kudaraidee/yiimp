@@ -1,6 +1,6 @@
 
 #include "stratum.h"
-#include "nebhash/work.h"
+#include "protocol/nebhash/work.h"
 
 //void check_job(YAAMP_JOB *job)
 //{

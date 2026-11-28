@@ -1,8 +1,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <sha3/sph_blake.h>
-#include "algos/blake3/blake3.h"
+#include <third_party/sph/sph_blake.h>
+#include "third_party/blake3/blake3.h"
 #include "decred.h"
 
 // Decred proof of work since DCP-0011: BLAKE3-256 over the 180-byte header

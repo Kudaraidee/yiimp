@@ -1,6 +1,6 @@
 
 #include "stratum.h"
-#include "randomscash/randomscash.h"
+#include "algos/randomx/randomscash.h"
 
 uint64_t lyra2z_height = 0;
 

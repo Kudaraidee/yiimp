@@ -417,10 +417,7 @@ json_value *rpc_curl_call(YAAMP_RPC *rpc, char const *method, char const *params
 	char *message = (char *)malloc(paramlen+1024);
 	if(!message) return NULL;
 
-	if(params)
-		sprintf(message, "{\"method\":\"%s\",\"params\":%s,\"id\":\"%d\"}", method, params, ++rpc->id);
-	else
-		sprintf(message, "{\"method\":\"%s\",\"id\":\"%d\"}", method, ++rpc->id);
+	rpc_build_request(message, paramlen+1024, method, params, ++rpc->id);
 
 	YAAMP_COIND *coind = rpc->coind;
 	if (coind && coind->rpcdebug) {

@@ -1,5 +1,5 @@
 #include "stratum.h"
-#include "ethash/engine.h"
+#include "protocol/ethash/engine.h"
 #include <signal.h>
 #include <sys/resource.h>
 

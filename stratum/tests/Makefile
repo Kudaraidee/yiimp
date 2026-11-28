@@ -88,13 +88,15 @@ OBJ_MAIN   := $(OUT)/stratum.o
 HASHCHECK  := $(OUT)/hashcheck
 TEMPLCHECK := $(OUT)/templcheck
 XHASHCHECK := $(OUT)/xhashcheck
+PPCHECK    := $(OUT)/progpowcheck
+GETHCHECK  := $(OUT)/gethcheck
 STRATUM    := $(OUT)/stratum
 
 .PHONY: all tools libs check vectors hardened asan warnings clean \
-        check-hash check-ref check-templ check-xhash overflow
+        check-hash check-ref check-templ check-xhash check-progpow check-geth overflow
 .DEFAULT_GOAL := check
 
-all tools: $(HASHCHECK) $(TEMPLCHECK) $(XHASHCHECK)
+all tools: $(HASHCHECK) $(TEMPLCHECK) $(XHASHCHECK) $(PPCHECK) $(GETHCHECK)
 
 libs:
 	$(MAKE) -C $(TOP) libs
@@ -118,6 +120,12 @@ $(OUT)/tests/%.o: %.cpp
 $(HASHCHECK): $(OUT)/tests/hashcheck.o $(OBJ_NOMAIN) $(OBJ_CORE) | libs
 	$(TOP_CXX) -no-pie $^ $(LIBS) $(XLDFLAGS) -o $@
 
+$(PPCHECK): $(OUT)/tests/progpowcheck.o $(OBJ_NOMAIN) $(OBJ_CORE) | libs
+	$(TOP_CXX) -no-pie $^ $(LIBS) $(XLDFLAGS) -o $@
+
+$(GETHCHECK): $(OUT)/tests/gethcheck.o $(OBJ_NOMAIN) $(OBJ_CORE) | libs
+	$(TOP_CXX) -no-pie $^ $(LIBS) $(XLDFLAGS) -o $@
+
 $(TEMPLCHECK): $(OUT)/tests/templcheck.o $(OUT)/tests/rpc_mock.o $(OBJ_NOMAIN) $(filter-out $(OBJ_RPC),$(OBJ_CORE)) | libs
 	$(TOP_CXX) -no-pie $^ $(LIBS) $(XLDFLAGS) -o $@
 
@@ -134,7 +142,7 @@ $(STRATUM): $(OBJ_MAIN) $(OBJ_CORE) | libs
 FIXTURES := $(sort $(dir $(wildcard fixtures/*/coind.conf)))
 OVERFLOW := $(sort $(dir $(wildcard overflow/*/coind.conf)))
 
-check: check-ref check-hash check-templ check-xhash overflow
+check: check-ref check-hash check-templ check-xhash check-progpow check-geth overflow
 
 check-ref: $(HASHCHECK)
 	$(HASHCHECK) --reference vectors/reference.txt
@@ -155,9 +163,16 @@ check-templ: $(TEMPLCHECK)
 check-xhash: $(XHASHCHECK)
 	$(XHASHCHECK)
 
+check-progpow: $(PPCHECK)
+	$(PPCHECK) --check vectors/progpow.txt
+
+check-geth: $(GETHCHECK)
+	$(GETHCHECK)
+
 # golden masters from the current code; review `git diff` before committing
-vectors: $(HASHCHECK) $(TEMPLCHECK)
+vectors: $(HASHCHECK) $(TEMPLCHECK) $(PPCHECK)
 	$(HASHCHECK) --generate > vectors/hash.txt
+	$(PPCHECK) --generate > vectors/progpow.txt
 	@for d in $(FIXTURES); do $(TEMPLCHECK) $$d > $${d}expected.txt; echo "wrote $${d}expected.txt"; done
 
 # overflow cases: inputs larger than the fixed buffers must be rejected

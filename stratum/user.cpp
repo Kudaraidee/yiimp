@@ -1,6 +1,6 @@
 
 #include "stratum.h"
-#include "nebhash/work.h"
+#include "protocol/nebhash/work.h"
 
 // sql injection security, unwanted chars
 void db_check_user_input(char* input)

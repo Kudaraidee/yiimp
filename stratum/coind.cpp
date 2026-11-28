@@ -1,4 +1,6 @@
 
+#include <ctype.h>
+
 #include "stratum.h"
 
 void coind_error(YAAMP_COIND *coind, const char *s)
@@ -99,6 +101,18 @@ bool coind_can_mine(YAAMP_COIND *coind, bool isaux)
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// GETH-family daemons (ethash, xhash, ...) have no validateaddress RPC. Match
+// the web backend's rule: EVM addresses are 0x (or 0X) plus 40 hex digits.
+bool geth_valid_address(const char *address)
+{
+	if (!address) return false;
+	if (strlen(address) != 42) return false;
+	if (address[0] != '0' || (address[1] != 'x' && address[1] != 'X')) return false;
+	for (int i = 2; i < 42; i++)
+		if (!isxdigit((unsigned char)address[i])) return false;
+	return true;
+}
+
 bool coind_validate_user_address(YAAMP_COIND *coind, char* const address)
 {
 	if(!address[0]) return false;
@@ -107,6 +121,15 @@ bool coind_validate_user_address(YAAMP_COIND *coind, char* const address)
 	if (is_nebhash)
 	{
 		bool valid = nebhash_valid_address(address);
+		if (!valid)
+			stratumlog("%s: %s user address %s is not valid.\n", g_stratum_algo, coind->symbol, address);
+		return valid;
+	}
+
+	// GETH/Parallax nodes do not implement validateaddress; validate locally.
+	if (!strcasecmp(coind->rpcencoding, "GETH") || !strcasecmp(coind->rpcencoding, "NIRO"))
+	{
+		bool valid = geth_valid_address(address);
 		if (!valid)
 			stratumlog("%s: %s user address %s is not valid.\n", g_stratum_algo, coind->symbol, address);
 		return valid;

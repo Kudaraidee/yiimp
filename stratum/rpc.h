@@ -1,6 +1,20 @@
 
 class YAAMP_COIND;
 
+// Build a JSON-RPC 2.0 request. GETH-family daemons (ethash, xhash, ...)
+// reject requests that omit the jsonrpc field; Bitcoin-style daemons accept
+// the explicit version as well.
+inline void rpc_build_request(char *out, size_t outsz, const char *method,
+                              const char *params, int id)
+{
+	if (params)
+		snprintf(out, outsz, "{\"jsonrpc\":\"2.0\",\"method\":\"%s\",\"params\":%s,\"id\":\"%d\"}",
+		         method, params, id);
+	else
+		snprintf(out, outsz, "{\"jsonrpc\":\"2.0\",\"method\":\"%s\",\"id\":\"%d\"}",
+		         method, id);
+}
+
 struct YAAMP_RPC
 {
 	YAAMP_COIND *coind;

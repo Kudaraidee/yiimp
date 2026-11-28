@@ -1,0 +1,414 @@
+// Copyright (c) 2023 barrystyle
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#include "stratum.h"
+
+//#include <openssl/sha.h>
+
+#include <algos/progpow/firopow/hash.h>
+
+#include <algos/progpow/phihash/hash.h>
+
+#include <algos/progpow/meowpow/hash.h>
+
+#include <algos/progpow/evrprogpow/hash.h>
+
+#include <algos/progpow/kawpow/hash.h>
+#include <algos/progpow/kawpow/helpers.hpp>
+#include <algos/progpow/kawpow/include/progpow.hpp>
+
+static int g_extraonce1_counter = 0;
+static bool g_twobyte_extranonce = true;
+
+void get_nonce_prefix(char* extraonce1)
+{
+    CommonLock(&g_nonce1_mutex);
+
+    g_extraonce1_counter++;
+    if (g_twobyte_extranonce) {
+        sprintf(extraonce1, "%04hhx", g_extraonce1_counter | 0x8000);
+    } else {
+        sprintf(extraonce1, "%06x", g_extraonce1_counter | 0x800000);
+    }
+
+    CommonUnlock(&g_nonce1_mutex);
+}
+
+bool kawpow_send_nonceprefix(YAAMP_CLIENT* client)
+{
+    char buffer[256];
+    memset(buffer, 0, sizeof(buffer));
+
+    sprintf(buffer, "{\"id\":1,\"error\":null,\"result\":[null,\"%s\"]}\n", client->extranonce1);
+    return socket_send(client->sock, buffer);
+}
+
+bool kawpow_check_nonceprefix(YAAMP_CLIENT* client, std::string nonce)
+{
+    const int extranonce_len = g_twobyte_extranonce ? 4 : 6;
+
+    char submitted_nonce[20];
+    sprintf(submitted_nonce, "%s", nonce.c_str());
+    submitted_nonce[extranonce_len] = '\0';
+
+    bool match = memcmp(client->extranonce1, submitted_nonce, extranonce_len);
+    return !match;
+}
+
+uint256 get_kawpow_seed(int height)
+{
+    std::string seed_string = to_hex(ethash::calculate_epoch_seed(get_epoch_number(height)));
+    return uint256S(seed_string);
+}
+
+void kawpow_job_mining_notify_buffer(YAAMP_JOB* job, YAAMP_CLIENT* client, char* buffer, int gen)
+{
+    YAAMP_JOB_TEMPLATE* templ = job->templ;
+    char jobid[32];
+    job_notify_id(jobid, job, gen);
+
+    sprintf(buffer, "{\"id\":null,\"method\":\"mining.notify\",\"params\":[\"%s\",\"%s\",\"%s\",\"%s\",true,%d,\"%s\"]}\n",
+        jobid,
+        templ->header_hash.ToString().c_str(),
+        templ->header_seed.ToString().c_str(),
+        client->share_target.ToString().c_str(),
+        templ->height,
+        templ->nbits);
+}
+
+void build_kawpow_header(YAAMP_JOB_TEMPLATE* templ, const char* nonce64, const char* mixhash, char* blockheader_be, char* coinbase)
+{
+    YAAMP_JOB_VALUES submitvalues;
+    memset(&submitvalues, 0, sizeof(submitvalues));
+
+    STRFMT(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
+    int coinbase_len = strlen(submitvalues.coinbase);
+    memcpy(coinbase, submitvalues.coinbase, coinbase_len);
+
+    unsigned char coinbase_bin[sizeof(submitvalues.coinbase)/2];
+    memset(coinbase_bin, 0, sizeof(coinbase_bin));
+    binlify(coinbase_bin, submitvalues.coinbase);
+
+    char doublehash[128];
+    memset(doublehash, 0, 128);
+
+    YAAMP_HASH_FUNCTION merkle_hash = sha256_double_hash_hex;
+    if (g_current_algo->merkle_func)
+        merkle_hash = g_current_algo->merkle_func;
+    merkle_hash((char*)coinbase_bin, doublehash, coinbase_len / 2);
+
+    string merkleroot = merkle_with_first(templ->txsteps, doublehash);
+    ser_string_be(merkleroot.c_str(), submitvalues.merkleroot_be, 8);
+
+    ///////////////////////////////////////////// STFIX
+    char ntime[10];
+    memset(ntime, 0, 10);
+    sprintf(ntime, "%08x", templ->created);
+
+    char n1[10], n2[10];
+    memset(n1, 0, 10);
+    memset(n2, 0, 10);
+    memcpy(n2, nonce64, 8);
+    memcpy(n1, nonce64 + 8, 8);
+
+    char mixhash_be[128];
+    memset(mixhash_be, 0, 128);
+    ser_string_be2(mixhash, mixhash_be, 8);
+    ///////////////////////////////////////////// ENDFIX
+
+    char blockheader[512];
+    memset(blockheader, 0, 512);
+    STRFMT(blockheader, "%s%s%s%s%s%08x%s%s%s", templ->version, templ->prevhash_be, submitvalues.merkleroot_be,
+        ntime, templ->nbits, templ->height, n1, n2, mixhash_be);
+
+    ser_string_be(blockheader, blockheader_be, 30);
+}
+
+uint256 build_header_hash(YAAMP_JOB_TEMPLATE* templ)
+{
+    YAAMP_JOB_VALUES submitvalues;
+    memset(&submitvalues, 0, sizeof(submitvalues));
+    STRFMT(submitvalues.coinbase, "%s%s", templ->coinb1, templ->coinb2);
+    int coinbase_len = strlen(submitvalues.coinbase);
+
+    unsigned char coinbase_bin[sizeof(submitvalues.coinbase)/2];
+    memset(coinbase_bin, 0, sizeof(coinbase_bin));
+    binlify(coinbase_bin, submitvalues.coinbase);
+
+    char doublehash[128];
+    memset(doublehash, 0, 128);
+
+    YAAMP_HASH_FUNCTION merkle_hash = sha256_double_hash_hex;
+    if (g_current_algo->merkle_func)
+        merkle_hash = g_current_algo->merkle_func;
+    merkle_hash((char*)coinbase_bin, doublehash, coinbase_len / 2);
+
+    string merkleroot = merkle_with_first(templ->txsteps, doublehash);
+    ser_string_be(merkleroot.c_str(), submitvalues.merkleroot_be, 8);
+
+    ///////////////////////////////////////////// STFIX
+    char ntime[10];
+    memset(ntime, 0, 10);
+    sprintf(ntime, "%08x", templ->created);
+    ///////////////////////////////////////////// ENDFIX
+
+    sprintf(submitvalues.header, "%s%s%s%s%s%08x", templ->version, templ->prevhash_be, submitvalues.merkleroot_be,
+        ntime, templ->nbits, templ->height);
+
+    ser_string_be(submitvalues.header, submitvalues.header_be, 20);
+    binlify(submitvalues.header_bin, submitvalues.header_be);
+
+    uint256 header_hash;
+    SHA256(submitvalues.header_bin, 80, (unsigned char*)&header_hash);
+    SHA256((const unsigned char*)&header_hash, 32, (unsigned char*)&header_hash);
+
+    return header_hash;
+}
+
+// Full block for submitblock: kawpow header (with nonce and mix hash),
+// tx count, coinbase and transactions. No side effects (templcheck).
+string kawpow_build_block(YAAMP_JOB_TEMPLATE *templ, const char *nonce64, const char *mixhash)
+{
+    char block_header[256];
+    memset(block_header, 0, sizeof(block_header));
+
+    char coin_base[sizeof(YAAMP_JOB_VALUES::coinbase)];	// build_kawpow_header() copies the coinbase
+    memset(coin_base, 0, sizeof(coin_base));
+
+    build_kawpow_header(templ, nonce64, mixhash, block_header, coin_base);
+
+    char count_hex[COMPACTSIZE_HEX];
+    ser_compactsize(templ->txcount, count_hex);
+
+    string out = block_header;
+    out += count_hex;
+    out += coin_base;
+    for (vector<string>::const_iterator i = templ->txdata.begin(); i != templ->txdata.end(); ++i)
+        out += *i;
+    return out;
+}
+
+void kawpow_block(YAAMP_CLIENT* client, YAAMP_JOB* job, YAAMP_JOB_TEMPLATE *templ, const char* nonce64, const char* mixhash, uint256& blockhash)
+{
+    if (!templ) {
+       debuglog("lost pointer to *templ\n");
+       return;
+    }
+
+    YAAMP_COIND *coind = job->coind;
+
+    if (job->block_found)
+        return;
+    if (job->deleted)
+        return;
+
+    string block = kawpow_build_block(templ, nonce64, mixhash);
+
+    {
+        bool b = coind_submit(coind, block.c_str());
+        if (b) {
+            debuglog("*** ACCEPTED %s %d by %s (id: %d)\n", coind->name, templ->height,
+                client->sock->ip, client->userid);
+            job->block_found = true;
+
+            double coin_diff = target_to_diff( decode_compact(templ->nbits, 25) );
+
+            block_add(client->userid, client->workerid, coind->id, templ->height,
+				coin_diff , target_to_diff(blockhash) ,
+				blockhash.ToString().c_str(), blockhash.ToString().c_str(), templ->has_segwit_txs, client->solo);
+            if(!strcmp(coind->lastnotifyhash, blockhash.ToString().c_str())) {
+                block_confirm(coind->id, blockhash.ToString().c_str());
+            }
+        } else {
+            debuglog("*** REJECTED :( %s block %d %d txs\n", coind->name, templ->height, templ->txcount);
+            rejectlog("REJECTED %s block %d\n", coind->symbol, templ->height);
+        }
+    }
+}
+
+bool kawpow_submit(YAAMP_CLIENT* client, json_value* json_params)
+{
+    // submit(worker_name, jobid, nonce, header, mixhash):
+    if (json_params->u.array.length < 5 || !valid_string_params(json_params)) {
+        debuglog("%s - %s bad message\n", client->username, client->sock->ip);
+        client->submit_bad++;
+        return false;
+    }
+
+    char nonce[128], header[128], mixhash[128];
+    memset(nonce, 0, sizeof(nonce));
+    memset(header, 0, sizeof(header));
+    memset(mixhash, 0, sizeof(mixhash));
+
+    if (strlen(json_params->u.array.values[1]->u.string.ptr) > 32) {
+        clientlog(client, "bad json, wrong jobid len");
+        client->submit_bad++;
+        return false;
+    }
+
+    int jobid = htoi(json_params->u.array.values[1]->u.string.ptr);
+    int jobgen = client_jobid_gen(json_params->u.array.values[1]->u.string.ptr);
+
+    // test if miner has supplied params with prefix
+    int offset = 0;
+    if (!memcmp(json_params->u.array.values[2]->u.string.ptr, "0x", 2)) {
+        offset = 2;
+    }
+
+    strncpy(nonce, json_params->u.array.values[2]->u.string.ptr + offset, 16);
+    strncpy(header, json_params->u.array.values[3]->u.string.ptr + offset, 64);
+    strncpy(mixhash, json_params->u.array.values[4]->u.string.ptr + offset, 64);
+
+    string_lower(nonce);
+    string_lower(header);
+    string_lower(mixhash);
+
+    // share_add() stores the third error argument as ntime. Progpow-style
+    // submits carry header/mixhash instead, so always pass a real ntime here.
+    char *submit_ntime = (char *)"";
+
+    YAAMP_JOB* job = (YAAMP_JOB*)object_find(&g_list_job, jobid, true);
+    if (!job) {
+        client_submit_error(client, NULL, 21, "Invalid job id", header, submit_ntime, nonce);
+        return true;
+    } else if (job->deleted) {
+        // job replaced by a new block: answered as accepted, but not counted
+        client_log_submit(client, "stale job, ignored");
+        client_send_result(client, "true");
+        object_unlock(job);
+        return true;
+    }
+
+    int coinid = job->coind->id;
+    if (job->templ) submit_ntime = job->templ->ntime;
+
+    // KIIRO/Miningcore requires the worker to echo the exact header hash from
+    // mining.notify. Reject a mismatched header before crediting a share that
+    // could never be submitted as a valid block via pprpcsb.
+    if (is_firopow && job->templ) {
+        char expected_header[65] = { 0 };
+        snprintf(expected_header, sizeof(expected_header), "%s",
+            job->templ->header_hash.ToString().c_str());
+        string_lower(expected_header);
+        if (strcmp(header, expected_header)) {
+            client_submit_error(client, job, 20, "Invalid header hash", header, submit_ntime, nonce);
+            return true;
+        }
+    }
+
+    //! sanity check nonce
+    if (strlen(nonce) != YAAMP_KAWPOW_NONCE_SIZE * 2 || !ishexa(nonce, YAAMP_KAWPOW_NONCE_SIZE * 2)) {
+        client_submit_error(client, job, 20, "Invalid nonce size", header, submit_ntime, nonce);
+        return true;
+    }
+
+    //! make sure nonce matches prefix
+    if (!kawpow_check_nonceprefix(client, nonce)) {
+        client_submit_error(client, job, 20, "Invalid nonce prefix", header, submit_ntime, nonce);
+        return true;
+    }
+
+    //! sanity check header/mixhash
+    if ((strlen(header) != 64 || !ishexa(header, 64)) || (strlen(mixhash) != 64 || !ishexa(mixhash, 64))) {
+        client_submit_error(client, job, 20, "Invalid header/mixhash", header, submit_ntime, nonce);
+        return true;
+    }
+
+    YAAMP_SHARE* share = share_find(job->id, header, mixhash, nonce, client->username);
+    if (share) {
+        client_submit_error(client, job, 22, "Duplicate share", header, submit_ntime, nonce);
+        return true;
+    }
+
+    std::string header_str = string(header);
+    std::string mixhash_str = string(mixhash);
+    std::string nonce_str = string(nonce);
+
+    std::string mixhash_calc;
+    uint256 hash;
+    if (is_kawpow)
+        hash = kawpow_hash(header_str, nonce_str, mixhash_calc, coinid);
+    else if (is_firopow)
+        hash = firopow_hash(header_str, nonce_str, mixhash_str, coinid);
+    else if (is_phihash)
+        hash = phihash_hash(header_str, nonce_str, mixhash_str, coinid);
+    else if (is_meowpow)
+        hash = meowpow_hash(header_str, nonce_str, mixhash_str, coinid);
+    else if (is_evrprogpow)
+        hash = evrprogpow_hash(header_str, nonce_str, mixhash_str, coinid);
+
+    // the miner switches difficulty with the next job, judge the share by its job
+    uint256 target;
+    client->share_difficulty = client_share_difficulty(client, job, jobgen);
+    diff_to_target(target, client->share_difficulty);
+    uint64_t hash_int = get_hash_difficulty((uint8_t*)&hash);
+    double share_diff = target_to_diff(hash_int);
+    client->submit_share_diff = share_diff;
+
+    stratumlog("client %d on job %d sent diff %0.3f powhash %s\n", client->userid, job->id, share_diff,hash.ToString().c_str());
+
+    if (hash > target) {
+        client_submit_error(client, job, 26, "Low difficulty share", header, submit_ntime, nonce);
+        return true;
+    }
+
+    YAAMP_JOB_TEMPLATE* templ = job->templ;
+    uint32_t nbits = strtoul(templ->nbits, NULL, 16);
+
+    uint256 coin_target;
+    decode_nbits(coin_target, nbits);
+
+    if (hash < coin_target) {
+        if (is_progpow && !is_firopow && !is_meraki) {
+            kawpow_block(client, job, templ, nonce, mixhash, hash);
+        }
+        if (is_firopow) {
+            YAAMP_COIND *coind = (YAAMP_COIND *)object_find(&g_list_coind, coinid);
+            if (!coind) {
+                clientlog(client, "unable to find the wallet for coinid %d...", coinid);
+                return false;
+            }
+
+            bool accepted = coind_pprpcsb(coind, templ->header_hash.ToString().c_str(), mixhash, nonce);
+            if (accepted) {
+                char blockhash[65] = { 0 };
+                if (coind_getblockhash(coind, templ->height, blockhash, sizeof(blockhash))) {
+                    job->block_found = true;
+
+                    double coin_diff = target_to_diff(decode_compact(templ->nbits, 25));
+                    block_add(client->userid, client->workerid, coind->id, templ->height,
+                        coin_diff, share_diff, blockhash, blockhash,
+                        templ->has_segwit_txs, client->solo);
+
+                    // Mark it confirmed so block_prune() writes it to the DB.
+                    block_confirm(coind->id, blockhash);
+
+                    debuglog("*** ACCEPTED %s %d by %s (id: %d) hash %s\n", coind->name,
+                        templ->height, client->sock->ip, client->userid, blockhash);
+                } else {
+                    job->block_found = true;
+                    debuglog("*** ACCEPTED %s %d but getblockhash failed\n",
+                        coind->name, templ->height);
+                }
+            } else {
+                debuglog("*** REJECTED :( %s block %d pprpcsb\n", coind->name, templ->height);
+                rejectlog("REJECTED %s block %d pprpcsb\n", coind->symbol, templ->height);
+            }
+        }
+        job_signal();
+    }
+
+    client_send_result(client, "true");
+    client->submit_bad = 0;
+    client->shares++;
+
+    share_add(client, job, true, header, job->templ->ntime, nonce, share_diff , 0, job->templ->height);
+    client_log_submit(client, "accepted");
+    client_record_difficulty(client);
+    client_vardiff_share(client, job, jobgen);
+
+    object_unlock(job);
+
+    return true;
+}

@@ -1,6 +1,6 @@
 # Stratum build. GNU make reads this file before Makefile.
 #
-# Makefile, algos/makefile and sha3/makefile stay as they are: they are the
+# Makefile, algos/makefile and third_party/sph/makefile stay as they are: they are the
 # legacy build (make -f Makefile) and the source lists. Sources, defines and
 # libraries are read from them, so files added there are built here as well.
 #
@@ -27,9 +27,9 @@ LEGACY_LDLIBS  := $(call legacy,.,Makefile,LDLIBS)
 ALGO_SRCS      := $(addprefix algos/,$(call legacy,algos,makefile,SOURCES))
 ALGO_LCFLAGS   := $(call legacy,algos,makefile,CFLAGS)
 ALGO_LCXXFLAGS := $(call legacy,algos,makefile,CXXFLAGS)
-SHA3_SRCS      := $(addprefix sha3/,$(call legacy,sha3,makefile,SOURCES))
-SHA3_LCFLAGS   := $(call legacy,sha3,makefile,CFLAGS)
-INI_SRCS       := $(addprefix iniparser/,$(call legacy,iniparser,Makefile,SRCS))
+SHA3_SRCS      := $(addprefix third_party/sph/,$(call legacy,third_party/sph,makefile,SOURCES))
+SHA3_LCFLAGS   := $(call legacy,third_party/sph,makefile,CFLAGS)
+INI_SRCS       := $(addprefix third_party/iniparser/,$(call legacy,third_party/iniparser,Makefile,SRCS))
 
 ifeq ($(strip $(LEGACY_OBJS)),)
   $(error cannot read OBJECTS from Makefile)
@@ -66,7 +66,7 @@ MYSQL_CFLAGS := $(shell mysql_config --cflags 2>/dev/null)
 
 # per part: includes, defines and language flags as the legacy makefiles have them
 CORE_CPPFLAGS := $(filter -I% -D%,$(LEGACY_CFLAGS)) $(MYSQL_CFLAGS)
-# algos and sha3 keep their own -O level, except in the sanitizer build
+# algos and third_party/sph keep their own -O level, except in the sanitizer build
 PART_OPT      := $(if $(filter 1,$(SANITIZE)),$(OPT),$(filter-out -O%,$(OPT)))
 # the core was built at -O0 until now: no strict-aliasing or overflow assumptions
 CORE_OPT      := $(OPT) -march=$(ARCH) -ffp-contract=off -fno-strict-aliasing -fwrapv
@@ -101,8 +101,8 @@ SECP256K1 := secp256k1/.libs/libsecp256k1.a
 # our archives in place of its in-tree ones. A library that only Makefile
 # knows how to build (an upstream addition) fails with "No rule to make
 # target": add a rule for it below.
-LINK_LIBS := $(patsubst iniparser/libiniparser.a,$(LIBINI),$(patsubst algos/libalgos.a,$(LIBALGOS),\
-	$(patsubst sha3/libhash.a,$(LIBHASH),$(filter-out -I%,$(LEGACY_LDLIBS)))))
+LINK_LIBS := $(patsubst third_party/iniparser/libiniparser.a,$(LIBINI),$(patsubst algos/libalgos.a,$(LIBALGOS),\
+	$(patsubst third_party/sph/libhash.a,$(LIBHASH),$(filter-out -I%,$(LEGACY_LDLIBS)))))
 LINK_DEPS := $(filter-out -%,$(LINK_LIBS))
 
 # --- targets -----------------------------------------------------------------
@@ -132,7 +132,7 @@ $(LIBALGOS) $(LIBHASH) $(LIBINI):
 	$(Q)rm -f $@ && $(AR) rcs $@ $^
 
 $(SECP256K1):
-	cd secp256k1 && chmod +x autogen.sh && ./autogen.sh && ./configure --enable-experimental \
+	cd third_party/secp256k1 && chmod +x autogen.sh && ./autogen.sh && ./configure --enable-experimental \
 		--enable-module-ecdh --with-bignum=no --enable-endomorphism && $(MAKE)
 
 # the most specific pattern (shortest stem) wins
@@ -142,13 +142,21 @@ $(B)/algos/%.o: algos/%.c
 $(B)/algos/%.o: algos/%.cpp
 	$(call msg,CXX,$<)
 	$(Q)mkdir -p $(@D) && $(CXX) $(ALGO_CXXFLAGS) $(COMMON) -c $< -o $@
-$(B)/sha3/%.o: sha3/%.c
+$(B)/third_party/sph/%.o: third_party/sph/%.c
 	$(call msg,CC,$<)
 	$(Q)mkdir -p $(@D) && $(CC) $(SHA3_CFLAGS) $(COMMON) -c $< -o $@
-$(B)/sha3/blake2s.o: SHA3_CFLAGS += -std=gnu99
-$(B)/iniparser/%.o: iniparser/%.c
+$(B)/third_party/sph/blake2s.o: SHA3_CFLAGS += -std=gnu99
+$(B)/third_party/iniparser/%.o: third_party/iniparser/%.c
 	$(call msg,CC,$<)
 	$(Q)mkdir -p $(@D) && $(CC) $(INI_CFLAGS) $(COMMON) -c $< -o $@
+# Makefile builds these algos/ sources with the core, so they keep the core flags
+CORE_IN_ALGOS := $(filter algos/%,$(CORE_SRCS))
+$(call obj,$(filter %.cpp,$(CORE_IN_ALGOS))): $(B)/%.o: %.cpp
+	$(call msg,CXX,$<)
+	$(Q)mkdir -p $(@D) && $(CXX) $(CORE_CPPFLAGS) $(CORE_OPT) -MMD -MP -c $< -o $@
+$(call obj,$(filter %.c,$(CORE_IN_ALGOS))): $(B)/%.o: %.c
+	$(call msg,CC,$<)
+	$(Q)mkdir -p $(@D) && $(CC) $(CORE_CPPFLAGS) $(CORE_OPT) -MMD -MP -c $< -o $@
 $(B)/%.o: %.cpp
 	$(call msg,CXX,$<)
 	$(Q)mkdir -p $(@D) && $(CXX) $(CORE_CPPFLAGS) $(CORE_OPT) -MMD -MP -c $< -o $@
